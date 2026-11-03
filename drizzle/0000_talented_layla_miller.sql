@@ -48,4 +48,13 @@ CREATE UNIQUE INDEX `leads_matter_id_unique` ON `leads` (`matter_id`);--> statem
 CREATE INDEX `leads_stage_idx` ON `leads` (`stage`);--> statement-breakpoint
 CREATE INDEX `leads_assigned_to_idx` ON `leads` (`assigned_to_id`);--> statement-breakpoint
 CREATE INDEX `leads_campaign_idx` ON `leads` (`campaign`);--> statement-breakpoint
-CREATE INDEX `leads_email_idx` ON `leads` (`email`);
+CREATE INDEX `leads_email_idx` ON `leads` (`email`);--> statement-breakpoint
+CREATE TABLE `sessions` (
+	`token_hash` text PRIMARY KEY NOT NULL,
+	`user_id` integer NOT NULL,
+	`expires_at` text NOT NULL,
+	`created_at` text NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `sessions_user_id_idx` ON `sessions` (`user_id`);
