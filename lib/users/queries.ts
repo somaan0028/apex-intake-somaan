@@ -5,7 +5,7 @@
  * happen in SQL, and the grid is handed one page at a time. Nothing here ever
  * selects `password_hash`.
  */
-import { asc, eq, type SQL } from "drizzle-orm";
+import { asc, count, eq, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import {
@@ -15,7 +15,8 @@ import {
   searchCondition,
   type ListPageResult,
 } from "@/lib/db/list-query";
-import { USER_ROLES, users, type UserRole } from "@/lib/db/schema";
+import { USER_ROLES, leads, users, type UserRole } from "@/lib/db/schema";
+import { can, type Actor } from "@/lib/rbac";
 import type { TableQuery } from "@/lib/table-query";
 
 /** A user as the UI consumes it (no credential material). */
@@ -83,11 +84,47 @@ export function listUsers(query: TableQuery): ListPageResult<UserRow> {
   return { rows, total: plan.total, page: plan.page, sort: plan.sort };
 }
 
-/** Id + name of everyone a lead can be assigned to (used by the leads filters). */
-export function listAssignees(): Array<{ id: number; name: string }> {
-  return getDb()
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .orderBy(asc(users.name))
-    .all();
+/**
+ * Id + name of everyone a lead can be assigned to (used by the leads filters).
+ *
+ * Scoped to what the actor can actually see: admins get the whole team, an agent
+ * only themselves (the UI adds the "Unassigned" option), so the filter never
+ * offers a choice that would always come back empty.
+ */
+export function listAssignees(
+  actor: Actor,
+): Array<{ id: number; name: string }> {
+  const db = getDb();
+  const columns = { id: users.id, name: users.name };
+
+  if (can(actor.role, "leads.view.all")) {
+    return db.select(columns).from(users).orderBy(asc(users.name)).all();
+  }
+  return db.select(columns).from(users).where(eq(users.id, actor.id)).all();
+}
+
+/**
+ * How many admins exist. Feeds the "never leave the desk without an admin" rule
+ * (`canDeleteUser` / `canChangeUserRole`), both to disable controls and to gate
+ * the mutation on the server.
+ */
+export function countAdmins(): number {
+  return (
+    getDb()
+      .select({ value: count() })
+      .from(users)
+      .where(eq(users.role, "ADMIN"))
+      .get()?.value ?? 0
+  );
+}
+
+/** How many leads are currently assigned to `userId` (blocks a dangling delete). */
+export function countAssignedLeads(userId: number): number {
+  return (
+    getDb()
+      .select({ value: count() })
+      .from(leads)
+      .where(eq(leads.assignedToId, userId))
+      .get()?.value ?? 0
+  );
 }

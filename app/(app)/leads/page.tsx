@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireUser } from "@/lib/auth/session";
 import { LEADS_DEFAULT_SORT, listLeads } from "@/lib/leads/queries";
 import { loadTablePage } from "@/lib/table-query";
 import { listAssignees } from "@/lib/users/queries";
@@ -17,12 +18,15 @@ export default async function LeadsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  // The session drives row-level scoping: an agent only sees the unassigned pool
+  // plus their own leads (see `leadsVisibilityCondition`).
+  const user = await requireUser();
   const { query, rows, total } = await loadTablePage(
     searchParams,
     { defaultSort: LEADS_DEFAULT_SORT },
-    listLeads,
+    (parsed) => listLeads(parsed, user),
   );
-  const assignees = listAssignees();
+  const assignees = listAssignees(user);
 
   return (
     <div className="space-y-4">

@@ -5,9 +5,10 @@
  * and paging all in SQL, one page at a time. The shared plumbing lives in
  * `lib/db/list-query.ts`.
  */
-import { eq, isNull, type SQL } from "drizzle-orm";
+import { eq, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
+import { can, type Actor } from "@/lib/rbac";
 import {
   allOf,
   booleanFilter,
@@ -95,12 +96,36 @@ function isLeadStage(value: string): value is LeadStage {
   return (LEAD_STAGES as readonly string[]).includes(value);
 }
 
-/** One page of leads for `query`, plus the total number of matching rows. */
-export function listLeads(query: TableQuery): ListPageResult<LeadRow> {
+/**
+ * The row-level visibility filter for `actor`, mirroring `canViewLead`.
+ *
+ * Admins see everything; an agent sees the unassigned pool plus their own leads.
+ * A role granted no view capability sees nothing — a `false` condition, not "no
+ * condition" (which SQL would read as *every* row).
+ */
+export function leadsVisibilityCondition(actor: Actor): SQL | undefined {
+  if (can(actor.role, "leads.view.all")) return undefined;
+
+  const conditions: SQL[] = [];
+  if (can(actor.role, "leads.view.unassigned")) {
+    conditions.push(isNull(leads.assignedToId));
+  }
+  if (can(actor.role, "leads.view.assigned")) {
+    conditions.push(eq(leads.assignedToId, actor.id));
+  }
+  return conditions.length ? or(...conditions) : sql`0`;
+}
+
+/** One page of leads for `query` that `actor` is allowed to see, plus the total. */
+export function listLeads(
+  query: TableQuery,
+  actor: Actor,
+): ListPageResult<LeadRow> {
   const db = getDb();
 
   // Search spans the matter id and the injured person's contact details.
   const conditions: Array<SQL | undefined> = [
+    leadsVisibilityCondition(actor),
     searchCondition(query.search, [
       leads.matterId,
       leads.injuredFirstName,

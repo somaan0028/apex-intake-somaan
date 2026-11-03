@@ -6,6 +6,7 @@ import { ClipboardList, LayoutDashboard, LogOut, Users } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import type { AuthUser } from "@/lib/auth/session";
 import { initials } from "@/lib/format";
+import { can, type Permission } from "@/lib/rbac";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -20,15 +21,30 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-/** Primary navigation. `/dashboard` is the Overview tab. */
-const NAV_ITEMS = [
-  { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Leads", url: "/leads", icon: ClipboardList },
-  { title: "Users", url: "/users", icon: Users },
-] as const;
+/**
+ * Primary navigation. `/dashboard` is the Overview tab.
+ *
+ * An item may declare the `permission` it needs; items the current role lacks
+ * are hidden. This is presentation only — the page behind each link re-checks
+ * the same policy on the server (see `app/(app)/users/page.tsx`).
+ */
+const NAV_ITEMS: ReadonlyArray<{
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  permission: Permission | null;
+}> = [
+  { title: "Overview", url: "/dashboard", icon: LayoutDashboard, permission: null },
+  { title: "Leads", url: "/leads", icon: ClipboardList, permission: null },
+  { title: "Users", url: "/users", icon: Users, permission: "users.manage" },
+];
 
 export function AppSidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
+
+  const navItems = NAV_ITEMS.filter(
+    (item) => item.permission === null || can(user.role, item.permission),
+  );
 
   return (
     <Sidebar>
@@ -55,7 +71,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const isActive =
                   pathname === item.url || pathname.startsWith(`${item.url}/`);
                 return (
@@ -82,7 +98,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
             <SidebarMenuButton
               size="lg"
               tooltip={user.email}
-              render={<Link href="/users" />}
+              render={<Link href="/dashboard" />}
             >
               <Avatar className="size-8 rounded-lg">
                 <AvatarFallback className="rounded-lg">

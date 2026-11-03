@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:reset": "tsx scripts/reset-db.ts",
     "db:studio": "drizzle-kit studio",
-    "geo:generate": "tsx scripts/generate-counties.ts"
+    "geo:generate": "tsx scripts/generate-counties.ts",
+    "rbac:check": "tsx scripts/check-rbac.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

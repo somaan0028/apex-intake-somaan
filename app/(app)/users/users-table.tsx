@@ -8,6 +8,8 @@
  * The URL sync comes from the shared `useTableQuerySync` hook.
  */
 import { createColumnHelper } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
+import { useState } from "react";
 import {
   DataTable,
   useTableQuerySync,
@@ -16,11 +18,15 @@ import {
 import { dataTableFeatures } from "@/components/data-table/features";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { USER_ROLE_LABELS } from "@/lib/labels";
 import { formatDate, initials } from "@/lib/format";
+import { can } from "@/lib/rbac";
 import { USER_ROLES, type UserRole } from "@/lib/db/schema";
+import type { AuthUser } from "@/lib/auth/session";
 import type { TableQuery } from "@/lib/table-query";
 import type { UserRow } from "@/lib/users/queries";
+import { UserDialog, type UserDialogState } from "./user-dialog";
 
 const columnHelper = createColumnHelper<typeof dataTableFeatures, UserRow>();
 
@@ -77,27 +83,52 @@ export function UsersTable({
   users,
   total,
   query,
+  viewer,
+  adminCount,
 }: {
   users: UserRow[];
   total: number;
   query: TableQuery;
+  /** The signed-in admin (the page already gated on `users.manage`). */
+  viewer: AuthUser;
+  /** Number of admins, so the last one can't be deleted or demoted. */
+  adminCount: number;
 }) {
   const { isPending, onQueryChange } = useTableQuerySync();
+  const [dialog, setDialog] = useState<UserDialogState | null>(null);
 
   return (
-    <DataTable
-      columns={columns}
-      data={users}
-      rowCount={total}
-      query={query}
-      onQueryChange={onQueryChange}
-      isPending={isPending}
-      getRowId={getRowId}
-      ariaLabel="Users"
-      searchPlaceholder="Search users…"
-      filters={filters}
-      emptyMessage="No users yet."
-      emptyFilteredMessage="No users match your search."
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={users}
+        rowCount={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        isPending={isPending}
+        getRowId={getRowId}
+        ariaLabel="Users"
+        searchPlaceholder="Search users…"
+        filters={filters}
+        emptyMessage="No users yet."
+        emptyFilteredMessage="No users match your search."
+        onRowClick={(user) => setDialog({ mode: "edit", user })}
+        toolbarActions={
+          can(viewer.role, "users.manage") ? (
+            <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
+              <Plus />
+              Add user
+            </Button>
+          ) : null
+        }
+      />
+
+      <UserDialog
+        state={dialog}
+        onClose={() => setDialog(null)}
+        viewer={viewer}
+        adminCount={adminCount}
+      />
+    </>
   );
 }

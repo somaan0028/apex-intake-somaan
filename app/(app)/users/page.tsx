@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth/session";
+import { canManageUsers } from "@/lib/rbac";
 import { loadTablePage } from "@/lib/table-query";
-import { USERS_DEFAULT_SORT, listUsers } from "@/lib/users/queries";
+import { USERS_DEFAULT_SORT, countAdmins, listUsers } from "@/lib/users/queries";
 import { UsersTable } from "./users-table";
 
 export const metadata: Metadata = {
@@ -17,6 +20,11 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  // The sidebar hides this link for agents, but that is only cosmetic — the
+  // page gates on the same policy itself (a hand-typed URL must not get in).
+  const user = await requireUser();
+  if (!canManageUsers(user)) redirect("/dashboard");
+
   const { query, rows, total } = await loadTablePage(
     searchParams,
     { defaultSort: USERS_DEFAULT_SORT },
@@ -31,7 +39,13 @@ export default async function UsersPage({
           Everyone with access to the intake desk.
         </p>
       </div>
-      <UsersTable users={rows} total={total} query={query} />
+      <UsersTable
+        users={rows}
+        total={total}
+        query={query}
+        viewer={user}
+        adminCount={countAdmins()}
+      />
     </div>
   );
 }

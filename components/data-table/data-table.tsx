@@ -48,7 +48,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -139,6 +139,16 @@ export interface DataTableProps<TData extends RowData> {
   emptyFilteredMessage?: string;
   /** Page sizes offered in the footer. */
   pageSizeOptions?: number[];
+  /**
+   * Caller-supplied controls (e.g. an "Add user" button) rendered right-aligned
+   * on their own row beneath the filters.
+   */
+  toolbarActions?: ReactNode;
+  /**
+   * When set, clicking a row — or pressing Enter/Space while it is focused —
+   * calls this with the row's data, e.g. to open a detail editor.
+   */
+  onRowClick?: (row: TData) => void;
 }
 
 /** Sentinel for the "no filter" choice in a column filter select. */
@@ -163,6 +173,8 @@ export function DataTable<TData extends RowData>({
   emptyMessage = "No results.",
   emptyFilteredMessage = "No rows match the current filters.",
   pageSizeOptions = PAGE_SIZE_OPTIONS,
+  toolbarActions,
+  onRowClick,
 }: DataTableProps<TData>) {
   const { page, pageSize, search, filters: filterValues } = query;
   const sortId = query.sort?.id ?? null;
@@ -328,6 +340,11 @@ export function DataTable<TData extends RowData>({
             ))}
           </div>
         ) : null}
+
+        {/* Row 3: caller-supplied actions (e.g. "Add user"), right-aligned. */}
+        {toolbarActions ? (
+          <div className="flex justify-end">{toolbarActions}</div>
+        ) : null}
       </div>
 
       <div
@@ -376,7 +393,28 @@ export function DataTable<TData extends RowData>({
           <TableBody>
             {rows.length ? (
               rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  onClick={
+                    onRowClick ? () => onRowClick(row.original) : undefined
+                  }
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onRowClick(row.original);
+                          }
+                        }
+                      : undefined
+                  }
+                  tabIndex={onRowClick ? 0 : undefined}
+                  className={
+                    onRowClick
+                      ? "cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                      : undefined
+                  }
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       <table.FlexRender cell={cell} />
