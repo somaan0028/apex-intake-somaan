@@ -19,7 +19,7 @@ import type {
 } from "@/lib/db/schema";
 
 export const CASE_TYPE_LABELS: Record<CaseType, string> = {
-  MVA: "Motor Vehicle Accident",
+  MVA: "MVA",
   MASS_TORT: "Mass Tort",
   OTHER: "Other",
 };

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { parseTableQuery } from "@/lib/table-query";
-import { listUsers } from "@/lib/users/queries";
+import { loadTablePage } from "@/lib/table-query";
+import { USERS_DEFAULT_SORT, listUsers } from "@/lib/users/queries";
 import { UsersTable } from "./users-table";
 
 export const metadata: Metadata = {
@@ -17,12 +17,11 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const parsed = parseTableQuery(await searchParams);
-  const { rows, total, page } = listUsers(parsed);
-
-  // `listUsers` clamps an out-of-range page; reflect that back into the grid so
-  // its pager and its rows always agree.
-  const query = page === parsed.page ? parsed : { ...parsed, page };
+  const { query, rows, total } = await loadTablePage(
+    searchParams,
+    { defaultSort: USERS_DEFAULT_SORT },
+    listUsers,
+  );
 
   return (
     <div className="space-y-4">

@@ -28,6 +28,7 @@ import {
   type Column,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnVisibilityState,
   type ReactTable,
   type RowData,
   type SortDirection,
@@ -43,6 +44,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronsUpDown,
+  ListFilter,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
@@ -93,10 +95,10 @@ export interface DataTableFilterOption {
 export interface DataTableFilter {
   /** Id of the column to filter (the accessor key, unless overridden). */
   columnId: string;
+  /** Short name, shown in the Filters menu and used as the control's label. */
+  label: string;
   /** Text for the "no filter" choice, e.g. "All roles". */
   allLabel: string;
-  /** Accessible name for the control, e.g. "Filter by role". */
-  ariaLabel: string;
   options: DataTableFilterOption[];
 }
 
@@ -121,6 +123,16 @@ export interface DataTableProps<TData extends RowData> {
   searchPlaceholder?: string;
   /** Declarative select filters rendered beside the search box. */
   filters?: DataTableFilter[];
+  /**
+   * Filter controls hidden on first render, e.g. `{ hasAttorney: false }`.
+   * Anything not listed starts visible; the Filters menu toggles them.
+   */
+  defaultFilterVisibility?: Record<string, boolean>;
+  /**
+   * Columns hidden on first render, e.g. `{ source: false }`. Anything not
+   * listed starts visible, and the user can still toggle any of them.
+   */
+  defaultColumnVisibility?: ColumnVisibilityState;
   /** Shown when the table has no rows at all. */
   emptyMessage?: string;
   /** Shown when filters exclude every row. */
@@ -146,6 +158,8 @@ export function DataTable<TData extends RowData>({
   getRowId,
   searchPlaceholder = "Search…",
   filters,
+  defaultFilterVisibility = {},
+  defaultColumnVisibility = {},
   emptyMessage = "No results.",
   emptyFilteredMessage = "No rows match the current filters.",
   pageSizeOptions = PAGE_SIZE_OPTIONS,
@@ -164,6 +178,16 @@ export function DataTable<TData extends RowData>({
     setAdoptedSearch(search);
     setSearchText(search);
   }
+
+  // --- Filter controls the user has chosen to show/hide --------------------
+  // UI-only state (unlike the filters themselves, which live in the URL), so it
+  // stays local and resets with the page.
+  const [filterVisibility, setFilterVisibility] = useState<
+    Record<string, boolean>
+  >(() => ({ ...defaultFilterVisibility }));
+  const visibleFilters = (filters ?? []).filter(
+    (filter) => filterVisibility[filter.columnId] !== false,
+  );
 
   const latestQuery = useRef(query);
   useEffect(() => {
@@ -216,6 +240,8 @@ export function DataTable<TData extends RowData>({
     rowCount,
     // One sort column at a time keeps the URL and the SQL simple.
     enableMultiSort: false,
+    // Column visibility is table-owned, so it is seeded rather than controlled.
+    initialState: { columnVisibility: defaultColumnVisibility },
     state: controlledState,
     onPaginationChange: (updater) => {
       const next = functionalUpdate(updater, paginationState);
@@ -257,28 +283,51 @@ export function DataTable<TData extends RowData>({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative w-full sm:max-w-xs">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder={searchPlaceholder}
-            aria-label={searchPlaceholder}
-            className="h-8 pl-8"
-          />
+      <div className="space-y-3">
+        {/* Row 1: the search box, and the two menus that control what is shown. */}
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-xs">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              className="h-8 pl-8"
+            />
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {filters?.length ? (
+              <FilterVisibilityMenu
+                filters={filters}
+                visibility={filterVisibility}
+                onToggle={(columnId, visible) =>
+                  setFilterVisibility((previous) => ({
+                    ...previous,
+                    [columnId]: visible,
+                  }))
+                }
+                onReset={() =>
+                  setFilterVisibility({ ...defaultFilterVisibility })
+                }
+              />
+            ) : null}
+            <ColumnVisibilityMenu table={table} />
+          </div>
         </div>
 
-        {filters?.map((filter) => (
-          <ColumnFilter key={filter.columnId} table={table} filter={filter} />
-        ))}
-
-        <div className="sm:ml-auto">
-          <ColumnVisibilityMenu table={table} />
-        </div>
+        {/* Row 2: the filter controls, wrapping as needed. */}
+        {visibleFilters.length ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {visibleFilters.map((filter) => (
+              <ColumnFilter key={filter.columnId} table={table} filter={filter} />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -371,7 +420,7 @@ export function DataTable<TData extends RowData>({
             >
               <SelectTrigger
                 size="sm"
-                className="w-[4.5rem]"
+                className="w-fit"
                 aria-label="Rows per page"
               >
                 <SelectValue />
@@ -465,32 +514,78 @@ function ColumnFilter<TData extends RowData>({
     ...filter.options,
   ];
 
+  // Each control carries a visible label: a select only shows its *value*, so
+  // without this several filters (all three booleans, for one) read identically.
+  const labelId = `${filter.columnId}-filter-label`;
+
   return (
-    <Select
-      items={items}
-      value={selected}
-      onValueChange={(value) =>
-        column.setFilterValue(
-          value === null || value === ALL_FILTER_VALUE ? undefined : value,
-        )
-      }
-    >
-      <SelectTrigger
-        size="sm"
-        className="w-full sm:w-[10rem]"
-        aria-label={filter.ariaLabel}
+    <div className="flex items-center gap-2">
+      <span
+        id={labelId}
+        className="text-sm font-medium whitespace-nowrap text-muted-foreground"
       >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL_FILTER_VALUE}>{filter.allLabel}</SelectItem>
-        {filter.options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+        {filter.label}
+      </span>
+      <Select
+        items={items}
+        value={selected}
+        onValueChange={(value) =>
+          column.setFilterValue(
+            value === null || value === ALL_FILTER_VALUE ? undefined : value,
+          )
+        }
+      >
+        <SelectTrigger size="sm" className="w-fit" aria-labelledby={labelId}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_FILTER_VALUE}>{filter.allLabel}</SelectItem>
+          {filter.options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/** Dropdown that toggles which filter controls are shown. */
+function FilterVisibilityMenu({
+  filters,
+  visibility,
+  onToggle,
+  onReset,
+}: {
+  filters: DataTableFilter[];
+  visibility: Record<string, boolean>;
+  onToggle: (columnId: string, visible: boolean) => void;
+  onReset: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+        <ListFilter aria-hidden />
+        <span className="hidden sm:inline">Filters</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Filters</DropdownMenuLabel>
+          {filters.map((filter) => (
+            <DropdownMenuCheckboxItem
+              key={filter.columnId}
+              checked={visibility[filter.columnId] !== false}
+              onCheckedChange={(checked) => onToggle(filter.columnId, checked)}
+            >
+              {filter.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onReset}>Reset filters</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

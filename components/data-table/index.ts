@@ -1,7 +1,7 @@
 /**
  * Barrel for the shared data-table module.
  *
- *     import { DataTable } from "@/components/data-table";
+ *     import { DataTable, useTableQuerySync } from "@/components/data-table";
  */
 export {
   DataTable,
@@ -10,3 +10,4 @@ export {
   type DataTableProps,
 } from "./data-table";
 export { dataTableFeatures, type DataTableFeatures } from "./features";
+export { useTableQuerySync } from "./use-table-query-sync";

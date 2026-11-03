@@ -4,12 +4,17 @@
  * The users grid is server-driven: searching, filtering, sorting, and paging all
  * happen in SQL, and the grid is handed one page at a time. Nothing here ever
  * selects `password_hash`.
- *
- * Every value that reaches the SQL comes from the URL, so each one is validated
- * against a fixed allow-list first (sort columns, roles, page size).
  */
-import { and, asc, count, desc, eq, like, or, type SQL } from "drizzle-orm";
+import { asc, eq, type SQL } from "drizzle-orm";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
+import {
+  allOf,
+  planListPage,
+  readFilter,
+  searchCondition,
+  type ListPageResult,
+} from "@/lib/db/list-query";
 import { USER_ROLES, users, type UserRole } from "@/lib/db/schema";
 import type { TableQuery } from "@/lib/table-query";
 
@@ -22,67 +27,44 @@ export type UserRow = {
   createdAt: Date;
 };
 
-export interface UsersResult {
-  rows: UserRow[];
-  /** Total rows matching the query, ignoring the page window. */
-  total: number;
-  /** The page actually returned, clamped to the last page when out of range. */
-  page: number;
-}
+/** Sort keys the grid exposes (see the columns in `users-table.tsx`). */
+type UserSortKey = "name" | "email" | "role" | "createdAt";
 
-/** Columns the grid may sort by; anything else falls back to `name`. */
-const SORT_COLUMNS = {
+/** Columns the grid may sort by; anything else falls back to the default. */
+const SORT_COLUMNS: Record<UserSortKey, AnySQLiteColumn> = {
   name: users.name,
   email: users.email,
   role: users.role,
   createdAt: users.createdAt,
 };
 
-function isSortColumn(value: string): value is keyof typeof SORT_COLUMNS {
-  return value in SORT_COLUMNS;
-}
+/** The grid's natural order. */
+export const USERS_DEFAULT_SORT = { id: "name", desc: false } as const;
 
 function isUserRole(value: string): value is UserRole {
   return (USER_ROLES as readonly string[]).includes(value);
 }
 
-/**
- * One page of users for `query`, plus the total number of matching rows (so the
- * client can compute the page count without a second request).
- */
-export function listUsers(query: TableQuery): UsersResult {
+/** One page of users for `query`, plus the total number of matching rows. */
+export function listUsers(query: TableQuery): ListPageResult<UserRow> {
   const db = getDb();
 
-  // --- WHERE: global search across name/email, plus the role filter ---
-  const conditions: SQL[] = [];
+  const conditions: Array<SQL | undefined> = [
+    searchCondition(query.search, [users.name, users.email]),
+  ];
 
-  const search = query.search.trim();
-  if (search) {
-    const pattern = `%${search}%`;
-    const match = or(like(users.name, pattern), like(users.email, pattern));
-    if (match) conditions.push(match);
-  }
+  const role = readFilter(query, "role", isUserRole);
+  if (role) conditions.push(eq(users.role, role));
 
-  const role = query.filters.role;
-  if (role && isUserRole(role)) conditions.push(eq(users.role, role));
+  const plan = planListPage({
+    db,
+    table: users,
+    where: allOf(conditions),
+    query,
+    sortColumns: SORT_COLUMNS,
+    defaultSort: USERS_DEFAULT_SORT,
+  });
 
-  const where = conditions.length ? and(...conditions) : undefined;
-
-  const total =
-    db.select({ value: count() }).from(users).where(where).get()?.value ?? 0;
-
-  // A hand-edited URL can point past the end; land on the last real page so the
-  // grid never reports a range like "26–15 of 15".
-  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
-  const page = Math.min(Math.max(query.page, 1), pageCount);
-
-  // --- ORDER BY: allow-listed column and direction ---
-  const sortKey =
-    query.sort && isSortColumn(query.sort.id) ? query.sort.id : "name";
-  const sortColumn = SORT_COLUMNS[sortKey];
-  const orderBy = query.sort?.desc ? desc(sortColumn) : asc(sortColumn);
-
-  // --- LIMIT/OFFSET: one page ---
   const rows = db
     .select({
       id: users.id,
@@ -92,11 +74,20 @@ export function listUsers(query: TableQuery): UsersResult {
       createdAt: users.createdAt,
     })
     .from(users)
-    .where(where)
-    .orderBy(orderBy)
-    .limit(query.pageSize)
-    .offset((page - 1) * query.pageSize)
+    .where(plan.where)
+    .orderBy(plan.orderBy)
+    .limit(plan.limit)
+    .offset(plan.offset)
     .all();
 
-  return { rows, total, page };
+  return { rows, total: plan.total, page: plan.page, sort: plan.sort };
+}
+
+/** Id + name of everyone a lead can be assigned to (used by the leads filters). */
+export function listAssignees(): Array<{ id: number; name: string }> {
+  return getDb()
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .orderBy(asc(users.name))
+    .all();
 }

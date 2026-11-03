@@ -8,7 +8,7 @@
  *
  * URL shape (defaults are omitted to keep links short):
  *
- *     /users?page=2&pageSize=25&sort=name&sortDir=asc&search=ada&filter.role=ADMIN
+ *     /leads?page=2&pageSize=25&sort=createdAt&sortDir=desc&search=price&filter.stage=NEW
  */
 
 /** A single-column sort. Server-side grids sort by one column at a time. */
@@ -23,7 +23,7 @@ export interface TableQuery {
   page: number;
   /** Rows per page. */
   pageSize: number;
-  /** Active sort, or `null` for the table's natural order. */
+  /** Active sort, or `null` when the grid has no natural order. */
   sort: TableSort | null;
   /** Global search text. */
   search: string;
@@ -31,8 +31,44 @@ export interface TableQuery {
   filters: Record<string, string>;
 }
 
+/** What every `list*` server query returns. */
+export interface ListPageResult<T> {
+  rows: T[];
+  /** Total rows matching the query, ignoring the page window. */
+  total: number;
+  /** The page actually returned, clamped to the last page. */
+  page: number;
+  /** The sort actually applied (the table's default when the URL's is invalid). */
+  sort: TableSort;
+}
+
 export const DEFAULT_PAGE_SIZE = 10;
 export const PAGE_SIZE_OPTIONS: number[] = [10, 25, 50, 100];
+
+/**
+ * Values a filter over a *nullable* boolean column can take.
+ *
+ * The app's boolean columns are normalised to SQLite `0`/`1` where `null` means
+ * "unknown", so filtering one is tri-state rather than two-state. One label map
+ * here drives both the filter options and the server's validation.
+ */
+const BOOLEAN_FILTER_LABELS = {
+  yes: "Yes",
+  no: "No",
+  unknown: "Unknown",
+} as const;
+
+export type BooleanFilterValue = keyof typeof BOOLEAN_FILTER_LABELS;
+
+export const BOOLEAN_FILTER_VALUES = Object.keys(
+  BOOLEAN_FILTER_LABELS,
+) as BooleanFilterValue[];
+
+export const BOOLEAN_FILTER_OPTIONS: Array<{ label: string; value: string }> =
+  BOOLEAN_FILTER_VALUES.map((value) => ({
+    label: BOOLEAN_FILTER_LABELS[value],
+    value,
+  }));
 
 /** Prefix that marks a URL param as a column filter (`filter.role=ADMIN`). */
 const FILTER_PREFIX = "filter.";
@@ -66,7 +102,7 @@ function toEntries(source: TableQuerySource): Array<[string, string]> {
  */
 export function parseTableQuery(
   source: TableQuerySource,
-  options: { defaultPageSize?: number } = {},
+  options: { defaultPageSize?: number; defaultSort?: TableSort } = {},
 ): TableQuery {
   const entries = toEntries(source);
   const read = (key: string): string | undefined =>
@@ -79,14 +115,13 @@ export function parseTableQuery(
     : defaultPageSize;
 
   const pageValue = Number(read(PAGE_PARAM));
-  const page = Number.isFinite(pageValue) && pageValue >= 1
-    ? Math.floor(pageValue)
-    : 1;
+  const page =
+    Number.isFinite(pageValue) && pageValue >= 1 ? Math.floor(pageValue) : 1;
 
   const sortId = read(SORT_PARAM);
   const sort: TableSort | null = sortId
     ? { id: sortId, desc: read(SORT_DIR_PARAM) === "desc" }
-    : null;
+    : (options.defaultSort ?? null);
 
   const filters: Record<string, string> = {};
   for (const [key, value] of entries) {
@@ -117,6 +152,24 @@ export function tableQueryToParams(query: TableQuery): URLSearchParams {
   }
 
   return params;
+}
+
+/**
+ * Parse a page's `searchParams`, run its list query, and hand back the query the
+ * grid should render.
+ *
+ * The list query clamps an out-of-range page and falls back to the table's
+ * default sort, so the returned query is the one the rows actually correspond
+ * to — that keeps the pager, the sort indicators, and the rows agreeing.
+ */
+export async function loadTablePage<T>(
+  searchParams: Promise<TableQuerySource>,
+  options: { defaultSort?: TableSort },
+  load: (query: TableQuery) => ListPageResult<T>,
+): Promise<{ query: TableQuery; rows: T[]; total: number }> {
+  const parsed = parseTableQuery(await searchParams, options);
+  const { rows, total, page, sort } = load(parsed);
+  return { query: { ...parsed, page, sort }, rows, total };
 }
 
 /**
