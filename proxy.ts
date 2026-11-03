@@ -15,15 +15,24 @@ import { SESSION_COOKIE } from "@/lib/auth/session-cookie";
  * `/login` and `/dashboard` forever. The login page handles that case itself
  * using the database-validated session.
  *
- * `/` and `/login` are public; everything else requires a session cookie.
+ * `/`, `/login` and the public intake API are open; everything else needs a
+ * session cookie. Unauthenticated API calls get a JSON 401 rather than an HTML
+ * redirect so clients aren't handed a login page.
  */
 const PUBLIC_PATHS = new Set(["/", "/login"]);
+const PUBLIC_API_PREFIX = "/api/public/";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has(SESSION_COOKIE);
 
-  if (!hasSession && !PUBLIC_PATHS.has(pathname)) {
+  const isPublic =
+    PUBLIC_PATHS.has(pathname) || pathname.startsWith(PUBLIC_API_PREFIX);
+
+  if (!hasSession && !isPublic) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

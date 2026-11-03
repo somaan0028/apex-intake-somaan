@@ -4,13 +4,14 @@ import * as React from "react";
 import { Check } from "lucide-react";
 import { cn } from "cn";
 import { Label } from "@/components/ui/label";
-import type { ChoiceOption, YesNo } from "./types";
+import type { ChoiceOption } from "./types";
 
-/** A labelled field with an optional hint and an "Optional" tag. */
+/** A labelled field with an optional hint, an error message, and an "Optional" tag. */
 export function Field({
   label,
   htmlFor,
   hint,
+  error,
   optional,
   className,
   children,
@@ -18,6 +19,7 @@ export function Field({
   label: string;
   htmlFor?: string;
   hint?: string;
+  error?: string;
   optional?: boolean;
   className?: string;
   children: React.ReactNode;
@@ -33,7 +35,11 @@ export function Field({
         ) : null}
       </div>
       {children}
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -42,7 +48,7 @@ export function Field({
  * Large, tappable radio cards. Uses a real (visually hidden) radio input so
  * keyboard and screen-reader semantics come for free.
  */
-export function OptionCards<T extends string>({
+export function OptionCards<T>({
   name,
   value,
   onChange,
@@ -50,7 +56,7 @@ export function OptionCards<T extends string>({
   columns = 1,
 }: {
   name: string;
-  value: T | "";
+  value: T | null;
   onChange: (value: T) => void;
   options: readonly ChoiceOption<T>[];
   columns?: 1 | 2;
@@ -65,7 +71,7 @@ export function OptionCards<T extends string>({
         const Icon = option.icon;
         return (
           <label
-            key={option.value}
+            key={String(option.value)}
             className={cn(
               "group/option relative flex cursor-pointer items-start gap-3 rounded-xl border border-input bg-card p-4 text-left transition-all",
               "hover:border-ring/60 hover:bg-accent/40",
@@ -77,7 +83,7 @@ export function OptionCards<T extends string>({
             <input
               type="radio"
               name={name}
-              value={option.value}
+              value={String(option.value)}
               checked={active}
               onChange={() => onChange(option.value)}
               className="sr-only"
@@ -117,25 +123,25 @@ export function OptionCards<T extends string>({
   );
 }
 
-/** Yes/No rendered as two side-by-side option cards. */
+/** Yes/No rendered as two side-by-side option cards (stored as a boolean). */
 export function YesNoField({
   name,
   value,
   onChange,
 }: {
   name: string;
-  value: YesNo | "";
-  onChange: (value: YesNo) => void;
+  value: boolean | null;
+  onChange: (value: boolean) => void;
 }) {
   return (
-    <OptionCards<YesNo>
+    <OptionCards<boolean>
       name={name}
       value={value}
       onChange={onChange}
       columns={2}
       options={[
-        { value: "Yes", label: "Yes" },
-        { value: "No", label: "No" },
+        { value: true, label: "Yes" },
+        { value: false, label: "No" },
       ]}
     />
   );

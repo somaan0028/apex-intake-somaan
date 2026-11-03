@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, ArrowRight, Check, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,16 +18,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { US_STATES } from "@/lib/us-states";
 import { COUNTIES_BY_STATE } from "@/lib/us-counties";
 import { RELATIONSHIP_LABELS } from "@/lib/labels";
-import {
-  Field,
-  OptionCards,
-  StepHeader,
-  YesNoField,
-} from "./fields";
+import { normalizePostcode } from "@/lib/validation";
+import { Field, OptionCards, StepHeader, YesNoField } from "./fields";
 import {
   CASE_TYPE_OPTIONS,
   FILLING_FOR_OPTIONS,
   INITIAL_VALUES,
+  buildIntakeSubmission,
+  firstErrorStep,
   formatPhone,
   getStepKeys,
   isStepComplete,
@@ -53,10 +52,10 @@ const RELATIONSHIP_ITEMS = Object.entries(RELATIONSHIP_LABELS).map(
 
 function FillingForStep({ values, update }: StepProps) {
   return (
-    <OptionCards
-      name="fillingFor"
-      value={values.fillingFor}
-      onChange={(value) => update("fillingFor", value)}
+    <OptionCards<boolean>
+      name="isFillingForSomeoneElse"
+      value={values.isFillingForSomeoneElse}
+      onChange={(value) => update("isFillingForSomeoneElse", value)}
       options={FILLING_FOR_OPTIONS}
       columns={2}
     />
@@ -67,7 +66,7 @@ function CaseTypeStep({ values, update }: StepProps) {
   return (
     <OptionCards
       name="caseType"
-      value={values.caseType}
+      value={values.caseType || null}
       onChange={(value) => update("caseType", value)}
       options={CASE_TYPE_OPTIONS}
     />
@@ -90,15 +89,15 @@ function WhenWhereStep({ values, update }: StepProps) {
     <>
       <Field
         label={isMva ? "When did the accident happen?" : "When did this start?"}
-        htmlFor="incidentDate"
+        htmlFor="dateOfAccident"
         hint="An approximate date is fine."
       >
         <Input
-          id="incidentDate"
+          id="dateOfAccident"
           type="date"
           max={today || undefined}
-          value={values.incidentDate}
-          onChange={(event) => update("incidentDate", event.target.value)}
+          value={values.dateOfAccident}
+          onChange={(event) => update("dateOfAccident", event.target.value)}
           className="h-11"
         />
       </Field>
@@ -149,7 +148,17 @@ function WhenWhereStep({ values, update }: StepProps) {
             </SelectContent>
           </Select>
         </Field>
-        <Field label="ZIP code" htmlFor="postcode" optional>
+        <Field
+          label="ZIP code"
+          htmlFor="postcode"
+          optional
+          error={
+            values.postcode.trim() !== "" &&
+            normalizePostcode(values.postcode) === null
+              ? "Enter a valid ZIP code."
+              : undefined
+          }
+        >
           <Input
             id="postcode"
             inputMode="numeric"
@@ -176,36 +185,36 @@ function IncidentStep({ values, update }: StepProps) {
             ? "Briefly describe the accident"
             : "Briefly describe what happened"
         }
-        htmlFor="description"
+        htmlFor="accidentDetails"
       >
         <Textarea
-          id="description"
+          id="accidentDetails"
           rows={4}
           placeholder={
             isMva
               ? "I was rear-ended at a red light…"
               : "I was prescribed… and started noticing…"
           }
-          value={values.description}
-          onChange={(event) => update("description", event.target.value)}
+          value={values.accidentDetails}
+          onChange={(event) => update("accidentDetails", event.target.value)}
         />
       </Field>
 
       <Field
         label={isMva ? "What injuries did you suffer?" : "How were you harmed?"}
-        htmlFor="howHurt"
+        htmlFor="injuryDetails"
         optional
       >
         <Textarea
-          id="howHurt"
+          id="injuryDetails"
           rows={3}
           placeholder={
             isMva
-              ? "For example: neck and back injuries."
-              : "For example: back pain, a skin reaction, or a diagnosed condition."
+              ? "Neck and back injuries."
+              : "Back pain, a skin reaction, or a diagnosed condition."
           }
-          value={values.howHurt}
-          onChange={(event) => update("howHurt", event.target.value)}
+          value={values.injuryDetails}
+          onChange={(event) => update("injuryDetails", event.target.value)}
         />
       </Field>
     </>
@@ -214,7 +223,7 @@ function IncidentStep({ values, update }: StepProps) {
 
 function QuestionsStep({ values, update }: StepProps) {
   const isMva = values.caseType === "MVA";
-  const forSomeoneElse = values.fillingFor === "SomeoneElse";
+  const forSomeoneElse = values.isFillingForSomeoneElse === true;
 
   const atFaultLabel = forSomeoneElse
     ? isMva
@@ -228,9 +237,9 @@ function QuestionsStep({ values, update }: StepProps) {
     <>
       <Field label={atFaultLabel}>
         <YesNoField
-          name="atFault"
-          value={values.atFault}
-          onChange={(value) => update("atFault", value)}
+          name="isAtFault"
+          value={values.isAtFault}
+          onChange={(value) => update("isAtFault", value)}
         />
       </Field>
 
@@ -256,9 +265,9 @@ function QuestionsStep({ values, update }: StepProps) {
         }
       >
         <YesNoField
-          name="receivedSettlement"
-          value={values.receivedSettlement}
-          onChange={(value) => update("receivedSettlement", value)}
+          name="hasReceivedSettlement"
+          value={values.hasReceivedSettlement}
+          onChange={(value) => update("hasReceivedSettlement", value)}
         />
       </Field>
     </>
@@ -267,7 +276,7 @@ function QuestionsStep({ values, update }: StepProps) {
 
 /** The injured person's details. For the submitter too when filing for self. */
 function InjuredStep({ values, update }: StepProps) {
-  const forSomeoneElse = values.fillingFor === "SomeoneElse";
+  const forSomeoneElse = values.isFillingForSomeoneElse === true;
 
   return (
     <>
@@ -279,10 +288,9 @@ function InjuredStep({ values, update }: StepProps) {
           <Input
             id="injuredFirstName"
             autoComplete={forSomeoneElse ? undefined : "given-name"}
+            placeholder="e.g. Jane"
             value={values.injuredFirstName}
-            onChange={(event) =>
-              update("injuredFirstName", event.target.value)
-            }
+            onChange={(event) => update("injuredFirstName", event.target.value)}
             className="h-11"
           />
         </Field>
@@ -293,6 +301,7 @@ function InjuredStep({ values, update }: StepProps) {
           <Input
             id="injuredLastName"
             autoComplete={forSomeoneElse ? undefined : "family-name"}
+            placeholder="e.g. Doe"
             value={values.injuredLastName}
             onChange={(event) => update("injuredLastName", event.target.value)}
             className="h-11"
@@ -301,31 +310,37 @@ function InjuredStep({ values, update }: StepProps) {
       </div>
 
       {forSomeoneElse ? (
-        <Field label="How are they related to you?" htmlFor="relationship">
-          <Select
-            items={RELATIONSHIP_ITEMS}
-            value={values.relationship || null}
-            onValueChange={(value) => update("relationship", value ?? "")}
-          >
-            <SelectTrigger id="relationship" className="h-11 w-full">
-              <SelectValue placeholder="Select relationship" />
-            </SelectTrigger>
-            <SelectContent>
-              {RELATIONSHIP_ITEMS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <Label htmlFor="relationshipToInjured" className="shrink-0 text-sm">
+            The injured person is my
+          </Label>
+          <div className="min-w-0 flex-1">
+            <Select
+              items={RELATIONSHIP_ITEMS}
+              value={values.relationshipToInjured || null}
+              onValueChange={(value) =>
+                update("relationshipToInjured", value ?? "")
+              }
+            >
+              <SelectTrigger id="relationshipToInjured" className="h-11 w-full">
+                <SelectValue placeholder="Select relationship" />
+              </SelectTrigger>
+              <SelectContent>
+                {RELATIONSHIP_ITEMS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label={forSomeoneElse ? "Their phone" : "Phone number"}
           htmlFor="injuredPhone"
-          optional={forSomeoneElse}
           hint={
             forSomeoneElse ? undefined : "We'll text or call to follow up."
           }
@@ -346,7 +361,6 @@ function InjuredStep({ values, update }: StepProps) {
         <Field
           label={forSomeoneElse ? "Their email" : "Email address"}
           htmlFor="injuredEmail"
-          optional={forSomeoneElse}
         >
           <Input
             id="injuredEmail"
@@ -363,26 +377,28 @@ function InjuredStep({ values, update }: StepProps) {
   );
 }
 
-/** The submitter's details — only shown when filing for someone else. */
+/** The submitter's details — required, only asked when filing for someone else. */
 function FillerStep({ values, update }: StepProps) {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="First name" htmlFor="firstName">
+        <Field label="First name" htmlFor="fillerFirstName">
           <Input
-            id="firstName"
+            id="fillerFirstName"
             autoComplete="given-name"
-            value={values.firstName}
-            onChange={(event) => update("firstName", event.target.value)}
+            placeholder="e.g. Jane"
+            value={values.fillerFirstName}
+            onChange={(event) => update("fillerFirstName", event.target.value)}
             className="h-11"
           />
         </Field>
-        <Field label="Last name" htmlFor="lastName">
+        <Field label="Last name" htmlFor="fillerLastName">
           <Input
-            id="lastName"
+            id="fillerLastName"
             autoComplete="family-name"
-            value={values.lastName}
-            onChange={(event) => update("lastName", event.target.value)}
+            placeholder="e.g. Doe"
+            value={values.fillerLastName}
+            onChange={(event) => update("fillerLastName", event.target.value)}
             className="h-11"
           />
         </Field>
@@ -390,29 +406,31 @@ function FillerStep({ values, update }: StepProps) {
 
       <Field
         label="Phone number"
-        htmlFor="phone"
+        htmlFor="fillerPhone"
         hint="We'll text or call to follow up."
       >
         <Input
-          id="phone"
+          id="fillerPhone"
           type="tel"
           inputMode="tel"
           autoComplete="tel"
           placeholder="(555) 555-5555"
-          value={values.phone}
-          onChange={(event) => update("phone", formatPhone(event.target.value))}
+          value={values.fillerPhone}
+          onChange={(event) =>
+            update("fillerPhone", formatPhone(event.target.value))
+          }
           className="h-11"
         />
       </Field>
 
-      <Field label="Email address" htmlFor="email">
+      <Field label="Email address" htmlFor="fillerEmail">
         <Input
-          id="email"
+          id="fillerEmail"
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
-          value={values.email}
-          onChange={(event) => update("email", event.target.value)}
+          value={values.fillerEmail}
+          onChange={(event) => update("fillerEmail", event.target.value)}
           className="h-11"
         />
       </Field>
@@ -422,13 +440,7 @@ function FillerStep({ values, update }: StepProps) {
 
 /* -------------------------------------------------------------- success */
 
-function IntakeSuccess({
-  firstName,
-  onReset,
-}: {
-  firstName: string;
-  onReset: () => void;
-}) {
+function IntakeSuccess({ firstName }: { firstName: string }) {
   return (
     <Card className="w-full overflow-hidden">
       <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
@@ -436,18 +448,12 @@ function IntakeSuccess({
           <Check className="size-7" />
         </span>
         <h2 className="text-xl font-semibold tracking-tight text-balance">
-          {firstName ? `Thanks, ${firstName} — you're all set` : "You're all set"}
+          {firstName ? `Thanks, ${firstName}` : "Thank you"}
         </h2>
         <p className="max-w-sm text-sm text-muted-foreground text-pretty">
-          We&apos;ve got what we need. A member of our intake team will reach out
-          shortly.
+          We&apos;ve received your information. A member of our team will contact
+          you shortly.
         </p>
-        <p className="text-xs text-muted-foreground">
-          Keep an eye on your phone and email.
-        </p>
-        <Button type="button" variant="outline" onClick={onReset}>
-          Start over
-        </Button>
       </CardContent>
     </Card>
   );
@@ -461,7 +467,10 @@ export function IntakeForm() {
   const [direction, setDirection] = React.useState<"forward" | "back">(
     "forward",
   );
-  const [submitted, setSubmitted] = React.useState(false);
+  const [status, setStatus] = React.useState<"idle" | "submitting" | "done">(
+    "idle",
+  );
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   // Steps vary with the answers (filing for self skips the submitter step).
   const stepKeys = getStepKeys(values);
@@ -470,6 +479,7 @@ export function IntakeForm() {
   const meta = stepMeta(currentKey, values);
   const canContinue = isStepComplete(currentKey, values);
   const isLastStep = index === stepKeys.length - 1;
+  const submitting = status === "submitting";
 
   function update<K extends keyof IntakeValues>(
     key: K,
@@ -483,33 +493,58 @@ export function IntakeForm() {
     setStep(Math.max(0, Math.min(stepKeys.length - 1, index + delta)));
   }
 
+  async function submitLead() {
+    setStatus("submitting");
+    setFormError(null);
+    try {
+      const response = await fetch("/api/public/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildIntakeSubmission(values)),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; errors?: Record<string, string> }
+          | null;
+        setFormError(
+          payload?.error ?? "Something went wrong. Please try again.",
+        );
+        // Send the user back to the first step that needs attention.
+        const step = payload?.errors
+          ? firstErrorStep(payload.errors, stepKeys)
+          : null;
+        if (step) {
+          const target = stepKeys.indexOf(step);
+          if (target !== -1) {
+            setDirection(target < index ? "back" : "forward");
+            setStep(target);
+          }
+        }
+        setStatus("idle");
+        return;
+      }
+      setStatus("done");
+    } catch {
+      setFormError("We couldn't reach the server. Please try again.");
+      setStatus("idle");
+    }
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isLastStep) {
       if (canContinue) stepBy(1);
       return;
     }
-    // TODO(submit): validate, build the lead payload and persist it to the DB.
-    //   Intentionally not wired up yet — this is the UI pass.
-    setSubmitted(true);
+    if (canContinue && !submitting) void submitLead();
   }
 
-  if (submitted) {
+  if (status === "done") {
     const firstName =
-      values.fillingFor === "SomeoneElse"
-        ? values.firstName
+      values.isFillingForSomeoneElse === true
+        ? values.fillerFirstName
         : values.injuredFirstName;
-    return (
-      <IntakeSuccess
-        firstName={firstName}
-        onReset={() => {
-          setValues(INITIAL_VALUES);
-          setDirection("forward");
-          setStep(0);
-          setSubmitted(false);
-        }}
-      />
-    );
+    return <IntakeSuccess firstName={firstName} />;
   }
 
   const stepProps: StepProps = { values, update };
@@ -545,21 +580,35 @@ export function IntakeForm() {
             {currentKey === "filler" ? <FillerStep {...stepProps} /> : null}
           </div>
 
+          {formError ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+            >
+              {formError}
+            </p>
+          ) : null}
+
           <div className="flex items-center justify-between gap-3">
             <Button
               type="button"
               variant="ghost"
               onClick={() => stepBy(-1)}
               className={cn(index === 0 && "invisible")}
+              disabled={submitting}
             >
               <ArrowLeft />
               Back
             </Button>
 
             {isLastStep ? (
-              <Button type="submit" size="lg" disabled={!canContinue}>
-                <ShieldCheck />
-                Submit my claim
+              <Button
+                type="submit"
+                size="lg"
+                disabled={!canContinue || submitting}
+              >
+                {submitting ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+                {submitting ? "Submitting…" : "Submit"}
               </Button>
             ) : (
               <Button type="submit" size="lg" disabled={!canContinue}>

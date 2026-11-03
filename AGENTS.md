@@ -51,6 +51,9 @@ their Lawmatics CRM.
 - Person data is split by role: `injured*` is always the injured person; `filler*` is
   the form submitter, populated only when `isFillingForSomeoneElse` is true (never
   duplicated). Brightwater receives the injured person's details.
+- `case_type` is `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in `lib/labels.ts`).
+- Public intake: the form posts to `POST /api/public/leads` (unauthenticated, allow-listed
+  in `proxy.ts`, validated by `lib/leads/intake.ts`); every other API route is protected.
 
 ## Data layer
 - Schema: one file per table in `lib/db/schema/`, re-exported by `lib/db/schema/index.ts`.
