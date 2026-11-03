@@ -13,7 +13,7 @@ import path from "node:path";
 import { hashPassword } from "@/lib/auth/password";
 import { csvToRecords } from "./csv";
 import {
-  toCampaign,
+  toCaseType,
   toCounty,
   toFillingForSomeoneElse,
   toLeadStage,
@@ -162,7 +162,7 @@ function seedLeads(db: AppDatabase): number {
       return {
         matterId,
         createdAt: toNullableDate(record.created_at),
-        campaign: toCampaign(record.campaign),
+        caseType: toCaseType(record.campaign),
         stage: toLeadStage(record.stage),
         assignedToId: userIdByEmail.get(assignedEmail) ?? null,
 

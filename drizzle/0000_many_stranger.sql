@@ -13,7 +13,7 @@ CREATE TABLE `leads` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`matter_id` text NOT NULL,
 	`created_at` integer,
-	`campaign` text,
+	`case_type` text,
 	`stage` text DEFAULT 'NEW' NOT NULL,
 	`assigned_to_id` integer,
 	`filler_first_name` text,
@@ -42,13 +42,14 @@ CREATE TABLE `leads` (
 	`brightwater_lead_id` text,
 	`sent_to_firm_at` integer,
 	FOREIGN KEY (`assigned_to_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
-	CONSTRAINT "leads_relationship_check" CHECK("leads"."relationship_to_injured" in ('SPOUSE', 'PARENT', 'STEP_PARENT', 'CHILD', 'STEP_CHILD', 'SIBLING', 'GRANDPARENT', 'GRANDCHILD', 'AUNT_UNCLE', 'NIECE', 'NEPHEW', 'COUSIN', 'IN_LAW', 'FRIEND', 'COLLEAGUE', 'NEIGHBOR', 'OTHER'))
+	CONSTRAINT "leads_relationship_check" CHECK("leads"."relationship_to_injured" in ('SPOUSE', 'PARENT', 'STEP_PARENT', 'CHILD', 'STEP_CHILD', 'SIBLING', 'GRANDPARENT', 'GRANDCHILD', 'AUNT_UNCLE', 'NIECE', 'NEPHEW', 'COUSIN', 'IN_LAW', 'FRIEND', 'COLLEAGUE', 'NEIGHBOR', 'OTHER')),
+	CONSTRAINT "leads_case_type_check" CHECK("leads"."case_type" in ('MVA', 'MASS_TORT', 'OTHER'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `leads_matter_id_unique` ON `leads` (`matter_id`);--> statement-breakpoint
 CREATE INDEX `leads_stage_idx` ON `leads` (`stage`);--> statement-breakpoint
 CREATE INDEX `leads_assigned_to_idx` ON `leads` (`assigned_to_id`);--> statement-breakpoint
-CREATE INDEX `leads_campaign_idx` ON `leads` (`campaign`);--> statement-breakpoint
+CREATE INDEX `leads_case_type_idx` ON `leads` (`case_type`);--> statement-breakpoint
 CREATE INDEX `leads_filler_email_idx` ON `leads` (`filler_email`);--> statement-breakpoint
 CREATE TABLE `sessions` (
 	`token_hash` text PRIMARY KEY NOT NULL,

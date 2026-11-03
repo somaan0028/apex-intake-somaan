@@ -5,9 +5,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { IntakeForm } from "@/components/intake/intake-form";
 
 export const metadata: Metadata = {
-  title: "Apex | Free case review",
+  title: "Apex Intake Desk",
   description:
-    "Answer a few quick questions to see if you qualify for a free case review. No cost, no obligation.",
+    "Answer a few quick questions so our intake team can follow up with you.",
 };
 
 export default function HomePage() {
@@ -32,14 +32,14 @@ export default function HomePage() {
         <div className="flex flex-col items-center gap-4 text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             <BadgeCheck className="size-3.5" />
-            Free case review · No obligation
+            Secure intake
           </span>
           <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            See if you qualify in about two minutes
+            Tell us what happened in about two minutes
           </h1>
           <p className="max-w-md text-muted-foreground text-pretty">
-            Answer a few quick questions and a real person from our intake team
-            will follow up. No cost, no pressure.
+            Answer a few quick questions and our intake team will follow up with
+            you.
           </p>
         </div>
 
@@ -53,10 +53,6 @@ export default function HomePage() {
           <span className="inline-flex items-center gap-1.5">
             <Clock className="size-3.5" />
             Takes about two minutes
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5" />
-            No obligation
           </span>
         </div>
       </main>

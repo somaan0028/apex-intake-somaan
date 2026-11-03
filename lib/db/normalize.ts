@@ -6,11 +6,11 @@
  * These helpers turn raw cells into the shapes the schema actually expects.
  */
 import {
-  CAMPAIGNS,
+  CASE_TYPES,
   LEAD_STAGES,
   RELATIONSHIPS,
   USER_ROLES,
-  type Campaign,
+  type CaseType,
   type LeadStage,
   type Relationship,
   type UserRole,
@@ -60,11 +60,11 @@ function canonicalKey(value: string | null | undefined): string {
   return (value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 }
 
-/** Normalise a raw campaign cell (`MVA`, `Mass Tort`, `mass-tort`, …). */
-export function toCampaign(value: string | null | undefined): Campaign | null {
+/** Normalise a raw case-type cell (`MVA`, `Mass Tort`, `mass-tort`, …). */
+export function toCaseType(value: string | null | undefined): CaseType | null {
   const key = canonicalKey(value);
-  return (CAMPAIGNS as readonly string[]).includes(key)
-    ? (key as Campaign)
+  return (CASE_TYPES as readonly string[]).includes(key)
+    ? (key as CaseType)
     : null;
 }
 

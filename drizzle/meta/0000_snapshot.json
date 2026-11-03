@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7aeb4904-a520-498d-a384-9600f921b937",
+  "id": "5ceb0f89-ae9a-4ca0-a55f-3a92edd7a0a1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -94,8 +94,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "campaign": {
-          "name": "campaign",
+        "case_type": {
+          "name": "case_type",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -315,10 +315,10 @@
           ],
           "isUnique": false
         },
-        "leads_campaign_idx": {
-          "name": "leads_campaign_idx",
+        "leads_case_type_idx": {
+          "name": "leads_case_type_idx",
           "columns": [
-            "campaign"
+            "case_type"
           ],
           "isUnique": false
         },
@@ -351,6 +351,10 @@
         "leads_relationship_check": {
           "name": "leads_relationship_check",
           "value": "\"leads\".\"relationship_to_injured\" in ('SPOUSE', 'PARENT', 'STEP_PARENT', 'CHILD', 'STEP_CHILD', 'SIBLING', 'GRANDPARENT', 'GRANDCHILD', 'AUNT_UNCLE', 'NIECE', 'NEPHEW', 'COUSIN', 'IN_LAW', 'FRIEND', 'COLLEAGUE', 'NEIGHBOR', 'OTHER')"
+        },
+        "leads_case_type_check": {
+          "name": "leads_case_type_check",
+          "value": "\"leads\".\"case_type\" in ('MVA', 'MASS_TORT', 'OTHER')"
         }
       }
     },

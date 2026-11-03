@@ -12,15 +12,16 @@
  * stays safe to use from Client Components.
  */
 import type {
-  Campaign,
+  CaseType,
   LeadStage,
   Relationship,
   UserRole,
 } from "@/lib/db/schema";
 
-export const CAMPAIGN_LABELS: Record<Campaign, string> = {
+export const CASE_TYPE_LABELS: Record<CaseType, string> = {
   MVA: "Motor Vehicle Accident",
   MASS_TORT: "Mass Tort",
+  OTHER: "Other",
 };
 
 export const LEAD_STAGE_LABELS: Record<LeadStage, string> = {

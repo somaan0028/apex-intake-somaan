@@ -1,5 +1,5 @@
 /**
- * `leads` model — a lead captured by a campaign or the public intake form.
+ * `leads` model — a lead captured for one of our case types.
  *
  * Design notes
  * ------------
@@ -25,9 +25,9 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { users } from "./users";
 
-/** Campaigns the desk runs. Stored as canonical codes (labels in `lib/labels.ts`). */
-export const CAMPAIGNS = ["MVA", "MASS_TORT"] as const;
-export type Campaign = (typeof CAMPAIGNS)[number];
+/** Case types the desk handles. Stored as canonical codes (labels in `lib/labels.ts`). */
+export const CASE_TYPES = ["MVA", "MASS_TORT", "OTHER"] as const;
+export type CaseType = (typeof CASE_TYPES)[number];
 
 /** The ordered pipeline stages. `DISQUALIFIED` closes a lead. */
 export const LEAD_STAGES = [
@@ -69,8 +69,8 @@ export const leads = sqliteTable(
     /** External matter id from Lawmatics, e.g. `APX-10001`. Unique per lead. */
     matterId: text("matter_id").notNull(),
     createdAt: integer("created_at", { mode: "timestamp" }),
-    /** Campaign the lead was captured under (see `CAMPAIGNS`). */
-    campaign: text("campaign").$type<Campaign>(),
+    /** Case type the lead is (see `CASE_TYPES`). */
+    caseType: text("case_type").$type<CaseType>(),
     /** Pipeline stage; defaults to `NEW`. */
     stage: text("stage").$type<LeadStage>().notNull().default("NEW"),
     /** Intake agent currently owning the lead (null = unassigned). */
@@ -128,13 +128,21 @@ export const leads = sqliteTable(
     uniqueIndex("leads_matter_id_unique").on(table.matterId),
     index("leads_stage_idx").on(table.stage),
     index("leads_assigned_to_idx").on(table.assignedToId),
-    index("leads_campaign_idx").on(table.campaign),
+    index("leads_case_type_idx").on(table.caseType),
     index("leads_filler_email_idx").on(table.fillerEmail),
     // Enforce the fixed relationship set at the storage level (NULL is allowed).
     check(
       "leads_relationship_check",
       sql`${table.relationshipToInjured} in (${sql.join(
         RELATIONSHIPS.map((value) => sql.raw(`'${value}'`)),
+        sql`, `,
+      )})`,
+    ),
+    // Enforce the fixed case-type set at the storage level (NULL is allowed).
+    check(
+      "leads_case_type_check",
+      sql`${table.caseType} in (${sql.join(
+        CASE_TYPES.map((value) => sql.raw(`'${value}'`)),
         sql`, `,
       )})`,
     ),

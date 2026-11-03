@@ -14,27 +14,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { STATE_NAME_BY_CODE, US_STATES } from "@/lib/us-states";
+import { US_STATES } from "@/lib/us-states";
 import { COUNTIES_BY_STATE } from "@/lib/us-counties";
-import { RELATIONSHIP_LABELS, relationshipLabel } from "@/lib/labels";
+import { RELATIONSHIP_LABELS } from "@/lib/labels";
 import {
   Field,
   OptionCards,
-  ReviewRow,
-  ReviewSection,
   StepHeader,
   YesNoField,
 } from "./fields";
 import {
-  CAMPAIGN_OPTIONS,
+  CASE_TYPE_OPTIONS,
   FILLING_FOR_OPTIONS,
   INITIAL_VALUES,
-  STEP_COUNT,
-  STEP_INDEX,
-  STEPS,
-  formatDisplayDate,
   formatPhone,
+  getStepKeys,
   isStepComplete,
+  stepMeta,
   type IntakeValues,
   type UpdateFn,
 } from "./types";
@@ -42,7 +38,6 @@ import {
 interface StepProps {
   values: IntakeValues;
   update: UpdateFn;
-  goTo: (step: number) => void;
 }
 
 /** Select item lists (kept at module scope so they are stable). */
@@ -56,19 +51,31 @@ const RELATIONSHIP_ITEMS = Object.entries(RELATIONSHIP_LABELS).map(
 
 /* ------------------------------------------------------------------ steps */
 
-function CampaignStep({ values, update }: StepProps) {
+function FillingForStep({ values, update }: StepProps) {
   return (
     <OptionCards
-      name="campaign"
-      value={values.campaign}
-      onChange={(value) => update("campaign", value)}
-      options={CAMPAIGN_OPTIONS}
+      name="fillingFor"
+      value={values.fillingFor}
+      onChange={(value) => update("fillingFor", value)}
+      options={FILLING_FOR_OPTIONS}
+      columns={2}
+    />
+  );
+}
+
+function CaseTypeStep({ values, update }: StepProps) {
+  return (
+    <OptionCards
+      name="caseType"
+      value={values.caseType}
+      onChange={(value) => update("caseType", value)}
+      options={CASE_TYPE_OPTIONS}
     />
   );
 }
 
 function WhenWhereStep({ values, update }: StepProps) {
-  const isMva = values.campaign === "MVA";
+  const isMva = values.caseType === "MVA";
 
   // Set the date ceiling on the client only (avoids an SSR/client mismatch).
   const [today, setToday] = React.useState("");
@@ -158,28 +165,11 @@ function WhenWhereStep({ values, update }: StepProps) {
 }
 
 function IncidentStep({ values, update }: StepProps) {
-  const isMva = values.campaign === "MVA";
+  const isMva = values.caseType === "MVA";
 
   return (
     <>
-      <Field
-        label={
-          isMva
-            ? "How were you hurt?"
-            : "What product or medication harmed you?"
-        }
-        htmlFor="howHurt"
-        optional
-        hint={isMva ? "For example: neck and back injuries." : undefined}
-      >
-        <Textarea
-          id="howHurt"
-          rows={3}
-          value={values.howHurt}
-          onChange={(event) => update("howHurt", event.target.value)}
-        />
-      </Field>
-
+      {/* Required first, optional second. */}
       <Field
         label={
           isMva
@@ -200,26 +190,57 @@ function IncidentStep({ values, update }: StepProps) {
           onChange={(event) => update("description", event.target.value)}
         />
       </Field>
+
+      <Field
+        label={isMva ? "What injuries did you suffer?" : "How were you harmed?"}
+        htmlFor="howHurt"
+        optional
+      >
+        <Textarea
+          id="howHurt"
+          rows={3}
+          placeholder={
+            isMva
+              ? "For example: neck and back injuries."
+              : "For example: back pain, a skin reaction, or a diagnosed condition."
+          }
+          value={values.howHurt}
+          onChange={(event) => update("howHurt", event.target.value)}
+        />
+      </Field>
     </>
   );
 }
 
 function QuestionsStep({ values, update }: StepProps) {
-  const isMva = values.campaign === "MVA";
+  const isMva = values.caseType === "MVA";
+  const forSomeoneElse = values.fillingFor === "SomeoneElse";
+
+  const atFaultLabel = forSomeoneElse
+    ? isMva
+      ? "Was the injured person at fault for the accident?"
+      : "Was the injured person at fault?"
+    : isMva
+      ? "Were you at fault for the accident?"
+      : "Were you at fault?";
 
   return (
     <>
-      {isMva ? (
-        <Field label="Were you at fault for the accident?">
-          <YesNoField
-            name="atFault"
-            value={values.atFault}
-            onChange={(value) => update("atFault", value)}
-          />
-        </Field>
-      ) : null}
+      <Field label={atFaultLabel}>
+        <YesNoField
+          name="atFault"
+          value={values.atFault}
+          onChange={(value) => update("atFault", value)}
+        />
+      </Field>
 
-      <Field label="Do you already have an attorney?">
+      <Field
+        label={
+          forSomeoneElse
+            ? "Does the injured person already have an attorney?"
+            : "Do you already have an attorney?"
+        }
+      >
         <YesNoField
           name="hasAttorney"
           value={values.hasAttorney}
@@ -227,7 +248,13 @@ function QuestionsStep({ values, update }: StepProps) {
         />
       </Field>
 
-      <Field label="Have you received any settlement or insurance payment?">
+      <Field
+        label={
+          forSomeoneElse
+            ? "Has the injured person received any settlement or insurance payment?"
+            : "Have you received any settlement or insurance payment?"
+        }
+      >
         <YesNoField
           name="receivedSettlement"
           value={values.receivedSettlement}
@@ -238,95 +265,106 @@ function QuestionsStep({ values, update }: StepProps) {
   );
 }
 
-function ForWhomStep({ values, update }: StepProps) {
-  const onBehalf = values.fillingFor === "SomeoneElse";
+/** The injured person's details. For the submitter too when filing for self. */
+function InjuredStep({ values, update }: StepProps) {
+  const forSomeoneElse = values.fillingFor === "SomeoneElse";
 
   return (
     <>
-      <OptionCards
-        name="fillingFor"
-        value={values.fillingFor}
-        onChange={(value) => update("fillingFor", value)}
-        options={FILLING_FOR_OPTIONS}
-        columns={2}
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label={forSomeoneElse ? "Their first name" : "First name"}
+          htmlFor="injuredFirstName"
+        >
+          <Input
+            id="injuredFirstName"
+            autoComplete={forSomeoneElse ? undefined : "given-name"}
+            value={values.injuredFirstName}
+            onChange={(event) =>
+              update("injuredFirstName", event.target.value)
+            }
+            className="h-11"
+          />
+        </Field>
+        <Field
+          label={forSomeoneElse ? "Their last name" : "Last name"}
+          htmlFor="injuredLastName"
+        >
+          <Input
+            id="injuredLastName"
+            autoComplete={forSomeoneElse ? undefined : "family-name"}
+            value={values.injuredLastName}
+            onChange={(event) => update("injuredLastName", event.target.value)}
+            className="h-11"
+          />
+        </Field>
+      </div>
 
-      {onBehalf ? (
-        <div className="flex animate-in flex-col gap-5 rounded-xl border border-input bg-muted/30 p-4 duration-300 fade-in-0 slide-in-from-top-2">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Their first name" htmlFor="injuredFirstName">
-              <Input
-                id="injuredFirstName"
-                value={values.injuredFirstName}
-                onChange={(event) =>
-                  update("injuredFirstName", event.target.value)
-                }
-                className="h-11"
-              />
-            </Field>
-            <Field label="Their last name" htmlFor="injuredLastName">
-              <Input
-                id="injuredLastName"
-                value={values.injuredLastName}
-                onChange={(event) =>
-                  update("injuredLastName", event.target.value)
-                }
-                className="h-11"
-              />
-            </Field>
-          </div>
-
-          <Field label="Your relationship to them" htmlFor="relationship">
-            <Select
-              items={RELATIONSHIP_ITEMS}
-              value={values.relationship || null}
-              onValueChange={(value) => update("relationship", value ?? "")}
-            >
-              <SelectTrigger id="relationship" className="h-11 w-full">
-                <SelectValue placeholder="Select relationship" />
-              </SelectTrigger>
-              <SelectContent>
-                {RELATIONSHIP_ITEMS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Their phone" htmlFor="injuredPhone" optional>
-              <Input
-                id="injuredPhone"
-                type="tel"
-                inputMode="tel"
-                value={values.injuredPhone}
-                onChange={(event) =>
-                  update("injuredPhone", formatPhone(event.target.value))
-                }
-                className="h-11"
-              />
-            </Field>
-            <Field label="Their email" htmlFor="injuredEmail" optional>
-              <Input
-                id="injuredEmail"
-                type="email"
-                value={values.injuredEmail}
-                onChange={(event) =>
-                  update("injuredEmail", event.target.value)
-                }
-                className="h-11"
-              />
-            </Field>
-          </div>
-        </div>
+      {forSomeoneElse ? (
+        <Field label="How are they related to you?" htmlFor="relationship">
+          <Select
+            items={RELATIONSHIP_ITEMS}
+            value={values.relationship || null}
+            onValueChange={(value) => update("relationship", value ?? "")}
+          >
+            <SelectTrigger id="relationship" className="h-11 w-full">
+              <SelectValue placeholder="Select relationship" />
+            </SelectTrigger>
+            <SelectContent>
+              {RELATIONSHIP_ITEMS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
       ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label={forSomeoneElse ? "Their phone" : "Phone number"}
+          htmlFor="injuredPhone"
+          optional={forSomeoneElse}
+          hint={
+            forSomeoneElse ? undefined : "We'll text or call to follow up."
+          }
+        >
+          <Input
+            id="injuredPhone"
+            type="tel"
+            inputMode="tel"
+            autoComplete={forSomeoneElse ? undefined : "tel"}
+            placeholder="(555) 555-5555"
+            value={values.injuredPhone}
+            onChange={(event) =>
+              update("injuredPhone", formatPhone(event.target.value))
+            }
+            className="h-11"
+          />
+        </Field>
+        <Field
+          label={forSomeoneElse ? "Their email" : "Email address"}
+          htmlFor="injuredEmail"
+          optional={forSomeoneElse}
+        >
+          <Input
+            id="injuredEmail"
+            type="email"
+            autoComplete={forSomeoneElse ? undefined : "email"}
+            placeholder="you@example.com"
+            value={values.injuredEmail}
+            onChange={(event) => update("injuredEmail", event.target.value)}
+            className="h-11"
+          />
+        </Field>
+      </div>
     </>
   );
 }
 
-function ContactStep({ values, update }: StepProps) {
+/** The submitter's details — only shown when filing for someone else. */
+function FillerStep({ values, update }: StepProps) {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -353,7 +391,7 @@ function ContactStep({ values, update }: StepProps) {
       <Field
         label="Phone number"
         htmlFor="phone"
-        hint="We'll text or call about your free case review."
+        hint="We'll text or call to follow up."
       >
         <Input
           id="phone"
@@ -382,87 +420,6 @@ function ContactStep({ values, update }: StepProps) {
   );
 }
 
-function ReviewStep({ values, goTo }: StepProps) {
-  const isMva = values.campaign === "MVA";
-  const onBehalf = values.fillingFor === "SomeoneElse";
-
-  const location = [
-    STATE_NAME_BY_CODE[values.state],
-    values.county,
-    values.postcode,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  return (
-    <div className="flex flex-col gap-3">
-      <ReviewSection title="Your case" onEdit={() => goTo(STEP_INDEX.campaign)}>
-        <ReviewRow label="Type" value={values.campaign} />
-        <ReviewRow
-          label="Date"
-          value={formatDisplayDate(values.incidentDate)}
-        />
-        <ReviewRow label="Location" value={location} />
-      </ReviewSection>
-
-      <ReviewSection
-        title="What happened"
-        onEdit={() => goTo(STEP_INDEX.incident)}
-      >
-        {values.howHurt ? (
-          <ReviewRow label="Injuries" value={values.howHurt} />
-        ) : null}
-        <ReviewRow label="Details" value={values.description} />
-        {isMva ? (
-          <ReviewRow label="At fault" value={values.atFault} />
-        ) : null}
-      </ReviewSection>
-
-      <ReviewSection title="Claims" onEdit={() => goTo(STEP_INDEX.questions)}>
-        <ReviewRow label="Has attorney" value={values.hasAttorney} />
-        <ReviewRow
-          label="Settlement"
-          value={values.receivedSettlement}
-        />
-      </ReviewSection>
-
-      <ReviewSection title="Who it's for" onEdit={() => goTo(STEP_INDEX.forWhom)}>
-        <ReviewRow
-          label="Filing for"
-          value={onBehalf ? "Someone else" : "Myself"}
-        />
-        {onBehalf ? (
-          <>
-            <ReviewRow
-              label="Injured person"
-              value={`${values.injuredFirstName} ${values.injuredLastName}`.trim()}
-            />
-            <ReviewRow
-              label="Relationship"
-              value={relationshipLabel(values.relationship)}
-            />
-            {values.injuredPhone ? (
-              <ReviewRow label="Their phone" value={values.injuredPhone} />
-            ) : null}
-            {values.injuredEmail ? (
-              <ReviewRow label="Their email" value={values.injuredEmail} />
-            ) : null}
-          </>
-        ) : null}
-      </ReviewSection>
-
-      <ReviewSection title="Contact" onEdit={() => goTo(STEP_INDEX.contact)}>
-        <ReviewRow
-          label="Name"
-          value={`${values.firstName} ${values.lastName}`.trim()}
-        />
-        <ReviewRow label="Phone" value={values.phone} />
-        <ReviewRow label="Email" value={values.email} />
-      </ReviewSection>
-    </div>
-  );
-}
-
 /* -------------------------------------------------------------- success */
 
 function IntakeSuccess({
@@ -483,7 +440,7 @@ function IntakeSuccess({
         </h2>
         <p className="max-w-sm text-sm text-muted-foreground text-pretty">
           We&apos;ve got what we need. A member of our intake team will reach out
-          shortly to walk you through your free case review.
+          shortly.
         </p>
         <p className="text-xs text-muted-foreground">
           Keep an eye on your phone and email.
@@ -506,6 +463,14 @@ export function IntakeForm() {
   );
   const [submitted, setSubmitted] = React.useState(false);
 
+  // Steps vary with the answers (filing for self skips the submitter step).
+  const stepKeys = getStepKeys(values);
+  const index = Math.min(step, stepKeys.length - 1);
+  const currentKey = stepKeys[index];
+  const meta = stepMeta(currentKey, values);
+  const canContinue = isStepComplete(currentKey, values);
+  const isLastStep = index === stepKeys.length - 1;
+
   function update<K extends keyof IntakeValues>(
     key: K,
     value: IntakeValues[K],
@@ -513,18 +478,15 @@ export function IntakeForm() {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  function goTo(next: number) {
-    setDirection(next >= step ? "forward" : "back");
-    setStep(Math.max(0, Math.min(STEP_COUNT - 1, next)));
+  function stepBy(delta: number) {
+    setDirection(delta >= 0 ? "forward" : "back");
+    setStep(Math.max(0, Math.min(stepKeys.length - 1, index + delta)));
   }
-
-  const canContinue = isStepComplete(step, values);
-  const isLastStep = step === STEP_COUNT - 1;
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isLastStep) {
-      if (canContinue) goTo(step + 1);
+      if (canContinue) stepBy(1);
       return;
     }
     // TODO(submit): validate, build the lead payload and persist it to the DB.
@@ -533,9 +495,13 @@ export function IntakeForm() {
   }
 
   if (submitted) {
+    const firstName =
+      values.fillingFor === "SomeoneElse"
+        ? values.firstName
+        : values.injuredFirstName;
     return (
       <IntakeSuccess
-        firstName={values.firstName}
+        firstName={firstName}
         onReset={() => {
           setValues(INITIAL_VALUES);
           setDirection("forward");
@@ -546,21 +512,16 @@ export function IntakeForm() {
     );
   }
 
-  const stepProps: StepProps = { values, update, goTo };
+  const stepProps: StepProps = { values, update };
 
   return (
     <Card className="w-full overflow-hidden">
       <CardContent className="flex flex-col gap-6 p-5 sm:p-7">
-        <StepHeader
-          index={step}
-          total={STEP_COUNT}
-          title={STEPS[step].title}
-          subtitle={STEPS[step].subtitle}
-        />
+        <StepHeader title={meta.title} subtitle={meta.subtitle} />
 
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
           <div
-            key={step}
+            key={currentKey}
             className={cn(
               "flex flex-col gap-5 duration-300",
               "animate-in fade-in-0",
@@ -569,28 +530,34 @@ export function IntakeForm() {
                 : "slide-in-from-left-4",
             )}
           >
-            {step === STEP_INDEX.campaign ? <CampaignStep {...stepProps} /> : null}
-            {step === STEP_INDEX.whenWhere ? <WhenWhereStep {...stepProps} /> : null}
-            {step === STEP_INDEX.incident ? <IncidentStep {...stepProps} /> : null}
-            {step === STEP_INDEX.questions ? <QuestionsStep {...stepProps} /> : null}
-            {step === STEP_INDEX.forWhom ? <ForWhomStep {...stepProps} /> : null}
-            {step === STEP_INDEX.contact ? <ContactStep {...stepProps} /> : null}
-            {step === STEP_INDEX.review ? <ReviewStep {...stepProps} /> : null}
+            {currentKey === "fillingFor" ? (
+              <FillingForStep {...stepProps} />
+            ) : null}
+            {currentKey === "caseType" ? <CaseTypeStep {...stepProps} /> : null}
+            {currentKey === "whenWhere" ? (
+              <WhenWhereStep {...stepProps} />
+            ) : null}
+            {currentKey === "incident" ? <IncidentStep {...stepProps} /> : null}
+            {currentKey === "questions" ? (
+              <QuestionsStep {...stepProps} />
+            ) : null}
+            {currentKey === "injured" ? <InjuredStep {...stepProps} /> : null}
+            {currentKey === "filler" ? <FillerStep {...stepProps} /> : null}
           </div>
 
           <div className="flex items-center justify-between gap-3">
             <Button
               type="button"
               variant="ghost"
-              onClick={() => goTo(step - 1)}
-              className={cn(step === 0 && "invisible")}
+              onClick={() => stepBy(-1)}
+              className={cn(index === 0 && "invisible")}
             >
               <ArrowLeft />
               Back
             </Button>
 
             {isLastStep ? (
-              <Button type="submit" size="lg">
+              <Button type="submit" size="lg" disabled={!canContinue}>
                 <ShieldCheck />
                 Submit my claim
               </Button>

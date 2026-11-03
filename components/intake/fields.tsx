@@ -3,9 +3,7 @@
 import * as React from "react";
 import { Check } from "lucide-react";
 import { cn } from "cn";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import type { ChoiceOption, YesNo } from "./types";
 
 /** A labelled field with an optional hint and an "Optional" tag. */
@@ -143,76 +141,27 @@ export function YesNoField({
   );
 }
 
-/** Progress bar + step counter + the step's title and subtitle. */
+/**
+ * The step's title and optional subtitle. Intentionally no progress bar or
+ * "step X of Y" — the flow length varies (filing for yourself skips a step) and
+ * we don't want to advertise how many there are.
+ */
 export function StepHeader({
-  index,
-  total,
   title,
   subtitle,
 }: {
-  index: number;
-  total: number;
   title: string;
-  subtitle: string;
+  subtitle?: string;
 }) {
-  const percent = Math.round(((index + 1) / total) * 100);
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span>
-            Step {index + 1} of {total}
-          </span>
-          <span className="tabular-nums">{percent}%</span>
-        </div>
-        <Progress value={percent} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold tracking-tight text-balance">
-          {title}
-        </h2>
+    <div className="flex flex-col gap-1">
+      <h2 className="text-xl font-semibold tracking-tight text-balance">
+        {title}
+      </h2>
+      {subtitle ? (
         <p className="text-sm text-muted-foreground text-pretty">{subtitle}</p>
-      </div>
+      ) : null}
     </div>
   );
 }
 
-/** A titled block on the review step, with an "Edit" affordance. */
-export function ReviewSection({
-  title,
-  onEdit,
-  children,
-}: {
-  title: string;
-  onEdit: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2 rounded-xl border border-input bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">{title}</h3>
-        <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
-          Edit
-        </Button>
-      </div>
-      <dl className="flex flex-col gap-1.5 text-sm">{children}</dl>
-    </div>
-  );
-}
-
-export function ReviewRow({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string;
-}) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-right font-medium break-words">
-        {value && value.length > 0 ? value : "—"}
-      </dd>
-    </div>
-  );
-}
