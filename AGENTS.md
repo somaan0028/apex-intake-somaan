@@ -41,19 +41,30 @@ their Lawmatics CRM.
 - Auth: email + shared demo password, hashed with Node `scrypt` (no native deps)
 
 ## Domain rules
-- Roles: `admin` (all leads, any stage, assign, send, manage users) and `user`
-  (unassigned + own leads, up to `Retained`).
-- Stages: `New → Contacted → Qualified → Retained → Sent to Firm`; `Disqualified` closes.
+- Roles: `ADMIN` (all leads, any stage, assign, send, manage users) and `USER`
+  (unassigned + own leads, up to `RETAINED`).
+- Stages: `NEW → CONTACTED → QUALIFIED → RETAINED → SENT_TO_FIRM`; `DISQUALIFIED` closes.
+  Enum values are stored as canonical codes (`MASS_TORT`, `SENT_TO_FIRM`, …);
+  display labels live in `lib/labels.ts`.
 - Only `MVA` leads are sent to partner firm Brightwater (form-urlencoded API),
   **at most once per lead**.
-- "On behalf of" leads: the injured person's name/phone/email replace the submitter's in
-  what's sent; the submitter stays as the contact of record.
+- Person data is split by role: `injured*` is always the injured person; `filler*` is
+  the form submitter, populated only when `isFillingForSomeoneElse` is true (never
+  duplicated). Brightwater receives the injured person's details.
 
 ## Data layer
 - Schema: one file per table in `lib/db/schema/`, re-exported by `lib/db/schema/index.ts`.
 - Boot: `instrumentation.ts` → `lib/db/bootstrap.ts` creates `data/apex.db`, applies
   migrations, and imports CSVs from `lib/db/seed-data/` **only if the DB file is absent**.
-- Free-text fields (including the boolean-looking ones) are stored as `TEXT`, never coerced.
+- Free-text fields are stored as `TEXT` (trimmed on import). The boolean columns
+  (`is_at_fault`, `has_attorney`, `has_received_settlement`, `is_filling_for_someone_else`)
+  are normalised to real booleans and stored as SQLite `0`/`1` (`null` = unknown).
+- Date/timestamp columns (`created_at`, `date_of_accident`, `sent_to_firm_at`, and the
+  session timestamps) are stored as **Unix timestamps in seconds** (Drizzle `timestamp` mode).
+- Phone numbers are normalised to `(XXX) XXX-XXXX`.
+- `relationship_to_injured` is a fixed set (`RELATIONSHIPS`), enforced by a CHECK.
+- `state` (2-letter code) and `county` are validated against the fixed lists in
+  `lib/us-states.ts` / `lib/us-counties.ts`; the seeder throws on anything unrecognised.
 - Passwords are a single `scrypt$params$salt$hash` string (per-user salt).
 
 ## Conventions

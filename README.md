@@ -24,7 +24,7 @@ seed CSVs; later boots reuse it. Delete `data/` to force a fresh import.
 
 | Route        | Access    | Notes                                          |
 | ------------ | --------- | ---------------------------------------------- |
-| `/`          | Public    | Home                                           |
+| `/`          | Public    | Marketing intake form (UI-only; not saved yet) |
 | `/login`     | Public    | Email + password (shared demo password)        |
 | `/dashboard` | Protected | Overview tab                                   |
 | `/leads`     | Protected | Lead list (placeholder)                        |
@@ -39,5 +39,6 @@ uses the demo password `apex-demo-2026`.
 
 - `npm run dev` — start the dev server
 - `npm run build` / `npm start` — production build / serve
+- `npm run db:reset` — delete the database and re-create + re-seed it
 - `npm run db:generate` — regenerate the Drizzle migration
 - `npm run db:studio` — browse the database

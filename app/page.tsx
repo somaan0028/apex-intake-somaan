@@ -1,32 +1,69 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BadgeCheck, Clock, Lock, ShieldCheck } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { IntakeForm } from "@/components/intake/intake-form";
 
 export const metadata: Metadata = {
-  title: "Apex Intake Desk",
+  title: "Apex | Free case review",
+  description:
+    "Answer a few quick questions to see if you qualify for a free case review. No cost, no obligation.",
 };
 
 export default function HomePage() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">This is the home route.</h1>
-        <p className="text-muted-foreground">
-          Public landing page. Every route except this one and{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">
-            /login
-          </code>{" "}
-          requires a session.
-        </p>
-      </div>
-      <div className="flex gap-3">
-        <Link href="/login" className={buttonVariants()}>
-          Log in
+    <div className="flex min-h-svh flex-col bg-muted/30">
+      <header className="mx-auto flex w-full max-w-2xl items-center justify-between px-5 py-4 sm:px-8">
+        <span className="flex items-center gap-2 font-semibold">
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <ShieldCheck className="size-4" />
+          </span>
+          Apex Intake Desk
+        </span>
+        <Link
+          href="/login"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
+          Team log in
         </Link>
-        <Link href="/dashboard" className={buttonVariants({ variant: "outline" })}>
-          Go to dashboard
-        </Link>
-      </div>
-    </main>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-5 py-6 sm:px-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            <BadgeCheck className="size-3.5" />
+            Free case review · No obligation
+          </span>
+          <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+            See if you qualify in about two minutes
+          </h1>
+          <p className="max-w-md text-muted-foreground text-pretty">
+            Answer a few quick questions and a real person from our intake team
+            will follow up. No cost, no pressure.
+          </p>
+        </div>
+
+        <IntakeForm />
+
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Lock className="size-3.5" />
+            Your information is private
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-3.5" />
+            Takes about two minutes
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="size-3.5" />
+            No obligation
+          </span>
+        </div>
+      </main>
+
+      <footer className="mx-auto w-full max-w-2xl px-5 pb-8 text-center text-xs text-muted-foreground sm:px-8">
+        Apex Lead Source · This is not legal advice.
+      </footer>
+    </div>
   );
 }

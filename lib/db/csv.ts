@@ -79,13 +79,3 @@ export function csvToRecords(input: string): Record<string, string>[] {
       return record;
     });
 }
-
-/**
- * Normalise a cell value: trim surrounding whitespace and treat an empty result
- * as `null`. Per the agreed import policy we do not otherwise transform values
- * (booleans, states, phone numbers and dates are stored exactly as provided).
- */
-export function toNullableText(value: string | null | undefined): string | null {
-  const trimmed = (value ?? "").trim();
-  return trimmed.length > 0 ? trimmed : null;
-}

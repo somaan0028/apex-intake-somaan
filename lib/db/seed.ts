@@ -4,19 +4,31 @@
  * Called once, on first boot, right after the schema is created (see
  * `bootstrap.ts`). Both files live in `lib/db/seed-data/`.
  *
- * Import policy (agreed): values are trimmed and otherwise stored exactly as
- * provided; empty strings become `NULL`.
+ * Import policy: text values are trimmed and empty strings become `NULL`;
+ * boolean-ish columns are normalised to real booleans (`Yes`/`N`/`true`/… →
+ * `true`/`false`, and blanks or unrecognised values → `NULL`).
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { hashPassword } from "@/lib/auth/password";
-import { csvToRecords, toNullableText } from "./csv";
+import { csvToRecords } from "./csv";
+import {
+  toCampaign,
+  toCounty,
+  toFillingForSomeoneElse,
+  toLeadStage,
+  toNullableBoolean,
+  toNullableDate,
+  toNullableText,
+  toRelationship,
+  toStateCode,
+  toUsPhone,
+  toUserRole,
+} from "./normalize";
 import { getDb, getRawDb, type AppDatabase } from "./index";
 import {
-  LEAD_STAGES,
   leads,
   users,
-  type LeadStage,
   type NewLead,
   type NewUser,
   type UserRole,
@@ -50,27 +62,19 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-/** Coerce a raw stage value to a known pipeline stage (falls back to `New`). */
-function coerceStage(value: string | null): LeadStage {
-  const candidate = value?.trim();
-  return (LEAD_STAGES as readonly string[]).includes(candidate ?? "")
-    ? (candidate as LeadStage)
-    : "New";
-}
-
 /** Insert the 15 demo users, hashing the shared password for each. */
 function seedUsers(db: AppDatabase): number {
   const records = csvToRecords(readSeedFile("users.csv"));
 
   const rows: NewUser[] = records.map((record) => {
-    const role: UserRole = toNullableText(record.role) === "admin" ? "admin" : "user";
+    const role: UserRole = toUserRole(record.role);
 
     return {
       name: toNullableText(record.name) ?? "Unknown",
       email: (toNullableText(record.email) ?? "").toLowerCase(),
       role,
       passwordHash: hashPassword(DEFAULT_DEMO_PASSWORD),
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     };
   });
 
@@ -97,38 +101,88 @@ function seedLeads(db: AppDatabase): number {
     // `matter_id` is the required business key; skip malformed rows defensively.
     .filter((record) => toNullableText(record.matter_id) !== null)
     .map((record) => {
+      const matterId = toNullableText(record.matter_id)!;
       const assignedEmail = (record.assigned_to ?? "").trim().toLowerCase();
+      const onBehalf = toFillingForSomeoneElse(record.filling_for);
+
+      // State and county must come from our fixed reference lists; anything we
+      // can't identify fails the import loudly rather than storing junk.
+      const stateCode = toStateCode(record.state);
+      if (!stateCode) {
+        throw new Error(
+          `[db] Lead ${matterId}: unrecognised state ${JSON.stringify(record.state)}. ` +
+            `Valid states live in lib/us-states.ts.`,
+        );
+      }
+      const rawCounty = toNullableText(record.county);
+      const county = rawCounty ? toCounty(stateCode, rawCounty) : null;
+      if (rawCounty && !county) {
+        throw new Error(
+          `[db] Lead ${matterId}: unrecognised county ${JSON.stringify(record.county)} ` +
+            `for ${stateCode}. Valid counties live in lib/us-counties.ts.`,
+        );
+      }
+
+      // The export stores the submitter's details in `first_name`…`email`
+      // regardless of who was injured. Redistribute so:
+      //   - `injured*` always describes the injured person, and
+      //   - `filler*` holds the submitter only when that is someone else.
+      const filler = onBehalf
+        ? {
+            fillerFirstName: toNullableText(record.first_name),
+            fillerLastName: toNullableText(record.last_name),
+            fillerPhone: toUsPhone(record.phone),
+            fillerEmail: toNullableText(record.email),
+          }
+        : {
+            fillerFirstName: null,
+            fillerLastName: null,
+            fillerPhone: null,
+            fillerEmail: null,
+          };
+
+      const injured = onBehalf
+        ? {
+            injuredFirstName: toNullableText(record.injured_first_name),
+            injuredLastName: toNullableText(record.injured_last_name),
+            injuredPhone: toUsPhone(record.injured_phone),
+            injuredEmail: toNullableText(record.injured_email),
+            relationshipToInjured: toRelationship(
+              record.relationship_to_injured,
+            ),
+          }
+        : {
+            injuredFirstName: toNullableText(record.first_name),
+            injuredLastName: toNullableText(record.last_name),
+            injuredPhone: toUsPhone(record.phone),
+            injuredEmail: toNullableText(record.email),
+            relationshipToInjured: null,
+          };
 
       return {
-        matterId: toNullableText(record.matter_id)!,
-        createdAt: toNullableText(record.created_at),
-        campaign: toNullableText(record.campaign),
-        stage: coerceStage(toNullableText(record.stage)),
+        matterId,
+        createdAt: toNullableDate(record.created_at),
+        campaign: toCampaign(record.campaign),
+        stage: toLeadStage(record.stage),
         assignedToId: userIdByEmail.get(assignedEmail) ?? null,
 
-        firstName: toNullableText(record.first_name),
-        lastName: toNullableText(record.last_name),
-        phone: toNullableText(record.phone),
-        email: toNullableText(record.email),
-        fillingFor: toNullableText(record.filling_for),
+        ...filler,
+        isFillingForSomeoneElse: onBehalf,
+        ...injured,
 
-        injuredFirstName: toNullableText(record.injured_first_name),
-        injuredLastName: toNullableText(record.injured_last_name),
-        injuredPhone: toNullableText(record.injured_phone),
-        injuredEmail: toNullableText(record.injured_email),
-        relationshipToInjured: toNullableText(record.relationship_to_injured),
-
-        dateOfAccident: toNullableText(record.date_of_accident),
-        state: toNullableText(record.state),
-        county: toNullableText(record.county),
+        dateOfAccident: toNullableDate(record.date_of_accident),
+        state: stateCode,
+        county,
         postcode: toNullableText(record.postcode),
-        howWereYouHurt: toNullableText(record.how_were_you_hurt),
-        brieflyDescribeAccident: toNullableText(record.briefly_describe_accident),
+        injuryDetails: toNullableText(record.how_were_you_hurt),
+        accidentDetails: toNullableText(record.briefly_describe_accident),
 
-        // Free-text booleans, stored verbatim (never coerced).
-        wereYouAtFault: toNullableText(record.were_you_at_fault),
-        doYouHaveAnAttorney: toNullableText(record.do_you_have_an_attorney),
-        haveYouReceivedSettlement: toNullableText(record.have_you_received_settlement),
+        // Normalise the export's messy boolean text (`Yes`/`N`/`true`/…).
+        isAtFault: toNullableBoolean(record.were_you_at_fault),
+        hasAttorney: toNullableBoolean(record.do_you_have_an_attorney),
+        hasReceivedSettlement: toNullableBoolean(
+          record.have_you_received_settlement,
+        ),
 
         source: toNullableText(record.source),
         ipaddress: toNullableText(record.ipaddress),
@@ -136,7 +190,7 @@ function seedLeads(db: AppDatabase): number {
         jornaya: toNullableText(record.jornaya),
 
         brightwaterLeadId: toNullableText(record.brightwater_lead_id),
-        sentToFirmAt: toNullableText(record.sent_to_firm_at),
+        sentToFirmAt: toNullableDate(record.sent_to_firm_at),
       };
     });
 

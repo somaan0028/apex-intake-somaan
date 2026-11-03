@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 /** The two roles supported by the single-tenant intake desk. */
-export const USER_ROLES = ["admin", "user"] as const;
+export const USER_ROLES = ["ADMIN", "USER"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 /**
@@ -27,14 +27,14 @@ export const users = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
     email: text("email").notNull(),
-    /** `'admin'` or `'user'`; constrained by a CHECK below. */
-    role: text("role").$type<UserRole>().notNull().default("user"),
+    /** `'ADMIN'` or `'USER'`; constrained by a CHECK below. */
+    role: text("role").$type<UserRole>().notNull().default("USER"),
     passwordHash: text("password_hash").notNull(),
-    createdAt: text("created_at").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [
     uniqueIndex("users_email_unique").on(table.email),
-    check("users_role_check", sql`${table.role} in ('admin', 'user')`),
+    check("users_role_check", sql`${table.role} in ('ADMIN', 'USER')`),
   ],
 );
 

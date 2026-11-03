@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5b020b81-ad91-4053-8ca9-18e66016f54d",
+  "id": "7aeb4904-a520-498d-a384-9600f921b937",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -34,7 +34,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'user'"
+          "default": "'USER'"
         },
         "password_hash": {
           "name": "password_hash",
@@ -45,7 +45,7 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -66,7 +66,7 @@
       "checkConstraints": {
         "users_role_check": {
           "name": "users_role_check",
-          "value": "\"users\".\"role\" in ('admin', 'user')"
+          "value": "\"users\".\"role\" in ('ADMIN', 'USER')"
         }
       }
     },
@@ -89,7 +89,7 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -107,7 +107,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'New'"
+          "default": "'NEW'"
         },
         "assigned_to_id": {
           "name": "assigned_to_id",
@@ -116,40 +116,41 @@
           "notNull": false,
           "autoincrement": false
         },
-        "first_name": {
-          "name": "first_name",
+        "filler_first_name": {
+          "name": "filler_first_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "last_name": {
-          "name": "last_name",
+        "filler_last_name": {
+          "name": "filler_last_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "phone": {
-          "name": "phone",
+        "filler_phone": {
+          "name": "filler_phone",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "email": {
-          "name": "email",
+        "filler_email": {
+          "name": "filler_email",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "filling_for": {
-          "name": "filling_for",
-          "type": "text",
+        "is_filling_for_someone_else": {
+          "name": "is_filling_for_someone_else",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "injured_first_name": {
           "name": "injured_first_name",
@@ -188,7 +189,7 @@
         },
         "date_of_accident": {
           "name": "date_of_accident",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -214,37 +215,37 @@
           "notNull": false,
           "autoincrement": false
         },
-        "how_were_you_hurt": {
-          "name": "how_were_you_hurt",
+        "injury_details": {
+          "name": "injury_details",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "briefly_describe_accident": {
-          "name": "briefly_describe_accident",
+        "accident_details": {
+          "name": "accident_details",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "were_you_at_fault": {
-          "name": "were_you_at_fault",
-          "type": "text",
+        "is_at_fault": {
+          "name": "is_at_fault",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "do_you_have_an_attorney": {
-          "name": "do_you_have_an_attorney",
-          "type": "text",
+        "has_attorney": {
+          "name": "has_attorney",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "have_you_received_settlement": {
-          "name": "have_you_received_settlement",
-          "type": "text",
+        "has_received_settlement": {
+          "name": "has_received_settlement",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -286,7 +287,7 @@
         },
         "sent_to_firm_at": {
           "name": "sent_to_firm_at",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -321,10 +322,10 @@
           ],
           "isUnique": false
         },
-        "leads_email_idx": {
-          "name": "leads_email_idx",
+        "leads_filler_email_idx": {
+          "name": "leads_filler_email_idx",
           "columns": [
-            "email"
+            "filler_email"
           ],
           "isUnique": false
         }
@@ -346,7 +347,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "leads_relationship_check": {
+          "name": "leads_relationship_check",
+          "value": "\"leads\".\"relationship_to_injured\" in ('SPOUSE', 'PARENT', 'STEP_PARENT', 'CHILD', 'STEP_CHILD', 'SIBLING', 'GRANDPARENT', 'GRANDCHILD', 'AUNT_UNCLE', 'NIECE', 'NEPHEW', 'COUSIN', 'IN_LAW', 'FRIEND', 'COLLEAGUE', 'NEIGHBOR', 'OTHER')"
+        }
+      }
     },
     "sessions": {
       "name": "sessions",
@@ -367,14 +373,14 @@
         },
         "expires_at": {
           "name": "expires_at",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

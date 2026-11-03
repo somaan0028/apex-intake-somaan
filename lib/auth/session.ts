@@ -72,7 +72,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!row) return null;
 
   // Reject (and clean up) expired sessions.
-  if (row.expiresAt <= new Date().toISOString()) {
+  if (row.expiresAt <= new Date()) {
     db.delete(sessions).where(eq(sessions.tokenHash, tokenHash)).run();
     return null;
   }
@@ -98,14 +98,14 @@ export async function createSession(userId: number): Promise<void> {
   const now = new Date();
 
   // Opportunistic cleanup so expired rows don't accumulate.
-  db.delete(sessions).where(lt(sessions.expiresAt, now.toISOString())).run();
+  db.delete(sessions).where(lt(sessions.expiresAt, now)).run();
 
   db.insert(sessions)
     .values({
       tokenHash: hashToken(token),
       userId,
-      expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString(),
-      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
+      createdAt: now,
     })
     .run();
 
