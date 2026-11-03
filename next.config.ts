@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   experimental: {
     agentFeedback: true,
+    // The authenticated shell is session-gated, so it can never produce an
+    // instant shell; automatic validation would flag it on every dev page load
+    // (the route redirects to /login mid-validation). Validate only segments
+    // that explicitly opt in with `export const instant`.
+    instantInsights: {
+      validationLevel: "manual-warning",
+    },
   },
   cacheComponents: true,
   partialPrefetching: true,

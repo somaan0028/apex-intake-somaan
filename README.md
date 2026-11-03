@@ -22,14 +22,18 @@ seed CSVs; later boots reuse it. Delete `data/` to force a fresh import.
 
 ## Routes
 
-| Route        | Access    | Notes                                              |
-| ------------ | --------- | -------------------------------------------------- |
-| `/`          | Public    | Home                                               |
-| `/login`     | Public    | Mock login (any non-empty credentials)             |
-| `/dashboard` | Protected | Placeholder                                        |
+| Route        | Access    | Notes                                          |
+| ------------ | --------- | ---------------------------------------------- |
+| `/`          | Public    | Home                                           |
+| `/login`     | Public    | Email + password (shared demo password)        |
+| `/dashboard` | Protected | Overview tab                                   |
+| `/leads`     | Protected | Lead list (placeholder)                        |
+| `/users`     | Protected | User management (placeholder)                  |
 
-Everything other than `/` and `/login` is protected by `proxy.ts`. Authentication is
-currently **mocked** (a plain cookie); real DB-backed auth comes next.
+Everything other than `/` and `/login` is protected by `proxy.ts`, and each page under
+the `(app)` route group re-checks the session server-side. Sessions are opaque,
+DB-backed tokens (`sessions` table); passwords are scrypt-hashed. Every seeded account
+uses the demo password `apex-demo-2026`.
 
 ## Scripts
 

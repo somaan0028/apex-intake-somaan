@@ -4,26 +4,27 @@ import { SESSION_COOKIE } from "@/lib/auth/session-cookie";
 /**
  * Route guard.
  *
- * `proxy.ts` is the renamed `middleware.ts` in Next 16. It redirects
- * unauthenticated users away from protected routes, but it is **not** a
+ * `proxy.ts` is the renamed `middleware.ts` in Next 16. It redirects requests
+ * that carry no session cookie away from protected routes, but it is **not** a
  * security boundary — protected pages and Server Actions re-check the session
- * themselves (see `lib/auth/session.ts`).
+ * against the database themselves (see `lib/auth/session.ts`).
  *
- * `/` and `/login` are public; everything else requires a (mock) session.
+ * It deliberately does NOT redirect authenticated-looking requests away from
+ * `/login`: proxy can only see whether the cookie *exists*, not whether the
+ * session is still valid, so doing so would bounce a stale cookie between
+ * `/login` and `/dashboard` forever. The login page handles that case itself
+ * using the database-validated session.
+ *
+ * `/` and `/login` are public; everything else requires a session cookie.
  */
 const PUBLIC_PATHS = new Set(["/", "/login"]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAuthenticated = request.cookies.has(SESSION_COOKIE);
+  const hasSession = request.cookies.has(SESSION_COOKIE);
 
-  if (!isAuthenticated && !PUBLIC_PATHS.has(pathname)) {
+  if (!hasSession && !PUBLIC_PATHS.has(pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Signed-in users have no reason to see the login form.
-  if (isAuthenticated && pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();
