@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ClipboardList, LayoutDashboard, LogOut, Users } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import type { AuthUser } from "@/lib/auth/session";
+import { initials } from "@/lib/format";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -25,16 +26,6 @@ const NAV_ITEMS = [
   { title: "Leads", url: "/leads", icon: ClipboardList },
   { title: "Users", url: "/users", icon: Users },
 ] as const;
-
-/** First letters of the first two words, e.g. "Dana Whitfield" -> "DW". */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 export function AppSidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
