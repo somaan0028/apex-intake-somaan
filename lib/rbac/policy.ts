@@ -62,21 +62,33 @@ export function canChangeLeadStage(
 }
 
 /**
- * May `actor` set `lead`'s assignee to `targetUserId`?
+ * May `actor` set `lead`'s assignee to `targetUserId` (`null` = unassigned)?
  *
- * Admins assign anyone to anyone. An agent may only *claim*: the lead must
- * currently be unassigned and the target must be the agent themselves.
+ * Admins assign anyone to anyone. An agent manages only their *own* assignment:
+ * they can claim an unassigned lead for themselves, or release a lead they own
+ * back to the pool.
  */
 export function canAssignLead(
   actor: Actor,
   lead: LeadSubject,
-  targetUserId: number,
+  targetUserId: number | null,
 ): boolean {
   if (can(actor.role, "leads.assign.any")) return true;
-  return (
+
+  // Claim: take an unassigned lead for yourself.
+  if (
     can(actor.role, "leads.claim") &&
     lead.assignedToId === null &&
     targetUserId === actor.id
+  ) {
+    return true;
+  }
+
+  // Release: hand a lead you own back to the pool.
+  return (
+    can(actor.role, "leads.release") &&
+    lead.assignedToId === actor.id &&
+    targetUserId === null
   );
 }
 

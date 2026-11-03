@@ -63,3 +63,16 @@ export function relationshipLabel(value: string | null | undefined): string {
   if (!value) return "";
   return RELATIONSHIP_LABELS[value as Relationship] ?? value;
 }
+
+/**
+ * Label for a person in an assignee dropdown.
+ *
+ * The signed-in user's own name is marked, so "Maria Delgado" reads as
+ * "(You) Maria Delgado" wherever they could pick themselves.
+ */
+export function assigneeLabel(
+  assignee: { id: number; name: string },
+  viewerId: number,
+): string {
+  return assignee.id === viewerId ? `${assignee.name} (You)` : assignee.name;
+}

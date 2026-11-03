@@ -140,8 +140,8 @@ export interface DataTableProps<TData extends RowData> {
   /** Page sizes offered in the footer. */
   pageSizeOptions?: number[];
   /**
-   * Caller-supplied controls (e.g. an "Add user" button) rendered right-aligned
-   * on their own row beneath the filters.
+   * Caller-supplied controls (e.g. an "Add user" button) rendered on the same
+   * line as the filters, pushed to the right.
    */
   toolbarActions?: ReactNode;
   /**
@@ -332,18 +332,17 @@ export function DataTable<TData extends RowData>({
           </div>
         </div>
 
-        {/* Row 2: the filter controls, wrapping as needed. */}
-        {visibleFilters.length ? (
+        {/* Row 2: the filter controls, with any caller-supplied actions pushed
+            to the right of the same line. */}
+        {visibleFilters.length || toolbarActions ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {visibleFilters.map((filter) => (
               <ColumnFilter key={filter.columnId} table={table} filter={filter} />
             ))}
+            {toolbarActions ? (
+              <div className="ml-auto">{toolbarActions}</div>
+            ) : null}
           </div>
-        ) : null}
-
-        {/* Row 3: caller-supplied actions (e.g. "Add user"), right-aligned. */}
-        {toolbarActions ? (
-          <div className="flex justify-end">{toolbarActions}</div>
         ) : null}
       </div>
 

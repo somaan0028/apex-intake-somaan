@@ -5,7 +5,7 @@
  * and paging all in SQL, one page at a time. The shared plumbing lives in
  * `lib/db/list-query.ts`.
  */
-import { eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { eq, getTableColumns, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import { can, type Actor } from "@/lib/rbac";
@@ -23,35 +23,18 @@ import {
   leads,
   users,
   type CaseType,
+  type Lead,
   type LeadStage,
 } from "@/lib/db/schema";
 import type { TableQuery } from "@/lib/table-query";
 import { LEAD_SOURCES, UNASSIGNED, type LeadSource } from "./constants";
 
-/** A lead row as the grid consumes it (assignee name comes from the join). */
-export type LeadRow = {
-  id: number;
-  createdAt: Date | null;
-  caseType: CaseType | null;
-  stage: LeadStage;
-  source: string | null;
-  state: string | null;
-  county: string | null;
-  injuredFirstName: string | null;
-  injuredLastName: string | null;
-  injuredEmail: string | null;
-  injuredPhone: string | null;
-  /** True when the form was submitted for someone other than the injured person. */
-  isFillingForSomeoneElse: boolean;
-  fillerFirstName: string | null;
-  fillerLastName: string | null;
-  /** Tri-state qualifying answers; `null` means "not recorded". */
-  isAtFault: boolean | null;
-  hasAttorney: boolean | null;
-  hasReceivedSettlement: boolean | null;
-  /** Display name of the assigned agent, or `null` when unassigned. */
-  assignedToName: string | null;
-};
+/**
+ * A lead as the grid *and* the detail dialog consume it: every column, plus the
+ * joined assignee's display name. It satisfies `LeadSubject`, so the dialog can
+ * run the same RBAC policies the server does.
+ */
+export type LeadRow = Lead & { assignedToName: string | null };
 
 /**
  * Sort keys the grid exposes. Typing the map as a complete `Record` makes a
@@ -172,26 +155,7 @@ export function listLeads(
   });
 
   const rows = db
-    .select({
-      id: leads.id,
-      createdAt: leads.createdAt,
-      caseType: leads.caseType,
-      stage: leads.stage,
-      source: leads.source,
-      state: leads.state,
-      county: leads.county,
-      injuredFirstName: leads.injuredFirstName,
-      injuredLastName: leads.injuredLastName,
-      injuredEmail: leads.injuredEmail,
-      injuredPhone: leads.injuredPhone,
-      isFillingForSomeoneElse: leads.isFillingForSomeoneElse,
-      fillerFirstName: leads.fillerFirstName,
-      fillerLastName: leads.fillerLastName,
-      isAtFault: leads.isAtFault,
-      hasAttorney: leads.hasAttorney,
-      hasReceivedSettlement: leads.hasReceivedSettlement,
-      assignedToName: users.name,
-    })
+    .select({ ...getTableColumns(leads), assignedToName: users.name })
     .from(leads)
     .leftJoin(users, eq(leads.assignedToId, users.id))
     .where(plan.where)

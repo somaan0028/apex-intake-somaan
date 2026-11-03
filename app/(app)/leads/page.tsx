@@ -41,6 +41,7 @@ export default async function LeadsPage({
         total={total}
         query={query}
         assignees={assignees}
+        viewer={user}
       />
     </div>
   );

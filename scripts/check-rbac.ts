@@ -70,6 +70,7 @@ const expectedGrants: Record<UserRole, readonly Permission[]> = {
     "leads.view.unassigned",
     "leads.edit.own",
     "leads.claim",
+    "leads.release",
   ],
 };
 for (const role of Object.keys(expectedGrants) as UserRole[]) {
@@ -114,10 +115,14 @@ check("admin moves any lead to the firm stage", canChangeLeadStage(admin, others
 
 console.log("\nAssign");
 check("admin assigns any lead to anyone", canAssignLead(admin, others, 99), true);
+check("admin unassigns any lead", canAssignLead(admin, others, null), true);
 check("agent claims an unassigned lead", canAssignLead(agent, unassigned, agent.id), true);
 check("agent cannot assign an unassigned lead to someone else", canAssignLead(agent, unassigned, 99), false);
 check("agent cannot re-claim a lead already theirs", canAssignLead(agent, own, agent.id), false);
 check("agent cannot claim another agent's lead", canAssignLead(agent, others, agent.id), false);
+check("agent releases a lead they own", canAssignLead(agent, own, null), true);
+check("agent cannot release a lead they don't own", canAssignLead(agent, others, null), false);
+check("agent cannot 'release' an already-unassigned lead", canAssignLead(agent, unassigned, null), false);
 
 // --- Send to firm ----------------------------------------------------------
 

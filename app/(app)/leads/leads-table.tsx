@@ -16,6 +16,7 @@
  * turned on from the Filters menu.
  */
 import { createColumnHelper } from "@tanstack/react-table";
+import { useState } from "react";
 import {
   DataTable,
   useTableQuerySync,
@@ -23,7 +24,7 @@ import {
 } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
 import { Badge } from "@/components/ui/badge";
-import { CASE_TYPE_LABELS, LEAD_STAGE_LABELS } from "@/lib/labels";
+import { CASE_TYPE_LABELS, LEAD_STAGE_LABELS, assigneeLabel } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import {
   CASE_TYPES,
@@ -31,9 +32,11 @@ import {
   type CaseType,
   type LeadStage,
 } from "@/lib/db/schema";
+import type { AuthUser } from "@/lib/auth/session";
 import { LEAD_SOURCES, UNASSIGNED } from "@/lib/leads/constants";
 import type { LeadRow } from "@/lib/leads/queries";
 import { BOOLEAN_FILTER_OPTIONS, type TableQuery } from "@/lib/table-query";
+import { LeadDialog } from "./lead-dialog";
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
@@ -187,7 +190,10 @@ const columns = columnHelper.columns([
 const getRowId = (lead: LeadRow) => String(lead.id);
 
 /** Filter descriptors; assignee options depend on the loaded team. */
-function buildFilters(assignees: Array<{ id: number; name: string }>): DataTableFilter[] {
+function buildFilters(
+  assignees: Array<{ id: number; name: string }>,
+  viewerId: number,
+): DataTableFilter[] {
   return [
     {
       columnId: "caseType",
@@ -220,7 +226,7 @@ function buildFilters(assignees: Array<{ id: number; name: string }>): DataTable
       options: [
         { label: "Unassigned", value: UNASSIGNED },
         ...assignees.map((assignee) => ({
-          label: assignee.name,
+          label: assigneeLabel(assignee, viewerId),
           value: String(assignee.id),
         })),
       ],
@@ -251,30 +257,44 @@ export function LeadsTable({
   total,
   query,
   assignees,
+  viewer,
 }: {
   leads: LeadRow[];
   total: number;
   query: TableQuery;
   assignees: Array<{ id: number; name: string }>;
+  /** The signed-in user, so the detail dialog can run the RBAC policies. */
+  viewer: AuthUser;
 }) {
   const { isPending, onQueryChange } = useTableQuerySync();
+  const [selected, setSelected] = useState<LeadRow | null>(null);
 
   return (
-    <DataTable
-      columns={columns}
-      data={leads}
-      rowCount={total}
-      query={query}
-      onQueryChange={onQueryChange}
-      isPending={isPending}
-      getRowId={getRowId}
-      ariaLabel="Leads"
-      searchPlaceholder="Search leads…"
-      filters={buildFilters(assignees)}
-      defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
-      defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
-      emptyMessage="No leads yet."
-      emptyFilteredMessage="No leads match your filters."
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={leads}
+        rowCount={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        isPending={isPending}
+        getRowId={getRowId}
+        ariaLabel="Leads"
+        searchPlaceholder="Search leads…"
+        filters={buildFilters(assignees, viewer.id)}
+        defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
+        defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        emptyMessage="No leads yet."
+        emptyFilteredMessage="No leads match your filters."
+        onRowClick={(lead) => setSelected(lead)}
+      />
+
+      <LeadDialog
+        lead={selected}
+        onClose={() => setSelected(null)}
+        viewer={viewer}
+        assignees={assignees}
+      />
+    </>
   );
 }

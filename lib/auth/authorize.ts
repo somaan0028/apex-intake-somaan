@@ -70,11 +70,11 @@ export function requireLeadStageChange(
   }
 }
 
-/** Throw unless `actor` may assign `lead` to `targetUserId`. */
+/** Throw unless `actor` may assign `lead` to `targetUserId` (`null` = unassigned). */
 export function requireLeadAssignment(
   actor: Actor,
   lead: LeadSubject,
-  targetUserId: number,
+  targetUserId: number | null,
 ): void {
   if (!canAssignLead(actor, lead, targetUserId)) {
     throw new ForbiddenError("You can't assign this lead to that user.");

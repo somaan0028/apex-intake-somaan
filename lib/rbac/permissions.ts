@@ -35,6 +35,8 @@ export const PERMISSIONS = [
   "leads.assign.any",
   /** Claim an unassigned lead for myself. */
   "leads.claim",
+  /** Give up a lead I own, returning it to the unassigned pool. */
+  "leads.release",
   /** Send / retry a lead to the partner firm. */
   "leads.send_to_firm",
   /** Create and manage intake users. */
@@ -60,6 +62,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "leads.view.unassigned",
     "leads.edit.own",
     "leads.claim",
+    "leads.release",
   ],
 };
 
