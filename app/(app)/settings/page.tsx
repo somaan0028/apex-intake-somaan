@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { listApiTokens } from "@/lib/auth/api-token";
 import { requireUser } from "@/lib/auth/session";
+import { mcpEndpoint } from "@/lib/mcp/endpoint";
 import { TokensCard } from "./tokens-card";
 
 export const metadata: Metadata = {
@@ -17,14 +18,10 @@ export default async function SettingsPage() {
   const tokens = listApiTokens(user.id);
 
   // The absolute MCP URL, so the instructions can be copied verbatim rather than
-  // assembled by hand. Taken from the request so it matches however the app was
-  // reached — localhost, a LAN address, or a tunnel.
+  // assembled by hand. It follows the request so localhost, a LAN address, and a
+  // reverse proxy each get their own working endpoint.
   const requestHeaders = await headers();
-  const host = requestHeaders.get("host") ?? "localhost:3000";
-  const forwardedProto = requestHeaders.get("x-forwarded-proto")?.split(",")[0];
-  const protocol =
-    forwardedProto?.trim() || (host.startsWith("localhost") ? "http" : "https");
-  const endpoint = `${protocol}://${host}/api/mcp`;
+  const endpoint = mcpEndpoint(requestHeaders);
 
   return (
     <div className="space-y-4">
