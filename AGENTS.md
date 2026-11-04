@@ -168,6 +168,9 @@ their Lawmatics CRM.
 - The copied endpoint comes from `lib/mcp/endpoint.ts`, which follows the request host
   (`x-forwarded-host` first) and `x-forwarded-proto`. When no proxy says otherwise,
   loopback and private/link-local addresses use HTTP and public hostnames use HTTPS.
+- The Settings card's **Copy Instructions for AI** button copies a ready-to-use prompt
+  with the endpoint, the bearer header, and the JSON config. A token created in the same
+  visit is included once; otherwise the prompt carries a placeholder.
 - A token carries **no permissions of its own**. Every call runs through the same services
   and `lib/auth/authorize.ts` checks the UI uses, so an agent can do what its owner can
   and nothing more. A refusal returns `isError` with the policy's own sentence (e.g.
