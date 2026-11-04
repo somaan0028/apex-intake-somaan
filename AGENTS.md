@@ -52,6 +52,10 @@ their Lawmatics CRM.
   display labels live in `lib/labels.ts`.
 - Only `MVA` leads are sent to partner firm Brightwater (form-urlencoded API),
   **at most once per lead**.
+- `SENT_TO_FIRM` records an actual submission: the service refuses to set that
+  stage unless `sent_to_firm_at` or `brightwater_lead_id` is populated, so the
+  stage cannot be chosen manually on an unsent lead. The dialog, inline select
+  and Kanban drop all surface the refusal.
 - Person data is split by role: `injured*` is always the injured person; `filler*` is
   the form submitter, populated only when `isFillingForSomeoneElse` is true (never
   duplicated). Brightwater receives the injured person's details.
@@ -193,6 +197,18 @@ their Lawmatics CRM.
   `stateLabel()`. The stage and assignee are also editable inline in the grid
   (`leads-table.tsx`): admins get both selects, agents get a stage select plus
   Claim/Release, and each cell saves through the same `saveLeadFields` action.
+- The leads page defaults to a **Kanban view**; the URL only needs `view=table`
+  to show the grid. The server loads the filtered set (up to 1000 rows) for the
+  board; cards drag between stage columns through the same `saveLeadFields`
+  action, carry an eye button that opens the detail dialog, and reuse the inline
+  assignee control. A Stages menu beside Filters hides and shows columns; hidden
+  stages free their width, the columns flex to fill the space, and the page
+  scrolls rather than each stage getting its own scrollbar. The stage filter is
+  dropped in Kanban because the board already groups by stage.
+- The leads grid and board always send `filter.addedFrom` (seven days ago by
+  default) and optionally `filter.addedTo`; `listLeads` turns those into
+  `created_at` bounds, so a fresh visit never loads the whole backlog. The lower
+  date has no clear control; the upper date can be cleared.
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the

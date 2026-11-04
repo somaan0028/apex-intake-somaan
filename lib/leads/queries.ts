@@ -9,8 +9,10 @@ import {
   and,
   eq,
   getTableColumns,
+  gte,
   isNotNull,
   isNull,
+  lte,
   notInArray,
   or,
   sql,
@@ -117,6 +119,39 @@ function isLeadStage(value: string): value is LeadStage {
 }
 
 /**
+ * Parse a `YYYY-MM-DD` date filter. `endOfDay` makes an upper bound inclusive
+ * of the whole day rather than midnight.
+ */
+function parseFilterDate(
+  value: string | undefined,
+  endOfDay = false,
+): Date | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  );
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+/**
  * The row-level visibility filter for `actor`, mirroring `canViewLead`.
  *
  * Admins see everything; an agent sees the unassigned pool plus their own leads.
@@ -198,6 +233,13 @@ export function listLeads(
   conditions.push(
     booleanFilter(query, "hasReceivedSettlement", leads.hasReceivedSettlement),
   );
+
+  // Added-date range. The board and grid always carry a lower bound so an
+  // unfiltered visit does not load the entire backlog.
+  const addedFrom = parseFilterDate(query.filters.addedFrom);
+  if (addedFrom) conditions.push(gte(leads.createdAt, addedFrom));
+  const addedTo = parseFilterDate(query.filters.addedTo, true);
+  if (addedTo) conditions.push(lte(leads.createdAt, addedTo));
 
   // Sorting by source is the same side-channel as filtering by it; fall back to
   // the default order rather than order by a column the viewer can't see.

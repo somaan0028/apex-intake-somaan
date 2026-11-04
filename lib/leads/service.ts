@@ -130,7 +130,20 @@ function applyLeadUpdate(
   );
 
   if (otherKeys.length > 0) requireLeadEdit(actor, lead);
-  if (stageChanged) requireLeadStageChange(actor, lead, update.stage!);
+  if (stageChanged) {
+    // The sent stage is a record of an actual submission, not a free choice.
+    if (
+      update.stage === "SENT_TO_FIRM" &&
+      lead.sentToFirmAt === null &&
+      lead.brightwaterLeadId === null
+    ) {
+      return {
+        ok: false,
+        error: "This lead hasn't been sent to the firm yet.",
+      };
+    }
+    requireLeadStageChange(actor, lead, update.stage!);
+  }
   if (assigneeChanged) {
     requireLeadAssignment(actor, lead, update.assignedToId!);
   }

@@ -149,6 +149,17 @@ export interface DataTableProps<TData extends RowData> {
    * calls this with the row's data, e.g. to open a detail editor.
    */
   onRowClick?: (row: TData) => void;
+  /**
+   * Replaces the table body and pager while keeping the search box, filters
+   * and toolbar actions. Used for the Kanban view of a grid.
+   */
+  renderContent?: ReactNode;
+  /** Hide the Columns menu when the active view has no columns. */
+  showColumnMenu?: boolean;
+  /** Replaces the Columns menu, e.g. with the Kanban Stages menu. */
+  columnMenu?: ReactNode;
+  /** Extra filter controls rendered with the select filters (e.g. a date range). */
+  toolbarFilters?: ReactNode;
 }
 
 /** Sentinel for the "no filter" choice in a column filter select. */
@@ -175,6 +186,10 @@ export function DataTable<TData extends RowData>({
   pageSizeOptions = PAGE_SIZE_OPTIONS,
   toolbarActions,
   onRowClick,
+  renderContent,
+  showColumnMenu = true,
+  columnMenu,
+  toolbarFilters,
 }: DataTableProps<TData>) {
   const { page, pageSize, search, filters: filterValues } = query;
   const sortId = query.sort?.id ?? null;
@@ -328,16 +343,22 @@ export function DataTable<TData extends RowData>({
                 }
               />
             ) : null}
-            <ColumnVisibilityMenu table={table} />
+            {columnMenu ??
+              (showColumnMenu ? <ColumnVisibilityMenu table={table} /> : null)}
           </div>
         </div>
 
         {/* Row 2: the filter controls, with any caller-supplied actions pushed
             to the right of the same line. */}
-        {visibleFilters.length || toolbarActions ? (
+        {visibleFilters.length || toolbarFilters || toolbarActions ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {toolbarFilters}
             {visibleFilters.map((filter) => (
-              <ColumnFilter key={filter.columnId} table={table} filter={filter} />
+              <ColumnFilter
+                key={filter.columnId}
+                table={table}
+                filter={filter}
+              />
             ))}
             {toolbarActions ? (
               <div className="ml-auto">{toolbarActions}</div>
@@ -346,176 +367,193 @@ export function DataTable<TData extends RowData>({
         ) : null}
       </div>
 
-      <div
-        className={cn(
-          "rounded-xl border transition-opacity",
-          isPending && "pointer-events-none opacity-60",
-        )}
-        aria-busy={isPending}
-      >
-        <Table aria-label={ariaLabel}>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  const sorted = header.column.getIsSorted();
-                  return (
-                    <TableHead
-                      key={header.id}
-                      colSpan={header.colSpan}
-                      aria-sort={
-                        sorted === "asc"
-                          ? "ascending"
-                          : sorted === "desc"
-                            ? "descending"
-                            : undefined
+      {renderContent ? (
+        <div
+          className={cn(
+            "transition-opacity",
+            isPending && "pointer-events-none opacity-60",
+          )}
+          aria-busy={isPending}
+        >
+          {renderContent}
+        </div>
+      ) : (
+        <>
+          <div
+            className={cn(
+              "rounded-xl border transition-opacity",
+              isPending && "pointer-events-none opacity-60",
+            )}
+            aria-busy={isPending}
+          >
+            <Table aria-label={ariaLabel}>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      const sorted = header.column.getIsSorted();
+                      return (
+                        <TableHead
+                          key={header.id}
+                          colSpan={header.colSpan}
+                          aria-sort={
+                            sorted === "asc"
+                              ? "ascending"
+                              : sorted === "desc"
+                                ? "descending"
+                                : undefined
+                          }
+                        >
+                          {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                            <button
+                              type="button"
+                              onClick={header.column.getToggleSortingHandler()}
+                              className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:text-foreground"
+                            >
+                              <table.FlexRender header={header} />
+                              <SortIcon direction={sorted} />
+                            </button>
+                          ) : (
+                            <table.FlexRender header={header} />
+                          )}
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {rows.length ? (
+                  rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      onClick={
+                        onRowClick ? () => onRowClick(row.original) : undefined
+                      }
+                      onKeyDown={
+                        onRowClick
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                onRowClick(row.original);
+                              }
+                            }
+                          : undefined
+                      }
+                      tabIndex={onRowClick ? 0 : undefined}
+                      className={
+                        onRowClick
+                          ? "cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                          : undefined
                       }
                     >
-                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                        <button
-                          type="button"
-                          onClick={header.column.getToggleSortingHandler()}
-                          className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:text-foreground"
-                        >
-                          <table.FlexRender header={header} />
-                          <SortIcon direction={sorted} />
-                        </button>
-                      ) : (
-                        <table.FlexRender header={header} />
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {rows.length ? (
-              rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  onClick={
-                    onRowClick ? () => onRowClick(row.original) : undefined
-                  }
-                  onKeyDown={
-                    onRowClick
-                      ? (event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            onRowClick(row.original);
-                          }
-                        }
-                      : undefined
-                  }
-                  tabIndex={onRowClick ? 0 : undefined}
-                  className={
-                    onRowClick
-                      ? "cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
-                      : undefined
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      <table.FlexRender cell={cell} />
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          <table.FlexRender cell={cell} />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={table.getVisibleLeafColumns().length}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      {isFiltered ? emptyFilteredMessage : emptyMessage}
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={table.getVisibleLeafColumns().length}
-                  className="h-24 text-center text-muted-foreground"
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <p className="text-sm text-muted-foreground">
+              {rowCount === 0
+                ? "No results"
+                : `Showing ${rangeStart}–${rangeEnd} of ${rowCount}`}
+            </p>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="hidden text-sm text-muted-foreground sm:inline">
+                  Rows per page
+                </span>
+                <Select
+                  items={pageSizeOptions.map((size) => ({
+                    label: String(size),
+                    value: String(size),
+                  }))}
+                  value={String(pagination.pageSize)}
+                  onValueChange={(value) =>
+                    value && table.setPageSize(Number(value))
+                  }
                 >
-                  {isFiltered ? emptyFilteredMessage : emptyMessage}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-fit"
+                    aria-label="Rows per page"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-        <p className="text-sm text-muted-foreground">
-          {rowCount === 0
-            ? "No results"
-            : `Showing ${rangeStart}–${rangeEnd} of ${rowCount}`}
-        </p>
+              <span className="text-sm tabular-nums">
+                Page {pageCount === 0 ? 0 : pagination.pageIndex + 1} of{" "}
+                {pageCount}
+              </span>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-muted-foreground sm:inline">
-              Rows per page
-            </span>
-            <Select
-              items={pageSizeOptions.map((size) => ({
-                label: String(size),
-                value: String(size),
-              }))}
-              value={String(pagination.pageSize)}
-              onValueChange={(value) => value && table.setPageSize(Number(value))}
-            >
-              <SelectTrigger
-                size="sm"
-                className="w-fit"
-                aria-label="Rows per page"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {pageSizeOptions.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => table.firstPage()}
+                  disabled={!table.getCanPreviousPage() || isPending}
+                  aria-label="First page"
+                >
+                  <ChevronsLeft />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage() || isPending}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage() || isPending}
+                  aria-label="Next page"
+                >
+                  <ChevronRight />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => table.lastPage()}
+                  disabled={!table.getCanNextPage() || isPending}
+                  aria-label="Last page"
+                >
+                  <ChevronsRight />
+                </Button>
+              </div>
+            </div>
           </div>
-
-          <span className="text-sm tabular-nums">
-            Page {pageCount === 0 ? 0 : pagination.pageIndex + 1} of {pageCount}
-          </span>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={() => table.firstPage()}
-              disabled={!table.getCanPreviousPage() || isPending}
-              aria-label="First page"
-            >
-              <ChevronsLeft />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage() || isPending}
-              aria-label="Previous page"
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage() || isPending}
-              aria-label="Next page"
-            >
-              <ChevronRight />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={() => table.lastPage()}
-              disabled={!table.getCanNextPage() || isPending}
-              aria-label="Last page"
-            >
-              <ChevronsRight />
-            </Button>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

@@ -55,6 +55,11 @@ export function canEditLead(actor: Actor, lead: LeadSubject): boolean {
  * list: an actor without `leads.send_to_firm` cannot set the sent stage. Editing
  * rights come first, so an agent cannot touch an unassigned lead even if the
  * target stage would otherwise be allowed — they must claim it first.
+ *
+ * The capability only decides who may *try* to set `SENT_TO_FIRM`. The service
+ * additionally refuses that stage until a firm submission has actually been
+ * recorded, so the UI can show the server's explanation instead of silently
+ * hiding the option.
  */
 export function canChangeLeadStage(
   actor: Actor,

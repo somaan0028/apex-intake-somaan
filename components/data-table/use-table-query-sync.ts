@@ -24,9 +24,25 @@ export function useTableQuerySync(): {
 
   const onQueryChange = useCallback(
     (next: TableQuery) => {
-      const params = tableQueryToParams(next).toString();
+      const params = tableQueryToParams(next);
+
+      // Keep params the table does not own, such as the leads page's `view`
+      // switch, when a filter or the search changes.
+      const current = new URLSearchParams(window.location.search);
+      current.forEach((value, key) => {
+        const owned =
+          key === "page" ||
+          key === "pageSize" ||
+          key === "sort" ||
+          key === "sortDir" ||
+          key === "search" ||
+          key.startsWith("filter.");
+        if (!owned) params.set(key, value);
+      });
+
+      const query = params.toString();
       startTransition(() => {
-        router.replace(params ? `${pathname}?${params}` : pathname, {
+        router.replace(query ? `${pathname}?${query}` : pathname, {
           scroll: false,
         });
       });

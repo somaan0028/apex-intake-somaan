@@ -16,14 +16,26 @@
  * turned on from the Filters menu.
  */
 import { createColumnHelper } from "@tanstack/react-table";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useContext,
   useMemo,
   useState,
+  useTransition,
   type SyntheticEvent,
 } from "react";
-import { Loader2 } from "lucide-react";
+import {
+  CalendarDays,
+  Columns3,
+  Eye,
+  Loader2,
+  Mail,
+  Phone,
+  SlidersHorizontal,
+  Table2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   DataTable,
@@ -34,6 +46,17 @@ import { dataTableFeatures } from "@/components/data-table/features";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -57,7 +80,7 @@ import {
 } from "@/lib/db/schema";
 import type { AuthUser } from "@/lib/auth/session";
 import { saveLeadFields } from "@/lib/leads/actions";
-import { LEAD_SOURCES, UNASSIGNED } from "@/lib/leads/constants";
+import { UNASSIGNED, type LeadsView } from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
 import {
@@ -67,6 +90,7 @@ import {
   canEditLead,
 } from "@/lib/rbac";
 import { BOOLEAN_FILTER_OPTIONS, type TableQuery } from "@/lib/table-query";
+import { cn } from "@/lib/utils";
 import { LeadDialog } from "./lead-dialog";
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
@@ -91,6 +115,11 @@ const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
   label: LEAD_STAGE_LABELS[value],
   value,
 }));
+
+const KANBAN_SORT_OPTIONS = [
+  { label: "Newest to Oldest", value: "newest" },
+  { label: "Oldest to Newest", value: "oldest" },
+];
 
 /** Optimistic inline values for a row, cleared once the grid catches up. */
 interface RowOverride {
@@ -292,7 +321,6 @@ const getRowId = (lead: LeadRow) => String(lead.id);
 function buildFilters(
   assignees: Array<{ id: number; name: string }>,
   viewerId: number,
-  showAttribution: boolean,
 ): DataTableFilter[] {
   return [
     {
@@ -313,17 +341,6 @@ function buildFilters(
         value,
       })),
     },
-    // Source is attribution data; the filter is only offered alongside the column.
-    ...(showAttribution
-      ? [
-          {
-            columnId: "source",
-            label: "Source",
-            allLabel: "Any",
-            options: LEAD_SOURCES.map((value) => ({ label: value, value })),
-          } satisfies DataTableFilter,
-        ]
-      : []),
     {
       columnId: "assignedTo",
       label: "Assigned to",
@@ -363,6 +380,8 @@ export function LeadsTable({
   query,
   assignees,
   viewer,
+  view,
+  sortExplicit,
 }: {
   leads: LeadRow[];
   total: number;
@@ -370,11 +389,19 @@ export function LeadsTable({
   assignees: Array<{ id: number; name: string }>;
   /** The signed-in user, so the detail dialog can run the RBAC policies. */
   viewer: AuthUser;
+  /** Table or Kanban; the server loads a larger set for the board. */
+  view: LeadsView;
+  /** True when the URL explicitly asked for a date-added sort. */
+  sortExplicit: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { isPending, onQueryChange } = useTableQuerySync();
+  const [viewPending, startViewTransition] = useTransition();
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [overrides, setOverrides] = useState<Record<number, RowOverride>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
+  const [hiddenStages, setHiddenStages] = useState<LeadStage[]>([]);
 
   // Attribution (source + tracking ids) is admin-only. The server already blanks
   // the values; dropping the column and its filter keeps the grid from offering
@@ -434,6 +461,91 @@ export function LeadsTable({
     return true;
   }
 
+  // Blank until the URL explicitly asks for a date-added sort, so the board
+  // keeps its natural order on a fresh visit.
+  const sortValue =
+    sortExplicit && query.sort?.id === "createdAt"
+      ? query.sort.desc
+        ? "newest"
+        : "oldest"
+      : "";
+
+  /** Apply the added-date range; the lower bound is required. */
+  function changeDateRange(from: string, to: string) {
+    if (!from) return;
+    const filters: Record<string, string> = {
+      ...query.filters,
+      addedFrom: from,
+    };
+    if (to) filters.addedTo = to;
+    else delete filters.addedTo;
+    onQueryChange({ ...query, page: 1, filters });
+  }
+
+  /** Switch views without losing the search, filters or sort. */
+  function changeView(next: LeadsView) {
+    if (next === view) return;
+    const params = new URLSearchParams(window.location.search);
+    if (next === "kanban") {
+      // Kanban is the default view, so the URL only needs `view=table`.
+      params.delete("view");
+      // The board has no pages; start at the top if the user returns.
+      params.delete("page");
+      // The board groups by stage, so the stage filter makes no sense there.
+      params.delete("filter.stage");
+    } else {
+      params.set("view", "table");
+    }
+    const search = params.toString();
+    startViewTransition(() => {
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
+    });
+  }
+
+  const stageMenu =
+    view === "kanban" ? (
+      <StageVisibilityMenu
+        hidden={hiddenStages}
+        onToggle={(stage, visible) =>
+          setHiddenStages((previous) =>
+            visible
+              ? previous.filter((value) => value !== stage)
+              : [...previous, stage],
+          )
+        }
+        onReset={() => setHiddenStages([])}
+      />
+    ) : null;
+
+  const viewToggle = (
+    <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
+      <Button
+        type="button"
+        size="sm"
+        variant={view === "table" ? "secondary" : "ghost"}
+        className="h-7"
+        aria-pressed={view === "table"}
+        onClick={() => changeView("table")}
+      >
+        <Table2 />
+        <span className="hidden sm:inline">Table</span>
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={view === "kanban" ? "secondary" : "ghost"}
+        className="h-7"
+        aria-pressed={view === "kanban"}
+        onClick={() => changeView("kanban")}
+      >
+        <Columns3 />
+        <span className="hidden sm:inline">Kanban</span>
+      </Button>
+    </div>
+  );
+
   const contextValue: LeadTableContextValue = {
     viewer,
     assignees,
@@ -450,17 +562,74 @@ export function LeadsTable({
         rowCount={total}
         query={query}
         onQueryChange={onQueryChange}
-        isPending={isPending}
+        isPending={isPending || viewPending}
         getRowId={getRowId}
         ariaLabel="Leads"
         searchPlaceholder="Search leads…"
-        filters={buildFilters(assignees, viewer.id, canSeeAttribution)}
+        filters={buildFilters(assignees, viewer.id).filter(
+          // The board is already grouped by stage, so its filter is noise.
+          (filter) => !(view === "kanban" && filter.columnId === "stage"),
+        )}
         defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
         defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
         emptyMessage="No leads yet."
         emptyFilteredMessage="No leads match your filters."
-        onRowClick={(lead) =>
-          setSelected(applyOverride(lead, overrides[lead.id]))
+        toolbarFilters={
+          <DateRangeFilter
+            from={query.filters.addedFrom ?? ""}
+            to={query.filters.addedTo ?? ""}
+            onChange={changeDateRange}
+          />
+        }
+        toolbarActions={
+          <div className="flex items-center gap-2">
+            {view === "kanban" ? (
+              <Select
+                items={KANBAN_SORT_OPTIONS}
+                value={sortValue || null}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  onQueryChange({
+                    ...query,
+                    page: 1,
+                    sort: { id: "createdAt", desc: value === "newest" },
+                  });
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-44"
+                  aria-label="Sort leads by date added"
+                >
+                  <SelectValue placeholder="Sort by date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KANBAN_SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            {viewToggle}
+          </div>
+        }
+        columnMenu={stageMenu}
+        showColumnMenu={view === "table"}
+        renderContent={
+          view === "kanban" ? (
+            <LeadsKanban
+              leads={leads}
+              hiddenStages={hiddenStages}
+              onOpen={(lead) => setSelected(lead)}
+            />
+          ) : undefined
+        }
+        onRowClick={
+          view === "table"
+            ? (lead) => setSelected(applyOverride(lead, overrides[lead.id]))
+            : undefined
         }
       />
 
@@ -540,7 +709,13 @@ function StageCell({ lead }: { lead: LeadRow }) {
 }
 
 /** The assignee selector for admins, the claim/release button for agents. */
-function AssigneeCell({ lead }: { lead: LeadRow }) {
+function AssigneeCell({
+  lead,
+  compact = false,
+}: {
+  lead: LeadRow;
+  compact?: boolean;
+}) {
   const { viewer, assignees, overrides, saving, save } = useLeadTable();
   const override = overrides[lead.id];
   const assignedToId =
@@ -587,7 +762,7 @@ function AssigneeCell({ lead }: { lead: LeadRow }) {
         >
           <SelectTrigger
             size="sm"
-            className="h-7 w-40"
+            className={cn("h-7", compact ? "w-full" : "w-40")}
             aria-label={`Assignee for ${leadName(lead)}`}
             onClick={stopRow}
           >
@@ -657,4 +832,344 @@ function AssigneeCell({ lead }: { lead: LeadRow }) {
       : (assignees.find((assignee) => assignee.id === assignedToId)?.name ??
         lead.assignedToName);
   return name ? <span>{name}</span> : EMPTY;
+}
+
+/** Column accents for the board, matching the stage colours in globals.css. */
+const STAGE_COLOR: Record<LeadStage, string> = {
+  NEW: "var(--stage-new)",
+  CONTACTED: "var(--stage-contacted)",
+  QUALIFIED: "var(--stage-qualified)",
+  RETAINED: "var(--stage-retained)",
+  SENT_TO_FIRM: "var(--stage-sent_to_firm)",
+  DISQUALIFIED: "var(--stage-disqualified)",
+};
+
+/**
+ * The Kanban board.
+ *
+ * The server hands us the whole filtered set, so each stage column can show its
+ * own count. Cards are drag targets: dropping one on another column calls the
+ * same `save` used by the table and dialog, which applies the stage change
+ * optimistically and quietly reverts it if the server refuses.
+ */
+function LeadsKanban({
+  leads,
+  hiddenStages,
+  onOpen,
+}: {
+  leads: LeadRow[];
+  hiddenStages: LeadStage[];
+  onOpen: (lead: LeadRow) => void;
+}) {
+  const { viewer, overrides, saving, save } = useLeadTable();
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [hoverStage, setHoverStage] = useState<LeadStage | null>(null);
+
+  const effective = (lead: LeadRow): LeadRow =>
+    applyOverride(lead, overrides[lead.id]);
+
+  const visibleStages = LEAD_STAGES.filter(
+    (stage) => !hiddenStages.includes(stage),
+  );
+
+  const byStage = new Map<LeadStage, LeadRow[]>();
+  for (const stage of LEAD_STAGES) byStage.set(stage, []);
+  for (const lead of leads) {
+    const row = effective(lead);
+    byStage.get(row.stage)?.push(row);
+  }
+
+  const dragged =
+    dragId === null ? null : leads.find((lead) => lead.id === dragId);
+  const draggedSubject = dragged ? effective(dragged) : null;
+
+  if (visibleStages.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+        No stages are showing. Use the Stages menu to bring one back.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-2.5 overflow-x-auto pr-4 pb-2">
+      {visibleStages.map((stage) => {
+        const cards = byStage.get(stage) ?? [];
+        const canDrop = Boolean(
+          draggedSubject &&
+          draggedSubject.stage !== stage &&
+          canChangeLeadStage(viewer, draggedSubject, stage) &&
+          (stage !== "SENT_TO_FIRM" ||
+            draggedSubject.sentToFirmAt !== null ||
+            draggedSubject.brightwaterLeadId !== null),
+        );
+
+        return (
+          <section
+            key={stage}
+            data-stage={stage}
+            className={cn(
+              "flex min-w-52 flex-1 flex-col overflow-hidden rounded-xl border bg-muted/20 transition-colors",
+              hoverStage === stage && canDrop && "border-ring bg-accent/30",
+              hoverStage === stage &&
+                draggedSubject &&
+                !canDrop &&
+                "border-destructive/50 bg-destructive/5",
+            )}
+            onDragOver={(event) => {
+              // Always allow the drop event so a refused drop can explain why.
+              // `dropEffect: none` would cancel the drop before `onDrop` runs.
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              if (hoverStage !== stage) setHoverStage(stage);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setHoverStage(null);
+              }
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setHoverStage(null);
+              setDragId(null);
+
+              const id = Number(event.dataTransfer.getData("text/plain"));
+              const lead = leads.find((row) => row.id === id);
+              if (!lead) return;
+
+              const subject = effective(lead);
+              if (subject.stage === stage) return;
+
+              if (
+                stage === "SENT_TO_FIRM" &&
+                subject.sentToFirmAt === null &&
+                subject.brightwaterLeadId === null
+              ) {
+                toast.error("Can't move this lead", {
+                  description:
+                    "Send it to the firm before marking it Sent to Firm.",
+                });
+                return;
+              }
+
+              if (!canChangeLeadStage(viewer, subject, stage)) {
+                toast.error("Can't move this lead", {
+                  description: `You can't move it to ${LEAD_STAGE_LABELS[stage]}.`,
+                });
+                return;
+              }
+
+              void save(lead, { stage });
+            }}
+          >
+            <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: STAGE_COLOR[stage] }}
+                />
+                <span className="text-sm font-medium">
+                  {LEAD_STAGE_LABELS[stage]}
+                </span>
+              </div>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                {cards.length}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2 p-2">
+              {cards.length === 0 ? (
+                <p className="px-2 py-8 text-center text-xs text-muted-foreground">
+                  No leads here.
+                </p>
+              ) : (
+                cards.map((lead) => {
+                  const name =
+                    [lead.injuredFirstName, lead.injuredLastName]
+                      .filter(Boolean)
+                      .join(" ") || "Unnamed lead";
+                  const isSaving = Boolean(saving[lead.id]);
+
+                  return (
+                    <article
+                      key={lead.id}
+                      draggable={!isSaving}
+                      onDragStart={(event) => {
+                        const target = event.target as HTMLElement;
+                        // Do not drag when the gesture starts on a control.
+                        if (
+                          target.closest("button, [data-slot=select-trigger]")
+                        ) {
+                          event.preventDefault();
+                          return;
+                        }
+                        event.dataTransfer.setData(
+                          "text/plain",
+                          String(lead.id),
+                        );
+                        event.dataTransfer.effectAllowed = "move";
+                        setDragId(lead.id);
+                      }}
+                      onDragEnd={() => {
+                        setDragId(null);
+                        setHoverStage(null);
+                      }}
+                      className={cn(
+                        "cursor-grab rounded-lg border bg-card p-2.5 shadow-xs transition-opacity active:cursor-grabbing",
+                        dragId === lead.id && "opacity-50",
+                        isSaving && "opacity-80",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{name}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {lead.caseType ? (
+                              <Badge variant="outline">
+                                {caseTypeLabel(lead.caseType)}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`Open ${name}`}
+                          onClick={() => onOpen(effective(lead))}
+                        >
+                          <Eye />
+                        </Button>
+                      </div>
+
+                      <div className="mt-2 grid min-w-0 gap-1 text-xs text-muted-foreground">
+                        <p className="flex min-w-0 items-center gap-1.5">
+                          <Mail className="size-3.5 shrink-0" />
+                          <span
+                            className="min-w-0 flex-1 truncate"
+                            title={lead.injuredEmail ?? undefined}
+                          >
+                            {lead.injuredEmail ?? "—"}
+                          </span>
+                        </p>
+                        <p className="flex min-w-0 items-center gap-1.5">
+                          <Phone className="size-3.5 shrink-0" />
+                          <span
+                            className="min-w-0 flex-1 truncate"
+                            title={lead.injuredPhone ?? undefined}
+                          >
+                            {lead.injuredPhone ?? "—"}
+                          </span>
+                        </p>
+                        <p className="flex min-w-0 items-center gap-1.5">
+                          <CalendarDays className="size-3.5 shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">
+                            Added {formatDate(lead.createdAt)}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="mt-3 border-t pt-2">
+                        <AssigneeCell lead={lead} compact />
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Show or hide stage columns without touching the underlying lead data. */
+function StageVisibilityMenu({
+  hidden,
+  onToggle,
+  onReset,
+}: {
+  hidden: LeadStage[];
+  onToggle: (stage: LeadStage, visible: boolean) => void;
+  onReset: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+        <SlidersHorizontal aria-hidden />
+        <span className="hidden sm:inline">Stages</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Stages</DropdownMenuLabel>
+          {LEAD_STAGES.map((stage) => (
+            <DropdownMenuCheckboxItem
+              key={stage}
+              checked={!hidden.includes(stage)}
+              onCheckedChange={(checked) => onToggle(stage, checked)}
+            >
+              {LEAD_STAGE_LABELS[stage]}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onReset}>Show all stages</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** The added-date range. The lower bound is required; the upper is optional. */
+function DateRangeFilter({
+  from,
+  to,
+  onChange,
+}: {
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
+        Added
+      </span>
+      <div className="flex items-center gap-1.5">
+        <DatePicker
+          value={from}
+          max={to || today}
+          placeholder="From"
+          className="h-8 w-36"
+          onChange={(value) => {
+            if (!value) return;
+            onChange(value, to && to < value ? value : to);
+          }}
+        />
+        <span className="text-sm text-muted-foreground">to</span>
+        <DatePicker
+          value={to}
+          min={from || undefined}
+          max={today}
+          placeholder="Any date"
+          className="h-8 w-36"
+          onChange={(value) => onChange(from, value)}
+        />
+        {to ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Clear end date"
+            onClick={() => onChange(from, "")}
+          >
+            <X />
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
 }

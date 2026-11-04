@@ -19,3 +19,6 @@ export type LeadSource = (typeof LEAD_SOURCES)[number];
 
 /** Assignee filter value meaning "no one owns this lead yet". */
 export const UNASSIGNED = "unassigned";
+
+/** How the leads page is displayed. */
+export type LeadsView = "table" | "kanban";
