@@ -16,10 +16,18 @@ export function searchCondition(
   term: string,
   columns: AnySQLiteColumn[],
 ): SQL | undefined {
-  const trimmed = term.trim();
-  if (!trimmed) return undefined;
-  const pattern = `%${trimmed}%`;
-  return or(...columns.map((column) => like(column, pattern)));
+  const words = term.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return undefined;
+
+  // Each word must match at least one column. Matching word by word is what
+  // lets a full name ("Jane Doe") find a row whose parts live in separate
+  // columns — a single `LIKE %Jane Doe%` matches neither.
+  const conditions = words.map((word) => {
+    const pattern = `%${word}%`;
+    return or(...columns.map((column) => like(column, pattern)));
+  });
+
+  return conditions.length === 1 ? conditions[0] : and(...conditions);
 }
 
 /**

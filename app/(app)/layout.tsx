@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
+import { AiAssistant } from "@/components/ai/ai-assistant";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <SidebarTrigger className="-ml-1" />
           <span aria-hidden className="h-4 w-px bg-border" />
           <span className="text-sm font-medium">Apex Intake Desk</span>
+          <AiAssistant />
         </header>
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
       </SidebarInset>

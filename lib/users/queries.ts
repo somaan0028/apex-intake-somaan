@@ -94,8 +94,29 @@ export function listUsers(query: TableQuery): ListPageResult<UserRow> {
 export function listAssignees(
   actor: Actor,
 ): Array<{ id: number; name: string }> {
+  return listAssignableUsers(actor).map(({ id, name }) => ({ id, name }));
+}
+
+/**
+ * Everyone the actor may reference or act on, with contact details.
+ *
+ * Same scope as `listAssignees` — admins see the whole team, an agent only
+ * themselves. The users grid itself stays admin-only; this is the subset that
+ * assignment and `@`-mentions are allowed to expose.
+ */
+export function listAssignableUsers(actor: Actor): Array<{
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+}> {
   const db = getDb();
-  const columns = { id: users.id, name: users.name };
+  const columns = {
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    role: users.role,
+  };
 
   if (can(actor.role, "leads.view.all")) {
     return db.select(columns).from(users).orderBy(asc(users.name)).all();
