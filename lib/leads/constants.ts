@@ -22,3 +22,11 @@ export const UNASSIGNED = "unassigned";
 
 /** How the leads page is displayed. */
 export type LeadsView = "table" | "kanban";
+
+/** The starting date for the custom added-date picker: seven days ago. */
+export function defaultAddedFrom(): string {
+  const date = new Date();
+  date.setDate(date.getDate() - 7);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

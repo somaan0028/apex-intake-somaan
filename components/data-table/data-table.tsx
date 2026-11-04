@@ -160,6 +160,10 @@ export interface DataTableProps<TData extends RowData> {
   columnMenu?: ReactNode;
   /** Extra filter controls rendered with the select filters (e.g. a date range). */
   toolbarFilters?: ReactNode;
+  /** Controls rendered beside Filters and Columns, e.g. a view switcher. */
+  headerActions?: ReactNode;
+  /** Controls rendered after the search box, before the right-hand button group. */
+  headerLeading?: ReactNode;
 }
 
 /** Sentinel for the "no filter" choice in a column filter select. */
@@ -190,6 +194,8 @@ export function DataTable<TData extends RowData>({
   showColumnMenu = true,
   columnMenu,
   toolbarFilters,
+  headerActions,
+  headerLeading,
 }: DataTableProps<TData>) {
   const { page, pageSize, search, filters: filterValues } = query;
   const sortId = query.sort?.id ?? null;
@@ -312,7 +318,7 @@ export function DataTable<TData extends RowData>({
     <div className="space-y-3">
       <div className="space-y-3">
         {/* Row 1: the search box, and the two menus that control what is shown. */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search
               aria-hidden
@@ -328,6 +334,7 @@ export function DataTable<TData extends RowData>({
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
+            {headerLeading}
             {filters?.length ? (
               <FilterVisibilityMenu
                 filters={filters}
@@ -345,6 +352,7 @@ export function DataTable<TData extends RowData>({
             ) : null}
             {columnMenu ??
               (showColumnMenu ? <ColumnVisibilityMenu table={table} /> : null)}
+            {headerActions}
           </div>
         </div>
 

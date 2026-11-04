@@ -205,10 +205,11 @@ their Lawmatics CRM.
   stages free their width, the columns flex to fill the space, and the page
   scrolls rather than each stage getting its own scrollbar. The stage filter is
   dropped in Kanban because the board already groups by stage.
-- The leads grid and board always send `filter.addedFrom` (seven days ago by
-  default) and optionally `filter.addedTo`; `listLeads` turns those into
-  `created_at` bounds, so a fresh visit never loads the whole backlog. The lower
-  date has no clear control; the upper date can be cleared.
+- The leads grid and board default to `filter.addedWithin=7d` (also `24h` and
+  `3d`), with a Custom option that uses `filter.addedFrom` (required, default
+  seven days ago) and optional `filter.addedTo`; `listLeads` turns those into
+  `created_at` bounds, so a fresh visit never loads the whole backlog. The custom
+  lower date has no clear control; the upper date can be cleared.
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the

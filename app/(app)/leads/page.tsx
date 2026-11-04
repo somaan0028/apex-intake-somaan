@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth/session";
-import { type LeadsView } from "@/lib/leads/constants";
+import { defaultAddedFrom, type LeadsView } from "@/lib/leads/constants";
 import { LEADS_DEFAULT_SORT, listLeads } from "@/lib/leads/queries";
 import { loadTablePage } from "@/lib/table-query";
 import { listAssignees } from "@/lib/users/queries";
@@ -12,14 +12,6 @@ export const metadata: Metadata = {
 
 /** The Kanban board needs the whole filtered set, not one table page. */
 const KANBAN_PAGE_SIZE = 1000;
-
-/** The earliest date a fresh visit shows: seven days ago. */
-function defaultAddedFrom(): string {
-  const date = new Date();
-  date.setDate(date.getDate() - 7);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 /**
  * Same shape as the users page: the URL is the query, the server does the
@@ -43,9 +35,18 @@ export default async function LeadsPage({
     // hide every other column.
     delete queryParams["filter.stage"];
   }
-  // The lower bound is never optional: start with the last week so a fresh
-  // visit does not load the entire backlog.
-  if (!queryParams["filter.addedFrom"]) {
+  // Default to the simple "within 7 days" preset. A URL that carries explicit
+  // from/to dates is a custom range, even if it predates the preset control.
+  if (!queryParams["filter.addedWithin"]) {
+    const hasCustomDates =
+      Boolean(queryParams["filter.addedFrom"]) ||
+      Boolean(queryParams["filter.addedTo"]);
+    queryParams["filter.addedWithin"] = hasCustomDates ? "custom" : "7d";
+  }
+  if (
+    queryParams["filter.addedWithin"] === "custom" &&
+    !queryParams["filter.addedFrom"]
+  ) {
     queryParams["filter.addedFrom"] = defaultAddedFrom();
   }
   const { query, rows, total } = await loadTablePage(

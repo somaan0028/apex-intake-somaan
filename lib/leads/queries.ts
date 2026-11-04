@@ -234,12 +234,34 @@ export function listLeads(
     booleanFilter(query, "hasReceivedSettlement", leads.hasReceivedSettlement),
   );
 
-  // Added-date range. The board and grid always carry a lower bound so an
-  // unfiltered visit does not load the entire backlog.
-  const addedFrom = parseFilterDate(query.filters.addedFrom);
-  if (addedFrom) conditions.push(gte(leads.createdAt, addedFrom));
-  const addedTo = parseFilterDate(query.filters.addedTo, true);
-  if (addedTo) conditions.push(lte(leads.createdAt, addedTo));
+  // Added-date range. The presets use a rolling window; the custom option uses
+  // explicit from/to dates.
+  const addedWithin = query.filters.addedWithin;
+  const windowDays =
+    addedWithin === "24h"
+      ? 1
+      : addedWithin === "3d"
+        ? 3
+        : addedWithin === "7d"
+          ? 7
+          : null;
+  if (windowDays) {
+    const from = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    conditions.push(gte(leads.createdAt, from));
+  } else {
+    const addedFrom = parseFilterDate(query.filters.addedFrom);
+    if (addedFrom) {
+      conditions.push(gte(leads.createdAt, addedFrom));
+    } else if (addedWithin === "custom") {
+      // The custom range always has a lower bound; never load the full backlog
+      // just because a hand-edited request omitted it.
+      const fallback = new Date();
+      fallback.setDate(fallback.getDate() - 7);
+      conditions.push(gte(leads.createdAt, fallback));
+    }
+    const addedTo = parseFilterDate(query.filters.addedTo, true);
+    if (addedTo) conditions.push(lte(leads.createdAt, addedTo));
+  }
 
   // Sorting by source is the same side-channel as filtering by it; fall back to
   // the default order rather than order by a column the viewer can't see.

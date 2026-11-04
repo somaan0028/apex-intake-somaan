@@ -80,7 +80,11 @@ import {
 } from "@/lib/db/schema";
 import type { AuthUser } from "@/lib/auth/session";
 import { saveLeadFields } from "@/lib/leads/actions";
-import { UNASSIGNED, type LeadsView } from "@/lib/leads/constants";
+import {
+  UNASSIGNED,
+  defaultAddedFrom,
+  type LeadsView,
+} from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
 import {
@@ -119,6 +123,13 @@ const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
 const KANBAN_SORT_OPTIONS = [
   { label: "Newest to Oldest", value: "newest" },
   { label: "Oldest to Newest", value: "oldest" },
+];
+
+const ADDED_PRESET_OPTIONS = [
+  { label: "Within 24 hours", value: "24h" },
+  { label: "Within 3 days", value: "3d" },
+  { label: "Within 7 days", value: "7d" },
+  { label: "Custom range", value: "custom" },
 ];
 
 /** Optimistic inline values for a row, cleared once the grid catches up. */
@@ -470,11 +481,38 @@ export function LeadsTable({
         : "oldest"
       : "";
 
-  /** Apply the added-date range; the lower bound is required. */
+  const addedWithin = query.filters.addedWithin;
+  const addedPreset =
+    addedWithin === "24h" ||
+    addedWithin === "3d" ||
+    addedWithin === "7d" ||
+    addedWithin === "custom"
+      ? addedWithin
+      : query.filters.addedFrom || query.filters.addedTo
+        ? "custom"
+        : "7d";
+
+  /** Switch between the rolling presets and the custom pickers. */
+  function changeAddedPreset(preset: string) {
+    const filters: Record<string, string> = {
+      ...query.filters,
+      addedWithin: preset,
+    };
+    if (preset === "custom") {
+      if (!filters.addedFrom) filters.addedFrom = defaultAddedFrom();
+    } else {
+      delete filters.addedFrom;
+      delete filters.addedTo;
+    }
+    onQueryChange({ ...query, page: 1, filters });
+  }
+
+  /** Apply the custom added-date range; the lower bound is required. */
   function changeDateRange(from: string, to: string) {
     if (!from) return;
     const filters: Record<string, string> = {
       ...query.filters,
+      addedWithin: "custom",
       addedFrom: from,
     };
     if (to) filters.addedTo = to;
@@ -576,14 +614,19 @@ export function LeadsTable({
         emptyFilteredMessage="No leads match your filters."
         toolbarFilters={
           <DateRangeFilter
-            from={query.filters.addedFrom ?? ""}
+            preset={addedPreset}
+            from={query.filters.addedFrom ?? defaultAddedFrom()}
             to={query.filters.addedTo ?? ""}
+            onPresetChange={changeAddedPreset}
             onChange={changeDateRange}
           />
         }
-        toolbarActions={
-          <div className="flex items-center gap-2">
-            {view === "kanban" ? (
+        headerLeading={
+          view === "kanban" ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
+                Sort
+              </span>
               <Select
                 items={KANBAN_SORT_OPTIONS}
                 value={sortValue || null}
@@ -601,7 +644,7 @@ export function LeadsTable({
                   className="w-44"
                   aria-label="Sort leads by date added"
                 >
-                  <SelectValue placeholder="Sort by date" />
+                  <SelectValue placeholder="Default" />
                 </SelectTrigger>
                 <SelectContent>
                   {KANBAN_SORT_OPTIONS.map((option) => (
@@ -611,10 +654,10 @@ export function LeadsTable({
                   ))}
                 </SelectContent>
               </Select>
-            ) : null}
-            {viewToggle}
-          </div>
+            </div>
+          ) : undefined
         }
+        headerActions={viewToggle}
         columnMenu={stageMenu}
         showColumnMenu={view === "table"}
         renderContent={
@@ -1123,12 +1166,16 @@ function StageVisibilityMenu({
 
 /** The added-date range. The lower bound is required; the upper is optional. */
 function DateRangeFilter({
+  preset,
   from,
   to,
+  onPresetChange,
   onChange,
 }: {
+  preset: string;
   from: string;
   to: string;
+  onPresetChange: (preset: string) => void;
   onChange: (from: string, to: string) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -1138,38 +1185,59 @@ function DateRangeFilter({
       <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
         Added
       </span>
-      <div className="flex items-center gap-1.5">
-        <DatePicker
-          value={from}
-          max={to || today}
-          placeholder="From"
-          className="h-8 w-36"
-          onChange={(value) => {
-            if (!value) return;
-            onChange(value, to && to < value ? value : to);
-          }}
-        />
-        <span className="text-sm text-muted-foreground">to</span>
-        <DatePicker
-          value={to}
-          min={from || undefined}
-          max={today}
-          placeholder="Any date"
-          className="h-8 w-36"
-          onChange={(value) => onChange(from, value)}
-        />
-        {to ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Clear end date"
-            onClick={() => onChange(from, "")}
-          >
-            <X />
-          </Button>
-        ) : null}
-      </div>
+      <Select
+        items={ADDED_PRESET_OPTIONS}
+        value={preset}
+        onValueChange={(value) => {
+          if (value) onPresetChange(value);
+        }}
+      >
+        <SelectTrigger size="sm" className="w-40" aria-label="Added date range">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ADDED_PRESET_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {preset === "custom" ? (
+        <div className="flex items-center gap-1.5">
+          <DatePicker
+            value={from}
+            max={to || today}
+            placeholder="From"
+            className="h-8 w-36"
+            onChange={(value) => {
+              if (!value) return;
+              onChange(value, to && to < value ? value : to);
+            }}
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <DatePicker
+            value={to}
+            min={from || undefined}
+            max={today}
+            placeholder="Any date"
+            className="h-8 w-36"
+            onChange={(value) => onChange(from, value)}
+          />
+          {to ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Clear end date"
+              onClick={() => onChange(from, "")}
+            >
+              <X />
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
