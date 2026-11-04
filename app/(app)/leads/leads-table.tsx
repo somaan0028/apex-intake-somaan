@@ -20,6 +20,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   useTransition,
@@ -29,11 +30,14 @@ import {
   CalendarDays,
   Columns3,
   Eye,
+  FilterX,
+  Heart,
   Loader2,
   Mail,
   Phone,
   SlidersHorizontal,
   Table2,
+  Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,6 +51,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -88,12 +101,27 @@ import {
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
 import {
+  readPersistedState,
+  readSavedViews,
+  viewSignature,
+  viewStateToParams,
+  writePersistedState,
+  writeSavedViews,
+  type LeadViewState,
+  type SavedLeadView,
+} from "@/lib/leads/saved-views";
+import {
   can,
   canAssignLead,
   canChangeLeadStage,
   canEditLead,
 } from "@/lib/rbac";
-import { BOOLEAN_FILTER_OPTIONS, type TableQuery } from "@/lib/table-query";
+import {
+  BOOLEAN_FILTER_OPTIONS,
+  filtersFromKey,
+  filtersKey,
+  type TableQuery,
+} from "@/lib/table-query";
 import { cn } from "@/lib/utils";
 import { LeadDialog } from "./lead-dialog";
 
@@ -137,6 +165,14 @@ interface RowOverride {
   stage?: LeadStage;
   assignedToId?: number | null;
 }
+
+/**
+ * The view a restore navigation is currently applying. Persistence waits until
+ * the page actually matches it: React's development double-mount runs the
+ * restore effect twice, and the second pass must not read (or write) the
+ * defaults the first pass has not navigated away from yet.
+ */
+let pendingRestore: LeadViewState | null = null;
 
 interface LeadTableContextValue {
   viewer: AuthUser;
@@ -413,6 +449,18 @@ export function LeadsTable({
   const [overrides, setOverrides] = useState<Record<number, RowOverride>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [hiddenStages, setHiddenStages] = useState<LeadStage[]>([]);
+  const [filterVisibility, setFilterVisibility] = useState<
+    Record<string, boolean>
+  >(() => ({ ...DEFAULT_FILTER_VISIBILITY }));
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >(() => ({ ...DEFAULT_COLUMN_VISIBILITY }));
+  const [savedViews, setSavedViews] = useState<SavedLeadView[]>([]);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [viewsReady, setViewsReady] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
 
   // Attribution (source + tracking ids) is admin-only. The server already blanks
   // the values; dropping the column and its filter keeps the grid from offering
@@ -428,6 +476,173 @@ export function LeadsTable({
           ),
     [canSeeAttribution],
   );
+
+  const filterKey = filtersKey(query.filters);
+  const currentFilters = useMemo(() => filtersFromKey(filterKey), [filterKey]);
+
+  // Restore the last visit once, then keep writing it back as the person works.
+  // Everything here is browser-local; nothing is sent to the server.
+  /* eslint-disable react-hooks/set-state-in-effect -- hydrating from localStorage on mount is the external-system case */
+  useEffect(() => {
+    const stored = readPersistedState();
+    if (stored) {
+      setFilterVisibility(stored.filterVisibility);
+      setColumnVisibility(stored.columnVisibility);
+      setHiddenStages(stored.hiddenStages as LeadStage[]);
+      setActiveViewId(stored.activeViewId);
+    }
+    setSavedViews(readSavedViews());
+    setViewsReady(true);
+
+    // A URL that already carries filters is an explicit request (a shared link
+    // or the back button), so only a bare /leads visit resumes the last view.
+    const params = new URLSearchParams(window.location.search);
+    const hasState = [...params.keys()].some(
+      (key) =>
+        key.startsWith("filter.") ||
+        ["view", "search", "sort", "sortDir", "page", "pageSize"].includes(key),
+    );
+    if (stored && !hasState) {
+      pendingRestore = {
+        view: stored.view,
+        filters: stored.filters,
+        search: stored.search,
+        sort: stored.sort,
+        filterVisibility: stored.filterVisibility,
+        columnVisibility: stored.columnVisibility,
+        hiddenStages: stored.hiddenStages,
+      };
+      const next = viewStateToParams(stored, {
+        page: stored.page,
+        pageSize: stored.pageSize,
+      }).toString();
+      startViewTransition(() => {
+        router.replace(next ? `${pathname}?${next}` : pathname, {
+          scroll: false,
+        });
+      });
+    }
+    // Mount only: the values captured here are the ones read from storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const sortId = query.sort?.id;
+  const sortDesc = query.sort?.desc;
+  useEffect(() => {
+    if (!viewsReady) return;
+    // Hold writes until the restore navigation lands; otherwise the bare page's
+    // defaults would overwrite the state we are restoring from.
+    if (pendingRestore) {
+      const restored = viewSignature({
+        view,
+        filters: currentFilters,
+        search: query.search,
+        sort: sortId ? { id: sortId, desc: Boolean(sortDesc) } : null,
+        filterVisibility,
+        columnVisibility,
+        hiddenStages,
+      });
+      if (restored !== viewSignature(pendingRestore)) return;
+      pendingRestore = null;
+    }
+    writePersistedState({
+      view,
+      filters: currentFilters,
+      search: query.search,
+      sort: sortId ? { id: sortId, desc: Boolean(sortDesc) } : null,
+      filterVisibility,
+      columnVisibility,
+      hiddenStages,
+      activeViewId,
+      page: query.page,
+      pageSize: query.pageSize,
+    });
+  }, [
+    viewsReady,
+    view,
+    currentFilters,
+    query.search,
+    query.page,
+    query.pageSize,
+    sortId,
+    sortDesc,
+    filterVisibility,
+    columnVisibility,
+    hiddenStages,
+    activeViewId,
+  ]);
+
+  const currentViewState: LeadViewState = {
+    view,
+    filters: currentFilters,
+    search: query.search,
+    sort: query.sort ?? null,
+    filterVisibility,
+    columnVisibility,
+    hiddenStages,
+  };
+  const currentSignature = viewSignature(currentViewState);
+  const activeView = savedViews.find((item) => item.id === activeViewId);
+  // The heart stays red only while the page still matches its saved view.
+  const viewActive = Boolean(
+    activeView && viewSignature(activeView) === currentSignature,
+  );
+
+  function saveCurrentView() {
+    const name = viewName.trim();
+    if (!name) return;
+    const entry: SavedLeadView = {
+      ...currentViewState,
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      createdAt: Date.now(),
+    };
+    const next = [...savedViews, entry];
+    setSavedViews(next);
+    writeSavedViews(next);
+    setActiveViewId(entry.id);
+    setSaveOpen(false);
+    setViewName("");
+    toast.success("View saved", {
+      description: "Saved in this browser.",
+    });
+  }
+
+  function deleteSavedView(id: string) {
+    const next = savedViews.filter((item) => item.id !== id);
+    setSavedViews(next);
+    writeSavedViews(next);
+    if (activeViewId === id) setActiveViewId(null);
+  }
+
+  function applySavedView(saved: SavedLeadView) {
+    setFilterVisibility(saved.filterVisibility);
+    setColumnVisibility(saved.columnVisibility);
+    setHiddenStages(saved.hiddenStages as LeadStage[]);
+    setActiveViewId(saved.id);
+    setListOpen(false);
+    const next = viewStateToParams(saved).toString();
+    startViewTransition(() => {
+      router.replace(next ? `${pathname}?${next}` : pathname, {
+        scroll: false,
+      });
+    });
+  }
+
+  /** Clear the active filter values and search; saved views are untouched. */
+  function clearFilters() {
+    setActiveViewId(null);
+    onQueryChange({
+      ...query,
+      page: 1,
+      search: "",
+      filters: { addedWithin: "7d" },
+    });
+  }
 
   /**
    * Inline stage/assignee save. The row updates immediately, the control is
@@ -610,6 +825,10 @@ export function LeadsTable({
         )}
         defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
         defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        filterVisibility={filterVisibility}
+        onFilterVisibilityChange={setFilterVisibility}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={setColumnVisibility}
         emptyMessage="No leads yet."
         emptyFilteredMessage="No leads match your filters."
         toolbarFilters={
@@ -620,6 +839,17 @@ export function LeadsTable({
             onPresetChange={changeAddedPreset}
             onChange={changeDateRange}
           />
+        }
+        toolbarActions={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+          >
+            <FilterX aria-hidden />
+            <span className="hidden sm:inline">Clear Filters</span>
+          </Button>
         }
         headerLeading={
           view === "kanban" ? (
@@ -657,7 +887,40 @@ export function LeadsTable({
             </div>
           ) : undefined
         }
-        headerActions={viewToggle}
+        headerActions={
+          <div className="flex flex-wrap items-center gap-2">
+            {viewToggle}
+            <div className="flex items-center gap-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setListOpen(true)}
+              >
+                Saved Views
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Save current view"
+                title="Save current view"
+                onClick={() => {
+                  setViewName("");
+                  setSaveOpen(true);
+                }}
+              >
+                <Heart
+                  className={cn(
+                    "size-4",
+                    viewActive && "fill-red-500 text-red-500",
+                  )}
+                />
+              </Button>
+            </div>
+          </div>
+        }
         columnMenu={stageMenu}
         showColumnMenu={view === "table"}
         renderContent={
@@ -687,6 +950,99 @@ export function LeadsTable({
         viewer={viewer}
         assignees={assignees}
       />
+
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveCurrentView();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Save view</DialogTitle>
+              <DialogDescription>
+                This view configurationis stored in this browser.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label htmlFor="saved-view-name" className="text-sm font-medium">
+                Name
+              </label>
+              <Input
+                id="saved-view-name"
+                value={viewName}
+                onChange={(event) => setViewName(event.target.value)}
+                placeholder="e.g. Unassigned MVAs this week"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSaveOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!viewName.trim()}>
+                Save view
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={listOpen} onOpenChange={setListOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Saved views</DialogTitle>
+            <DialogDescription>
+              Apply a saved view, or remove one you no longer need.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 space-y-1 overflow-y-auto">
+            {savedViews.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No saved views yet. Set the page up the way you like and press
+                the heart.
+              </p>
+            ) : (
+              savedViews.map((saved) => (
+                <div
+                  key={saved.id}
+                  className="flex items-center gap-1 rounded-lg border px-2 py-1.5 hover:bg-muted/50"
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => applySavedView(saved)}
+                  >
+                    <span className="block truncate text-sm font-medium">
+                      {saved.name}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {saved.view === "table" ? "Table" : "Kanban"}
+                      {saved.id === activeViewId ? " · current" : ""}
+                    </span>
+                  </button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete ${saved.name}`}
+                    onClick={() => deleteSavedView(saved.id)}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
     </LeadTableContext.Provider>
   );
 }
@@ -935,7 +1291,7 @@ function LeadsKanban({
   }
 
   return (
-    <div className="flex items-start gap-2.5 overflow-x-auto pr-4 pb-2">
+    <div className="flex min-h-[calc(100svh-21rem)] items-start gap-2.5 overflow-x-auto pr-4 pb-2 md:min-h-[calc(100svh-17rem)]">
       {visibleStages.map((stage) => {
         const cards = byStage.get(stage) ?? [];
         const canDrop = Boolean(

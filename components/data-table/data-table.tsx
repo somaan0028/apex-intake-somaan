@@ -164,6 +164,15 @@ export interface DataTableProps<TData extends RowData> {
   headerActions?: ReactNode;
   /** Controls rendered after the search box, before the right-hand button group. */
   headerLeading?: ReactNode;
+  /**
+   * Controlled filter-control visibility. Pair with
+   * `onFilterVisibilityChange` when a saved view must restore it.
+   */
+  filterVisibility?: Record<string, boolean>;
+  onFilterVisibilityChange?: (next: Record<string, boolean>) => void;
+  /** Controlled column visibility, e.g. when a saved view restores it. */
+  columnVisibility?: ColumnVisibilityState;
+  onColumnVisibilityChange?: (next: ColumnVisibilityState) => void;
 }
 
 /** Sentinel for the "no filter" choice in a column filter select. */
@@ -196,6 +205,10 @@ export function DataTable<TData extends RowData>({
   toolbarFilters,
   headerActions,
   headerLeading,
+  filterVisibility: controlledFilterVisibility,
+  onFilterVisibilityChange,
+  columnVisibility: controlledColumnVisibility,
+  onColumnVisibilityChange,
 }: DataTableProps<TData>) {
   const { page, pageSize, search, filters: filterValues } = query;
   const sortId = query.sort?.id ?? null;
@@ -214,13 +227,25 @@ export function DataTable<TData extends RowData>({
 
   // --- Filter controls the user has chosen to show/hide --------------------
   // UI-only state (unlike the filters themselves, which live in the URL), so it
-  // stays local and resets with the page.
-  const [filterVisibility, setFilterVisibility] = useState<
+  // stays local unless the caller (e.g. saved views) controls it.
+  const [internalFilterVisibility, setInternalFilterVisibility] = useState<
     Record<string, boolean>
   >(() => ({ ...defaultFilterVisibility }));
+  const filterVisibility =
+    controlledFilterVisibility ?? internalFilterVisibility;
+  const setFilterVisibility =
+    onFilterVisibilityChange ?? setInternalFilterVisibility;
   const visibleFilters = (filters ?? []).filter(
     (filter) => filterVisibility[filter.columnId] !== false,
   );
+
+  // --- Column visibility: table-owned unless a saved view controls it ------
+  const [internalColumnVisibility, setInternalColumnVisibility] =
+    useState<ColumnVisibilityState>(defaultColumnVisibility);
+  const columnVisibility =
+    controlledColumnVisibility ?? internalColumnVisibility;
+  const setColumnVisibility =
+    onColumnVisibilityChange ?? setInternalColumnVisibility;
 
   const latestQuery = useRef(query);
   useEffect(() => {
@@ -257,8 +282,9 @@ export function DataTable<TData extends RowData>({
       pagination: paginationState,
       sorting: sortingState,
       columnFilters: columnFiltersState,
+      columnVisibility,
     }),
-    [paginationState, sortingState, columnFiltersState],
+    [paginationState, sortingState, columnFiltersState, columnVisibility],
   );
 
   const table = useTable<DataTableFeatures, TData>({
@@ -273,7 +299,8 @@ export function DataTable<TData extends RowData>({
     rowCount,
     // One sort column at a time keeps the URL and the SQL simple.
     enableMultiSort: false,
-    // Column visibility is table-owned, so it is seeded rather than controlled.
+    // The initial map seeds the reset target; live changes flow through the
+    // controlled state above (so a saved view can restore it).
     initialState: { columnVisibility: defaultColumnVisibility },
     state: controlledState,
     onPaginationChange: (updater) => {
@@ -302,6 +329,9 @@ export function DataTable<TData extends RowData>({
         if (value) nextFilters[filter.id] = value;
       }
       onQueryChange({ ...query, filters: nextFilters, page: 1 });
+    },
+    onColumnVisibilityChange: (updater) => {
+      setColumnVisibility(functionalUpdate(updater, columnVisibility));
     },
   });
 
@@ -340,10 +370,10 @@ export function DataTable<TData extends RowData>({
                 filters={filters}
                 visibility={filterVisibility}
                 onToggle={(columnId, visible) =>
-                  setFilterVisibility((previous) => ({
-                    ...previous,
+                  setFilterVisibility({
+                    ...filterVisibility,
                     [columnId]: visible,
-                  }))
+                  })
                 }
                 onReset={() =>
                   setFilterVisibility({ ...defaultFilterVisibility })

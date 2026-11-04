@@ -210,6 +210,13 @@ their Lawmatics CRM.
   seven days ago) and optional `filter.addedTo`; `listLeads` turns those into
   `created_at` bounds, so a fresh visit never loads the whole backlog. The custom
   lower date has no clear control; the upper date can be cleared.
+- **Saved Views** (`lib/leads/saved-views.ts`) are browser-local, never sent to
+  the server: `localStorage` holds the named views plus the last place the person
+  left off (view, filter values, search, sort, filter/column visibility, hidden
+  stages, page). A bare `/leads` visit restores the last state and its saved view;
+  a URL with filters is treated as explicit. The heart opens the save dialog and
+  stays red only while the page still matches that saved view. **Clear Filters**
+  resets the filter values and search but never deletes a saved view.
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the
