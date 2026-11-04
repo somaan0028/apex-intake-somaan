@@ -170,6 +170,11 @@ export interface DataTableProps<TData extends RowData> {
    */
   filterVisibility?: Record<string, boolean>;
   onFilterVisibilityChange?: (next: Record<string, boolean>) => void;
+  /**
+   * When set, small screens show this control on the search row instead of the
+   * full toolbar, and the caller owns the compact panel it opens.
+   */
+  mobileControls?: ReactNode;
   /** Controlled column visibility, e.g. when a saved view restores it. */
   columnVisibility?: ColumnVisibilityState;
   onColumnVisibilityChange?: (next: ColumnVisibilityState) => void;
@@ -209,6 +214,7 @@ export function DataTable<TData extends RowData>({
   onFilterVisibilityChange,
   columnVisibility: controlledColumnVisibility,
   onColumnVisibilityChange,
+  mobileControls,
 }: DataTableProps<TData>) {
   const { page, pageSize, search, filters: filterValues } = query;
   const sortId = query.sort?.id ?? null;
@@ -363,7 +369,18 @@ export function DataTable<TData extends RowData>({
             />
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          {mobileControls ? (
+            <div className="ml-auto flex shrink-0 items-center gap-2 xl:hidden">
+              {mobileControls}
+            </div>
+          ) : null}
+
+          <div
+            className={cn(
+              "ml-auto flex shrink-0 items-center gap-2",
+              mobileControls && "hidden xl:flex",
+            )}
+          >
             {headerLeading}
             {filters?.length ? (
               <FilterVisibilityMenu
@@ -389,7 +406,12 @@ export function DataTable<TData extends RowData>({
         {/* Row 2: the filter controls, with any caller-supplied actions pushed
             to the right of the same line. */}
         {visibleFilters.length || toolbarFilters || toolbarActions ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-x-4 gap-y-2",
+              mobileControls && "hidden xl:flex",
+            )}
+          >
             {toolbarFilters}
             {visibleFilters.map((filter) => (
               <ColumnFilter
@@ -419,7 +441,7 @@ export function DataTable<TData extends RowData>({
         <>
           <div
             className={cn(
-              "rounded-xl border transition-opacity",
+              "overflow-x-auto rounded-xl border transition-opacity",
               isPending && "pointer-events-none opacity-60",
             )}
             aria-busy={isPending}

@@ -49,6 +49,7 @@ import {
 import { dataTableFeatures } from "@/components/data-table/features";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CopyButton } from "@/components/ui/copy-button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   CASE_TYPE_LABELS,
   LEAD_STAGE_LABELS,
@@ -159,6 +168,9 @@ const ADDED_PRESET_OPTIONS = [
   { label: "Within 7 days", value: "7d" },
   { label: "Custom range", value: "custom" },
 ];
+
+/** Sentinel for "no filter" in the compact panel's selects. */
+const ANY_FILTER_VALUE = "__any__";
 
 /** Optimistic inline values for a row, cleared once the grid catches up. */
 interface RowOverride {
@@ -364,6 +376,21 @@ const columns = columnHelper.columns([
 /** Stable row id so sorting/filtering preserves row identity. */
 const getRowId = (lead: LeadRow) => String(lead.id);
 
+/** Labels for the mobile Columns checklist, derived from the column defs. */
+const COLUMN_OPTIONS = columns
+  .map((column) => {
+    const id =
+      column.id ??
+      ("accessorKey" in column && typeof column.accessorKey === "string"
+        ? column.accessorKey
+        : "");
+    return {
+      id,
+      label: typeof column.header === "string" ? column.header : id,
+    };
+  })
+  .filter((option) => option.id);
+
 /** Filter descriptors; assignee options depend on the loaded team. */
 function buildFilters(
   assignees: Array<{ id: number; name: string }>,
@@ -460,6 +487,7 @@ export function LeadsTable({
   const [viewsReady, setViewsReady] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [viewName, setViewName] = useState("");
 
   // Attribution (source + tracking ids) is admin-only. The server already blanks
@@ -707,6 +735,16 @@ export function LeadsTable({
         ? "custom"
         : "7d";
 
+  /** Change the board sort without touching the date filter. */
+  function changeSort(value: string) {
+    if (!value) return;
+    onQueryChange({
+      ...query,
+      page: 1,
+      sort: { id: "createdAt", desc: value === "newest" },
+    });
+  }
+
   /** Switch between the rolling presets and the custom pickers. */
   function changeAddedPreset(preset: string) {
     const filters: Record<string, string> = {
@@ -756,6 +794,63 @@ export function LeadsTable({
       });
     });
   }
+
+  // The board is already grouped by stage, so its filter is noise there.
+  const boardFilters = buildFilters(assignees, viewer.id).filter(
+    (filter) => !(view === "kanban" && filter.columnId === "stage"),
+  );
+
+  const dateFilter = (
+    <DateRangeFilter
+      preset={addedPreset}
+      from={query.filters.addedFrom ?? defaultAddedFrom()}
+      to={query.filters.addedTo ?? ""}
+      onPresetChange={changeAddedPreset}
+      onChange={changeDateRange}
+    />
+  );
+
+  /** Write one filter value from the compact panel. */
+  function setFilterValue(columnId: string, value: string) {
+    const filters: Record<string, string> = { ...query.filters };
+    if (value) filters[columnId] = value;
+    else delete filters[columnId];
+    onQueryChange({ ...query, page: 1, filters });
+  }
+
+  // A quick signal on the compact trigger, ignoring the default date window.
+  const activeFilterCount =
+    Object.keys(query.filters).filter(
+      (key) => key !== "addedWithin" && query.filters[key],
+    ).length + (query.search ? 1 : 0);
+
+  const columnOptions = COLUMN_OPTIONS.filter(
+    (option) => canSeeAttribution || option.id !== "source",
+  );
+
+  const mobileControls = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="xl:hidden"
+      onClick={() => setControlsOpen(true)}
+    >
+      <SlidersHorizontal aria-hidden />
+      Options
+      {activeFilterCount > 0 ? (
+        <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+          {activeFilterCount}
+        </span>
+      ) : null}
+      {viewActive ? (
+        <Heart
+          aria-label="Saved view active"
+          className="size-3.5 fill-red-500 text-red-500"
+        />
+      ) : null}
+    </Button>
+  );
 
   const stageMenu =
     view === "kanban" ? (
@@ -819,10 +914,7 @@ export function LeadsTable({
         getRowId={getRowId}
         ariaLabel="Leads"
         searchPlaceholder="Search leads…"
-        filters={buildFilters(assignees, viewer.id).filter(
-          // The board is already grouped by stage, so its filter is noise.
-          (filter) => !(view === "kanban" && filter.columnId === "stage"),
-        )}
+        filters={boardFilters}
         defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
         defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
         filterVisibility={filterVisibility}
@@ -831,15 +923,8 @@ export function LeadsTable({
         onColumnVisibilityChange={setColumnVisibility}
         emptyMessage="No leads yet."
         emptyFilteredMessage="No leads match your filters."
-        toolbarFilters={
-          <DateRangeFilter
-            preset={addedPreset}
-            from={query.filters.addedFrom ?? defaultAddedFrom()}
-            to={query.filters.addedTo ?? ""}
-            onPresetChange={changeAddedPreset}
-            onChange={changeDateRange}
-          />
-        }
+        mobileControls={mobileControls}
+        toolbarFilters={dateFilter}
         toolbarActions={
           <Button
             type="button"
@@ -861,12 +946,7 @@ export function LeadsTable({
                 items={KANBAN_SORT_OPTIONS}
                 value={sortValue || null}
                 onValueChange={(value) => {
-                  if (!value) return;
-                  onQueryChange({
-                    ...query,
-                    page: 1,
-                    sort: { id: "createdAt", desc: value === "newest" },
-                  });
+                  if (value) changeSort(value);
                 }}
               >
                 <SelectTrigger
@@ -938,6 +1018,237 @@ export function LeadsTable({
             : undefined
         }
       />
+
+      <Sheet open={controlsOpen} onOpenChange={setControlsOpen}>
+        <SheetContent side="right" className="w-[92vw] gap-0 sm:max-w-md">
+          <SheetHeader className="border-b">
+            <SheetTitle>View and filters</SheetTitle>
+            <SheetDescription>
+              Change what this page shows without leaving it.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
+            <section className="space-y-2">
+              <p className="text-sm font-medium">View</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={view === "table" ? "secondary" : "outline"}
+                  aria-pressed={view === "table"}
+                  onClick={() => changeView("table")}
+                >
+                  <Table2 aria-hidden />
+                  Table
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={view === "kanban" ? "secondary" : "outline"}
+                  aria-pressed={view === "kanban"}
+                  onClick={() => changeView("kanban")}
+                >
+                  <Columns3 aria-hidden />
+                  Kanban
+                </Button>
+              </div>
+            </section>
+
+            {view === "kanban" ? (
+              <section className="space-y-2">
+                <label
+                  htmlFor="mobile-board-sort"
+                  className="text-sm font-medium"
+                >
+                  Sort
+                </label>
+                <Select
+                  items={KANBAN_SORT_OPTIONS}
+                  value={sortValue || null}
+                  onValueChange={(value) => {
+                    if (value) changeSort(value);
+                  }}
+                >
+                  <SelectTrigger
+                    id="mobile-board-sort"
+                    className="w-full"
+                    aria-label="Sort leads by date added"
+                  >
+                    <SelectValue placeholder="Default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KANBAN_SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </section>
+            ) : null}
+
+            <section className="space-y-2">
+              <p className="text-sm font-medium">Saved views</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setControlsOpen(false);
+                  setListOpen(true);
+                }}
+              >
+                Browse saved views
+                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {savedViews.length}
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setControlsOpen(false);
+                  setViewName("");
+                  setSaveOpen(true);
+                }}
+              >
+                <Heart
+                  aria-hidden
+                  className={cn(
+                    "size-4",
+                    viewActive && "fill-red-500 text-red-500",
+                  )}
+                />
+                Save current view
+              </Button>
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Filters</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={clearFilters}
+                >
+                  <FilterX aria-hidden />
+                  Clear
+                </Button>
+              </div>
+
+              {dateFilter}
+
+              {boardFilters.map((filter) => {
+                const current = query.filters[filter.columnId] ?? "";
+                const values = [
+                  { label: filter.allLabel, value: ANY_FILTER_VALUE },
+                  ...filter.options,
+                ];
+                return (
+                  <div key={filter.columnId} className="space-y-1.5">
+                    <label
+                      htmlFor={`mobile-filter-${filter.columnId}`}
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      {filter.label}
+                    </label>
+                    <Select
+                      items={values}
+                      value={current || ANY_FILTER_VALUE}
+                      onValueChange={(value) =>
+                        setFilterValue(
+                          filter.columnId,
+                          !value || value === ANY_FILTER_VALUE ? "" : value,
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        id={`mobile-filter-${filter.columnId}`}
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ANY_FILTER_VALUE}>
+                          {filter.allLabel}
+                        </SelectItem>
+                        {filter.options.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </section>
+
+            {view === "table" ? (
+              <section className="space-y-2">
+                <p className="text-sm font-medium">Columns</p>
+                <div className="space-y-1">
+                  {columnOptions.map((option) => (
+                    <label
+                      key={option.id}
+                      className="flex items-center gap-2 rounded-md px-1 py-1.5 text-sm"
+                    >
+                      <Checkbox
+                        checked={columnVisibility[option.id] !== false}
+                        onCheckedChange={(checked) =>
+                          setColumnVisibility({
+                            ...columnVisibility,
+                            [option.id]: checked === true,
+                          })
+                        }
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <section className="space-y-2">
+                <p className="text-sm font-medium">Stages</p>
+                <div className="space-y-1">
+                  {LEAD_STAGES.map((stage) => (
+                    <label
+                      key={stage}
+                      className="flex items-center gap-2 rounded-md px-1 py-1.5 text-sm"
+                    >
+                      <Checkbox
+                        checked={!hiddenStages.includes(stage)}
+                        onCheckedChange={(checked) =>
+                          setHiddenStages((previous) =>
+                            checked === true
+                              ? previous.filter((value) => value !== stage)
+                              : [...previous, stage],
+                          )
+                        }
+                      />
+                      {LEAD_STAGE_LABELS[stage]}
+                    </label>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          <SheetFooter className="border-t">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => setControlsOpen(false)}
+            >
+              Done
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <LeadDialog
         lead={selected}
@@ -1291,7 +1602,7 @@ function LeadsKanban({
   }
 
   return (
-    <div className="flex min-h-[calc(100svh-21rem)] items-start gap-2.5 overflow-x-auto pr-4 pb-2 md:min-h-[calc(100svh-17rem)]">
+    <div className="flex min-h-[calc(100svh-13rem)] items-start gap-2.5 overflow-x-auto pr-4 pb-2 xl:min-h-[calc(100svh-17rem)]">
       {visibleStages.map((stage) => {
         const cards = byStage.get(stage) ?? [];
         const canDrop = Boolean(

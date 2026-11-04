@@ -217,6 +217,10 @@ their Lawmatics CRM.
   a URL with filters is treated as explicit. The heart opens the save dialog and
   stays red only while the page still matches that saved view. **Clear Filters**
   resets the filter values and search but never deletes a saved view.
+- Below `xl`, the leads toolbar collapses into one **Options** sheet: search stays
+  inline, and view, sort, saved views, filters, columns, stages, and Clear all
+  move into the sheet. `DataTable`'s `mobileControls` prop owns that switch, and
+  the grid card scrolls horizontally so a wide table never widens the page.
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the
