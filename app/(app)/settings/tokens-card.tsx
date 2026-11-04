@@ -126,9 +126,9 @@ export function TokensCard({
             Assistant access tokens
           </CardTitle>
           <CardDescription>
-            Let an external AI assistant — Claude, Cursor, or anything that
-            speaks the Model Context Protocol — work on your leads. It signs in
-            as you, so it can do exactly what you can and nothing more, and it
+            Let an external AI assistant (Claude, Cursor, or anything that
+            speaks the Model Context Protocol) work for you. It signs in
+            as you, so it can do exactly what you can, and it
             stops working the moment you revoke its token.
           </CardDescription>
         </CardHeader>
