@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
@@ -122,9 +123,13 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={wide ? "col-span-2 grid gap-1" : "grid gap-1"}>
+    <div
+      className={wide ? "col-span-2 grid min-w-0 gap-1" : "grid min-w-0 gap-1"}
+    >
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm break-words">{children}</dd>
+      <dd className="min-w-0 text-sm break-words [overflow-wrap:anywhere]">
+        {children}
+      </dd>
     </div>
   );
 }
@@ -136,7 +141,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {title}
       </h3>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
+      <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
     </section>
   );
 }
@@ -617,30 +622,46 @@ function LeadForm({
                 />
               </FormField>
               <FormField label="Phone" htmlFor="injuredPhone">
-                <Input
-                  id="injuredPhone"
-                  type="tel"
-                  value={draft.injuredPhone}
-                  disabled={!canEdit}
-                  placeholder="(555) 555-5555"
-                  onChange={(event) =>
-                    changeText("injuredPhone", event.target.value)
-                  }
-                  onBlur={() => flush("injuredPhone")}
-                />
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="injuredPhone"
+                    type="tel"
+                    value={draft.injuredPhone}
+                    disabled={!canEdit}
+                    placeholder="(555) 555-5555"
+                    className="min-w-0 flex-1"
+                    onChange={(event) =>
+                      changeText("injuredPhone", event.target.value)
+                    }
+                    onBlur={() => flush("injuredPhone")}
+                  />
+                  <CopyButton
+                    value={draft.injuredPhone}
+                    label="Phone"
+                    size="icon-sm"
+                  />
+                </div>
               </FormField>
               <FormField label="Email" htmlFor="injuredEmail">
-                <Input
-                  id="injuredEmail"
-                  type="email"
-                  value={draft.injuredEmail}
-                  disabled={!canEdit}
-                  placeholder="name@example.com"
-                  onChange={(event) =>
-                    changeText("injuredEmail", event.target.value)
-                  }
-                  onBlur={() => flush("injuredEmail")}
-                />
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="injuredEmail"
+                    type="email"
+                    value={draft.injuredEmail}
+                    disabled={!canEdit}
+                    placeholder="name@example.com"
+                    className="min-w-0 flex-1"
+                    onChange={(event) =>
+                      changeText("injuredEmail", event.target.value)
+                    }
+                    onBlur={() => flush("injuredEmail")}
+                  />
+                  <CopyButton
+                    value={draft.injuredEmail}
+                    label="Email"
+                    size="icon-sm"
+                  />
+                </div>
               </FormField>
               <FormField label="Date of accident" htmlFor="dateOfAccident">
                 <DatePicker

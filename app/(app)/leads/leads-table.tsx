@@ -33,6 +33,7 @@ import {
 import { dataTableFeatures } from "@/components/data-table/features";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   Select,
   SelectContent,
@@ -183,16 +184,28 @@ const columns = columnHelper.columns([
   columnHelper.accessor("injuredEmail", {
     header: "Email",
     enableSorting: false,
-    cell: (info) => (
-      <span className="text-muted-foreground">{info.getValue() ?? "—"}</span>
-    ),
+    cell: (info) => {
+      const value = info.getValue();
+      return (
+        <div className="flex items-center gap-1">
+          <span className="text-muted-foreground">{value ?? "—"}</span>
+          <CopyButton value={value} label="Email" />
+        </div>
+      );
+    },
   }),
   columnHelper.accessor("injuredPhone", {
     header: "Phone",
     enableSorting: false,
-    cell: (info) => (
-      <span className="text-muted-foreground">{info.getValue() ?? "—"}</span>
-    ),
+    cell: (info) => {
+      const value = info.getValue();
+      return (
+        <div className="flex items-center gap-1">
+          <span className="text-muted-foreground">{value ?? "—"}</span>
+          <CopyButton value={value} label="Phone" />
+        </div>
+      );
+    },
   }),
   columnHelper.accessor("caseType", {
     header: "Case type",

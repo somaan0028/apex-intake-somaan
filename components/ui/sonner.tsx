@@ -39,6 +39,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          // Sonner hard-codes a lighter grey for the description; keep it the
+          // same colour as the title so the toast reads as one block.
+          description: "!text-popover-foreground",
         },
       }}
       {...props}
