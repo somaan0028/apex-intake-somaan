@@ -195,7 +195,7 @@ function AssistantMessage({ message }: { message: UIMessage }) {
 }
 
 /** A prompt a page asked the assistant to start with, and a counter identifying
- * the request. The counter is what lets the composer apply each request exactly
+ * the request. The counter is what lets the thread send each request exactly
  * once, even if the same question is asked twice. */
 export interface ComposerDraft {
   text: string;
@@ -206,12 +206,15 @@ export function ChatThread({
   chatId,
   initialMessages,
   draft,
+  onDraftConsumed,
   onTurnComplete,
 }: {
   chatId: string;
   initialMessages: StoredMessage[];
-  /** Text to place in the composer, chosen elsewhere (e.g. Overview suggestions). */
+  /** A question chosen elsewhere (e.g. Overview suggestions), sent on arrival. */
   draft?: ComposerDraft;
+  /** Called once a draft has been sent, so the panel can clear it. */
+  onDraftConsumed?: (seq: number) => void;
   /** Called after each completed turn, so the panel can refresh titles/order. */
   onTurnComplete?: () => void;
 }) {
@@ -230,8 +233,7 @@ export function ChatThread({
     onFinish: () => onTurnComplete?.(),
   });
 
-  const [input, setInput] = useState(draft?.text ?? "");
-  const [appliedDraftSeq, setAppliedDraftSeq] = useState(draft?.seq ?? 0);
+  const [input, setInput] = useState("");
   const [mentions, setMentions] = useState<MentionRef[]>([]);
   const [sessionMentions, setSessionMentions] = useState<MentionRef[]>([]);
   const [mentionQuery, setMentionQuery] =
@@ -246,15 +248,9 @@ export function ChatThread({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // A question chosen elsewhere (a suggestion on the Overview page) is folded
-  // into the composer. Adjusting state during render is React's documented
-  // alternative to an effect here: the counter means each request lands exactly
-  // once, and it converges on the next render.
-  if (draft && draft.seq !== appliedDraftSeq) {
-    setAppliedDraftSeq(draft.seq);
-    setInput(draft.text);
-  }
+  // The last draft counter this thread has sent; a ref because it must survive
+  // re-renders without triggering one.
+  const consumedDraftSeq = useRef(0);
 
   // Every reference this conversation has shown, so a tag renders as a tag when
   // a past chat is reloaded — the transcript carries its own references.
@@ -352,24 +348,53 @@ export function ChatThread({
     });
   }
 
-  async function handleSend() {
-    const text = input.trim();
-    const refs = activeMentions(input, mentions);
-    if ((!text && refs.length === 0) || isLoading) return;
+  /** Send one message, whether it came from the composer or a starter prompt. */
+  const submit = useCallback(
+    async (rawText: string, refs: MentionRef[]) => {
+      const text = rawText.trim();
+      if ((!text && refs.length === 0) || isLoading) return;
 
-    setInput("");
-    setMentions([]);
-    setMentionQuery(null);
-    setSuggestionState({ query: "", kind: null, items: [] });
-    setSessionMentions((previous) => mergeMentions(previous, refs));
+      setInput("");
+      setMentions([]);
+      setMentionQuery(null);
+      setSuggestionState({ query: "", kind: null, items: [] });
+      setSessionMentions((previous) => mergeMentions(previous, refs));
 
-    await sendMessage(
-      text || "Tell me about this.",
-      refs.length
-        ? { body: { mentions: refs.map((m) => ({ kind: m.kind, id: m.id })) } }
-        : undefined,
-    );
+      await sendMessage(
+        text || "Tell me about this.",
+        refs.length
+          ? {
+              body: {
+                mentions: refs.map((m) => ({ kind: m.kind, id: m.id })),
+              },
+            }
+          : undefined,
+      );
+    },
+    [isLoading, sendMessage],
+  );
+
+  function handleSend() {
+    void submit(input, activeMentions(input, mentions));
   }
+
+  // A question chosen elsewhere (a suggestion on the Overview page) is sent as
+  // soon as it arrives, not parked in the composer. The counter guarantees each
+  // request runs once; `onDraftConsumed` clears it so remounting the thread (a
+  // new chat, a reopened panel) cannot replay it.
+  useEffect(() => {
+    if (!draft || draft.seq === consumedDraftSeq.current) return;
+    if (!draft.text.trim()) return;
+    // If a reply is in flight, wait for it to finish and try again.
+    if (isLoading) return;
+
+    consumedDraftSeq.current = draft.seq;
+    onDraftConsumed?.(draft.seq);
+    // Sending talks to the chat connection (an external system), so this is a
+    // legitimate effect rather than a state write; the composer stays untouched
+    // and any text the user was typing is preserved.
+    void sendMessage(draft.text.trim());
+  }, [draft, isLoading, onDraftConsumed, sendMessage]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (open) {
@@ -435,10 +460,7 @@ export function ChatThread({
                 <button
                   key={prompt}
                   type="button"
-                  onClick={() => {
-                    setInput(prompt);
-                    textareaRef.current?.focus();
-                  }}
+                  onClick={() => void submit(prompt, [])}
                   className="rounded-lg border px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {prompt}
