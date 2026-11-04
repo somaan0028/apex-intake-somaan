@@ -41,6 +41,8 @@ export const PERMISSIONS = [
   "leads.send_to_firm",
   /** See a lead's attribution/tracking fields (IP, TrustedForm, Jornaya, source). */
   "leads.view.attribution",
+  /** See the Campaign Analytics dashboard (campaign/source/medium/content performance). */
+  "analytics.view",
   /** Create and manage intake users. */
   "users.manage",
 ] as const;

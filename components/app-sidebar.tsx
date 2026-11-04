@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ChartColumn,
   ChevronsUpDown,
   ClipboardList,
   LayoutDashboard,
@@ -59,6 +60,12 @@ const NAV_ITEMS: ReadonlyArray<{
     permission: null,
   },
   { title: "Leads", url: "/leads", icon: ClipboardList, permission: null },
+  {
+    title: "Campaign Analytics",
+    url: "/campaign-analytics",
+    icon: ChartColumn,
+    permission: "analytics.view",
+  },
   { title: "Users", url: "/users", icon: Users, permission: "users.manage" },
 ];
 
