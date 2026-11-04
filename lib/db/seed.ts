@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { hashPassword } from "@/lib/auth/password";
+import { isValidEmail, normalizePostcode } from "@/lib/validation";
 import { csvToRecords } from "./csv";
 import {
   toCaseType,
@@ -67,11 +68,22 @@ function seedUsers(db: AppDatabase): number {
   const records = csvToRecords(readSeedFile("users.csv"));
 
   const rows: NewUser[] = records.map((record) => {
+    const name = toNullableText(record.name);
+    const email = (toNullableText(record.email) ?? "").toLowerCase();
     const role: UserRole = toUserRole(record.role);
 
+    if (!name) {
+      throw new Error("[db] User seed row is missing a name.");
+    }
+    if (!isValidEmail(email)) {
+      throw new Error(
+        `[db] User ${email || "(blank)"}: invalid email address in users.csv.`,
+      );
+    }
+
     return {
-      name: toNullableText(record.name) ?? "Unknown",
-      email: (toNullableText(record.email) ?? "").toLowerCase(),
+      name,
+      email,
       role,
       passwordHash: hashPassword(DEFAULT_DEMO_PASSWORD),
       createdAt: new Date(),
@@ -123,6 +135,18 @@ function seedLeads(db: AppDatabase): number {
         );
       }
 
+      // ZIP codes go through the same canonicaliser the public form and the
+      // detail dialog use, so an export with junk fails the import loudly
+      // instead of putting an invalid postcode in the table.
+      const rawPostcode = toNullableText(record.postcode);
+      const postcode = rawPostcode ? normalizePostcode(rawPostcode) : null;
+      if (rawPostcode && !postcode) {
+        throw new Error(
+          `[db] Lead ${matterId}: invalid ZIP code ${JSON.stringify(record.postcode)}. ` +
+            `Expected 12345, 123456789 or 12345-6789.`,
+        );
+      }
+
       // The export stores the submitter's details in `first_name`…`email`
       // regardless of who was injured. Redistribute so:
       //   - `injured*` always describes the injured person, and
@@ -159,6 +183,86 @@ function seedLeads(db: AppDatabase): number {
             relationshipToInjured: null,
           };
 
+      // The injured person's identity is always required; the submitter's is
+      // required whenever the form was filled in for someone else. Contact
+      // details must be usable, so a bad export cell fails the import instead
+      // of silently becoming NULL (or, worse, storing junk).
+      if (!injured.injuredFirstName || !injured.injuredLastName) {
+        throw new Error(
+          `[db] Lead ${matterId}: the injured person's first and last name are required.`,
+        );
+      }
+      if (!injured.injuredEmail || !isValidEmail(injured.injuredEmail)) {
+        throw new Error(
+          `[db] Lead ${matterId}: invalid injured email ${JSON.stringify(
+            onBehalf ? record.injured_email : record.email,
+          )}.`,
+        );
+      }
+      // A phone is optional in the export (a few on-behalf rows have none),
+      // but a value that is present must be a usable 10-digit number.
+      const rawInjuredPhone = onBehalf ? record.injured_phone : record.phone;
+      if (toNullableText(rawInjuredPhone) && !injured.injuredPhone) {
+        throw new Error(
+          `[db] Lead ${matterId}: invalid injured phone ${JSON.stringify(
+            rawInjuredPhone,
+          )}.`,
+        );
+      }
+      if (onBehalf) {
+        if (!filler.fillerFirstName || !filler.fillerLastName) {
+          throw new Error(
+            `[db] Lead ${matterId}: the submitter's first and last name are required when filing for someone else.`,
+          );
+        }
+        if (!filler.fillerEmail || !isValidEmail(filler.fillerEmail)) {
+          throw new Error(
+            `[db] Lead ${matterId}: invalid submitter email ${JSON.stringify(
+              record.email,
+            )}.`,
+          );
+        }
+        if (toNullableText(record.phone) && !filler.fillerPhone) {
+          throw new Error(
+            `[db] Lead ${matterId}: invalid submitter phone ${JSON.stringify(
+              record.phone,
+            )}.`,
+          );
+        }
+        if (!injured.relationshipToInjured) {
+          throw new Error(
+            `[db] Lead ${matterId}: unrecognised relationship ${JSON.stringify(
+              record.relationship_to_injured,
+            )}. Valid relationships live in lib/db/schema/leads.ts.`,
+          );
+        }
+      }
+
+      const rawDate = toNullableText(record.date_of_accident);
+      const dateOfAccident = toNullableDate(record.date_of_accident);
+      if (rawDate && !dateOfAccident) {
+        throw new Error(
+          `[db] Lead ${matterId}: invalid accident date ${JSON.stringify(
+            record.date_of_accident,
+          )}.`,
+        );
+      }
+      if (dateOfAccident) {
+        const now = new Date();
+        const todayUtc = Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate(),
+        );
+        if (dateOfAccident.getTime() > todayUtc) {
+          throw new Error(
+            `[db] Lead ${matterId}: accident date ${JSON.stringify(
+              record.date_of_accident,
+            )} is in the future.`,
+          );
+        }
+      }
+
       return {
         matterId,
         createdAt: toNullableDate(record.created_at),
@@ -170,10 +274,10 @@ function seedLeads(db: AppDatabase): number {
         isFillingForSomeoneElse: onBehalf,
         ...injured,
 
-        dateOfAccident: toNullableDate(record.date_of_accident),
+        dateOfAccident,
         state: stateCode,
         county,
-        postcode: toNullableText(record.postcode),
+        postcode,
         injuryDetails: toNullableText(record.how_were_you_hurt),
         accidentDetails: toNullableText(record.briefly_describe_accident),
 

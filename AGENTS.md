@@ -68,6 +68,11 @@ their Lawmatics CRM.
 - Person data is split by role: `injured*` is always the injured person; `filler*` is
   the form submitter, populated only when `isFillingForSomeoneElse` is true (never
   duplicated). Brightwater receives the injured person's details.
+- Brightwater's payload (`lib/brightwater/payload.ts`) sends the state's **full name**
+  (`CO` → `Colorado`), the accident date split into `injury_year` (`YYYY`),
+  `injury_month` (`MM`) and `date_of_accident` (the two-digit day only), and no
+  `source` — the stored source is not the identifier Brightwater expects. Emails are
+  re-checked with `isValidEmail` at this boundary.
 - `case_type` is normally `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in
   `lib/labels.ts`), but an ad campaign we do not recognise is stored **verbatim** in this
   column, so read it through `caseTypeLabel()` rather than indexing `CASE_TYPE_LABELS`
@@ -103,11 +108,27 @@ their Lawmatics CRM.
 - `source`, `medium` and `content` are attribution fields (admin-only like the rest):
   `source` comes from `utm_source` via `lib/leads/utm.ts`, while `medium` and `content`
   are the raw `utm_medium` / `utm_content` values, stored only for later analytics.
+- `ipaddress` is stamped by the public intake route from the request, never from the
+  submitted body (`lib/leads/client-ip.ts`): the left-most `x-forwarded-for` hop
+  (Next's server fills it from the connection when absent) with `x-real-ip` as the
+  fallback. Locally that is `::1` or `127.0.0.1`; a visitor on the LAN appears as
+  their private address. Only valid IPv4/IPv6 literals are stored (ports, brackets
+  and IPv4-mapped IPv6 are normalised; junk becomes `null`).
 - `matter_id` is the Lawmatics business key and is only meaningful on imported leads.
   Public form submissions store an empty string; the unique index is partial
   (`WHERE matter_id <> ''`) so any number of those can coexist.
 - `state` (2-letter code) and `county` are validated against the fixed lists in
   `lib/us-states.ts` / `lib/us-counties.ts`; the seeder throws on anything unrecognised.
+- `postcode` is canonicalised by `normalizePostcode` (`12345` or `12345-6789`, with
+  `123456789` expanded) at every write boundary: public intake, the public endpoint,
+  the lead dialog / `saveLeadFields`, `updateLeadForActor`, and the CSV seeder. An
+  invalid value is rejected (or, for the CSV, fails the import loudly); it never
+  reaches SQLite. Validation is format-only — no bundled ZIP-to-state dataset.
+- The same final guard in `applyLeadUpdate` also validates required injured names,
+  email format, 10-digit phone, accident date, state/county, descriptions, stage and
+  assignee. The dialog mirrors it inline, the intake endpoint validates its own
+  payload, and the CSV seeder throws on any non-empty value it cannot canonicalise.
+  An invalid email can therefore not reach `leads` or `users`.
 - Passwords are a single `scrypt$params$salt$hash` string (per-user salt).
 - `api_tokens` (one row per personal access token for external agents) stores only the
   SHA-256 hash of the token plus a display `prefix`, its owner and `last_used_at`; the raw

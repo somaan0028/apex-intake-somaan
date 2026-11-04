@@ -125,11 +125,164 @@ export function updateLeadForActor(
   }
 }
 
+/**
+ * Final validation before SQLite.
+ *
+ * `normalizeLeadPatch` canonicalises the dialog's raw strings, but this runs on
+ * the canonical `LeadUpdate` too: the AI/MCP tools (and any future caller of
+ * `updateLeadForActor`) must not be able to persist a malformed value by
+ * skipping the dialog path.
+ */
+function validateLeadUpdate(lead: Lead, update: LeadUpdate): NormalizedPatch {
+  const next: LeadUpdate = { ...update };
+
+  // The injured person's names are always required.
+  if (next.injuredFirstName !== undefined) {
+    const value = toNullableText(next.injuredFirstName);
+    if (!value) {
+      return {
+        ok: false,
+        error: "The injured person's first name is required.",
+      };
+    }
+    next.injuredFirstName = value;
+  }
+  if (next.injuredLastName !== undefined) {
+    const value = toNullableText(next.injuredLastName);
+    if (!value) {
+      return {
+        ok: false,
+        error: "The injured person's last name is required.",
+      };
+    }
+    next.injuredLastName = value;
+  }
+
+  // An email is never allowed to be blank or malformed.
+  if (next.injuredEmail !== undefined) {
+    const value = (next.injuredEmail ?? "").trim();
+    if (!isValidEmail(value)) {
+      return { ok: false, error: "Enter a valid email address." };
+    }
+    next.injuredEmail = value;
+  }
+
+  if (next.injuredPhone !== undefined) {
+    const phone = toUsPhone(next.injuredPhone);
+    if (!phone) {
+      return { ok: false, error: "Enter a 10-digit US phone number." };
+    }
+    next.injuredPhone = phone;
+  }
+
+  if (next.dateOfAccident !== undefined && next.dateOfAccident !== null) {
+    if (!(next.dateOfAccident instanceof Date)) {
+      return { ok: false, error: "Enter a valid date." };
+    }
+    if (Number.isNaN(next.dateOfAccident.getTime())) {
+      return { ok: false, error: "Enter a valid date." };
+    }
+    const now = new Date();
+    const todayUtc = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+    );
+    if (next.dateOfAccident.getTime() > todayUtc) {
+      return { ok: false, error: "The date can't be in the future." };
+    }
+  }
+
+  if (next.state !== undefined) {
+    const raw = (next.state ?? "").trim();
+    const state = raw === "" ? null : toStateCode(raw);
+    if (raw !== "" && !state) {
+      return { ok: false, error: "Choose a valid US state." };
+    }
+    next.state = state;
+  }
+
+  if (next.county !== undefined) {
+    const raw = (next.county ?? "").trim();
+    if (raw === "") {
+      next.county = null;
+    } else {
+      const state = next.state !== undefined ? next.state : lead.state;
+      if (!state) {
+        return { ok: false, error: "Choose a state before choosing a county." };
+      }
+      const county = toCounty(state, raw);
+      if (!county) {
+        return { ok: false, error: "Choose a county from the list." };
+      }
+      next.county = county;
+    }
+  } else if (next.state !== undefined) {
+    // A state change must not leave a county that belongs to the old state.
+    if (next.state === null) {
+      next.county = null;
+    } else if (lead.county && !toCounty(next.state, lead.county)) {
+      next.county = null;
+    }
+  }
+
+  if (next.postcode !== undefined) {
+    const raw = (next.postcode ?? "").trim();
+    const postcode = raw === "" ? null : normalizePostcode(raw);
+    if (raw !== "" && !postcode) {
+      return { ok: false, error: "Enter a valid ZIP code." };
+    }
+    next.postcode = postcode;
+  }
+
+  for (const key of ["injuryDetails", "accidentDetails"] as const) {
+    if (next[key] === undefined) continue;
+    const value = toNullableText(next[key]);
+    if (value && value.length > MAX_TEXT_LENGTH) {
+      return { ok: false, error: "That description is too long." };
+    }
+    next[key] = value;
+  }
+
+  for (const key of [
+    "isAtFault",
+    "hasAttorney",
+    "hasReceivedSettlement",
+  ] as const) {
+    if (next[key] === undefined) continue;
+    const value = next[key];
+    if (value !== null && typeof value !== "boolean") {
+      return { ok: false, error: "Choose Yes, No, or Unknown." };
+    }
+  }
+
+  if (
+    next.stage !== undefined &&
+    !(LEAD_STAGES as readonly string[]).includes(next.stage)
+  ) {
+    return { ok: false, error: "Unknown stage." };
+  }
+
+  if (
+    next.assignedToId !== undefined &&
+    next.assignedToId !== null &&
+    (!Number.isInteger(next.assignedToId) || next.assignedToId <= 0)
+  ) {
+    return { ok: false, error: "Unknown assignee." };
+  }
+
+  return { ok: true, update: next };
+}
+
 function applyLeadUpdate(
   actor: Actor,
   lead: Lead,
   update: LeadUpdate,
 ): LeadMutationResult {
+  const validated = validateLeadUpdate(lead, update);
+  if (!validated.ok) return validated;
+  update = validated.update;
+
   const stageChanged =
     update.stage !== undefined && update.stage !== lead.stage;
   const assigneeChanged =
@@ -215,34 +368,41 @@ function normalizeLeadPatch(
     patch[key] !== undefined;
 
   if (provided("injuredFirstName")) {
-    update.injuredFirstName = toNullableText(patch.injuredFirstName);
+    const value = toNullableText(patch.injuredFirstName);
+    if (!value) {
+      return {
+        ok: false,
+        error: "The injured person's first name is required.",
+      };
+    }
+    update.injuredFirstName = value;
   }
   if (provided("injuredLastName")) {
-    update.injuredLastName = toNullableText(patch.injuredLastName);
+    const value = toNullableText(patch.injuredLastName);
+    if (!value) {
+      return {
+        ok: false,
+        error: "The injured person's last name is required.",
+      };
+    }
+    update.injuredLastName = value;
   }
 
   if (provided("injuredPhone")) {
     const raw = (patch.injuredPhone ?? "").trim();
-    if (raw === "") {
-      update.injuredPhone = null;
-    } else {
-      const phone = toUsPhone(raw);
-      if (!phone) {
-        return { ok: false, error: "Enter a 10-digit US phone number." };
-      }
-      update.injuredPhone = phone;
+    const phone = toUsPhone(raw);
+    if (!phone) {
+      return { ok: false, error: "Enter a 10-digit US phone number." };
     }
+    update.injuredPhone = phone;
   }
 
   if (provided("injuredEmail")) {
     const raw = (patch.injuredEmail ?? "").trim();
-    if (raw === "") {
-      update.injuredEmail = null;
-    } else if (!isValidEmail(raw)) {
+    if (!isValidEmail(raw)) {
       return { ok: false, error: "Enter a valid email address." };
-    } else {
-      update.injuredEmail = raw;
     }
+    update.injuredEmail = raw;
   }
 
   if (provided("fillerFirstName")) {

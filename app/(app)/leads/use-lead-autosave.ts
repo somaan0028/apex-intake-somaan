@@ -26,6 +26,8 @@ export interface LeadAutoSave {
   schedule: (key: string, patch: LeadFieldPatch) => void;
   /** Send the debounced patch for `key` now (e.g. on blur). */
   flush: (key: string) => void;
+  /** Drop the debounced patch for `key` (e.g. after it became invalid). */
+  cancel: (key: string) => void;
   /** Send every debounced patch now (e.g. when the dialog closes). */
   flushAll: () => void;
 }
@@ -116,6 +118,15 @@ export function useLeadAutoSave(leadId: number): LeadAutoSave {
     [saveNow],
   );
 
+  const cancel = useCallback((key: string) => {
+    const timer = timers.current.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      timers.current.delete(key);
+    }
+    latest.current.delete(key);
+  }, []);
+
   const schedule = useCallback(
     (key: string, patch: LeadFieldPatch) => {
       latest.current.set(key, patch);
@@ -140,5 +151,5 @@ export function useLeadAutoSave(leadId: number): LeadAutoSave {
     for (const key of Array.from(timers.current.keys())) flush(key);
   }, [flush]);
 
-  return { status, error, saveNow, schedule, flush, flushAll };
+  return { status, error, saveNow, schedule, flush, cancel, flushAll };
 }
