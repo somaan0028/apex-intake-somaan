@@ -209,28 +209,13 @@ export function TokensCard({
         <CardHeader>
           <CardTitle>Connect an assistant</CardTitle>
           <CardDescription>
-            Point the client at this endpoint and send a token in the
-            <code className="mx-1 font-mono text-xs">Authorization</code>
-            header. Most clients take a config entry like this one.
+            Let a coding agent set this up for you, or copy the endpoint and
+            config into a client yourself.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <CopyField label="Endpoint" value={endpoint} />
-          <div className="space-y-1.5">
-            <Label className="text-muted-foreground">Client config</Label>
-            <pre className="overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs">
-              <code>{`{
-  "mcpServers": {
-    "apex-intake-desk": {
-      "type": "http",
-      "url": "${endpoint}",
-      "headers": { "Authorization": "Bearer <your token>" }
-    }
-  }
-}`}</code>
-            </pre>
-          </div>
-          <div className="space-y-2 border-t pt-4">
+        <CardContent className="space-y-5">
+          <section className="space-y-2">
+            <h3 className="text-sm font-medium">Automatic setup</h3>
             <p className="text-sm text-muted-foreground">
               Paste these instructions into Claude Code, Cursor, or another
               coding agent and it can set up the connection for you.
@@ -239,7 +224,33 @@ export function TokensCard({
               value={instructionsFor(endpoint, state.token ?? null)}
               label="Copy Instructions for AI"
             />
-          </div>
+          </section>
+
+          <section className="space-y-4 border-t pt-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium">Manual setup</h3>
+              <p className="text-sm text-muted-foreground">
+                Add this endpoint and send a token in the
+                <code className="mx-1 font-mono text-xs">Authorization</code>
+                header.
+              </p>
+            </div>
+            <CopyField label="Endpoint" value={endpoint} />
+            <div className="space-y-1.5">
+              <Label className="text-muted-foreground">Client config</Label>
+              <pre className="overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs">
+                <code>{`{
+  "mcpServers": {
+    "apex-intake-desk": {
+      "type": "http",
+      "url": "${endpoint}",
+      "headers": { "Authorization": "Bearer <your token>" }
+    }
+  }
+}`}</code>
+              </pre>
+            </div>
+          </section>
         </CardContent>
       </Card>
     </div>
