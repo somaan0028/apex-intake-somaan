@@ -261,6 +261,12 @@ their Lawmatics CRM.
   `stateLabel()`. The stage and assignee are also editable inline in the grid
   (`leads-table.tsx`): admins get both selects, agents get a stage select plus
   Claim/Release, and each cell saves through the same `saveLeadFields` action.
+  The dialog also has two small history links: **View past changes (n)** under the stage
+  control (`lead:stage_update`) and **View attempts (n)** beside the Firm submission heading
+  (`lead:send_to_firm`), each carrying its row count. Both open a nested dialog of doer /
+  description / timestamp rows
+  from `lib/activities/actions.ts`; access follows lead visibility, not the Activity page's
+  doer scoping, so anyone who can open the lead sees what happened to it.
 - The leads page defaults to a **Kanban view**; the URL only needs `view=table`
   to show the grid. The server loads the filtered set (up to 1000 rows) for the
   board; cards drag between stage columns through the same `saveLeadFields`

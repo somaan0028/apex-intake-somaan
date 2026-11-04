@@ -67,6 +67,7 @@ import {
   isValidPhone,
   normalizePostcode,
 } from "@/lib/validation";
+import { LeadHistoryDialog } from "./lead-history-dialog";
 import { useLeadAutoSave, type SaveStatus } from "./use-lead-autosave";
 
 const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
@@ -146,13 +147,24 @@ function Field({
   );
 }
 
-/** A titled group of read-only fields. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** A titled group of read-only fields, with an optional header action. */
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="grid gap-3">
-      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        {title}
-      </h3>
+      <div className="flex items-center gap-2">
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          {title}
+        </h3>
+        {action}
+      </div>
       <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
     </section>
   );
@@ -590,6 +602,13 @@ function LeadForm({
                     Only the agent who owns this lead can edit it.
                   </p>
                 ) : null}
+                <LeadHistoryDialog
+                  leadId={lead.id}
+                  type="lead:stage_update"
+                  triggerLabel="View past changes"
+                  title="Past stage changes"
+                  emptyMessage="No stage changes have been recorded yet."
+                />
               </FormField>
 
               <FormField
@@ -1054,7 +1073,18 @@ function LeadForm({
             </Section>
           ) : null}
 
-          <Section title="Firm submission">
+          <Section
+            title="Firm submission"
+            action={
+              <LeadHistoryDialog
+                leadId={lead.id}
+                type="lead:send_to_firm"
+                triggerLabel="View attempts"
+                title="Submission attempts"
+                emptyMessage="No submission attempts have been recorded yet."
+              />
+            }
+          >
             <Field label="Sent to firm">
               {sentAt ? formatDateTime(sentAt) : "Not sent"}
             </Field>
