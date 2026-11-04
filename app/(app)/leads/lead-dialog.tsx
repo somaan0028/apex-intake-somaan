@@ -62,6 +62,11 @@ import {
 } from "@/lib/rbac";
 import { COUNTIES_BY_STATE } from "@/lib/us-counties";
 import { US_STATES } from "@/lib/us-states";
+import {
+  isValidEmail,
+  isValidPhone,
+  normalizePostcode,
+} from "@/lib/validation";
 import { useLeadAutoSave, type SaveStatus } from "./use-lead-autosave";
 
 const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
@@ -71,6 +76,9 @@ const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
 
 /** Sentinel for "not set" in the state/county selects. */
 const NONE = "__none__";
+
+/** Matches the service's free-text guard. */
+const MAX_TEXT_LENGTH = 5000;
 
 const STATE_OPTIONS = [
   { label: "Not set", value: NONE },
@@ -267,9 +275,8 @@ function LeadForm({
 }) {
   const router = useRouter();
   const [sending, startSending] = useTransition();
-  const { status, error, saveNow, schedule, flush, flushAll } = useLeadAutoSave(
-    lead.id,
-  );
+  const { status, error, saveNow, schedule, flush, cancel, flushAll } =
+    useLeadAutoSave(lead.id);
 
   const [stage, setStage] = useState<LeadStage>(lead.stage);
   const [assignedToId, setAssignedToId] = useState<number | null>(
@@ -351,9 +358,48 @@ function LeadForm({
     setDraft((prev) => ({ ...prev, [key]: value }));
   }
 
+  /** The same rules the service enforces, so invalid values never leave the browser. */
+  function textFieldError(key: TextField, value: string): string | null {
+    switch (key) {
+      case "injuredFirstName":
+        return value.trim() === "" ? "First name is required." : null;
+      case "injuredLastName":
+        return value.trim() === "" ? "Last name is required." : null;
+      case "injuredEmail":
+        return !isValidEmail(value) ? "Enter a valid email address." : null;
+      case "injuredPhone":
+        return !isValidPhone(value)
+          ? "Enter a 10-digit US phone number."
+          : null;
+      case "postcode":
+        return value.trim() !== "" && normalizePostcode(value) === null
+          ? "Enter a valid ZIP code (12345 or 12345-6789)."
+          : null;
+      default:
+        return null;
+    }
+  }
+
+  const fieldErrors = {
+    injuredFirstName: textFieldError(
+      "injuredFirstName",
+      draft.injuredFirstName,
+    ),
+    injuredLastName: textFieldError("injuredLastName", draft.injuredLastName),
+    injuredEmail: textFieldError("injuredEmail", draft.injuredEmail),
+    injuredPhone: textFieldError("injuredPhone", draft.injuredPhone),
+    postcode: textFieldError("postcode", draft.postcode),
+  } satisfies Partial<Record<TextField, string | null>>;
+
   /** Update a text field and debounce its save. */
   function changeText(key: TextField, value: string) {
     updateDraft(key, value);
+    // Never send a value the server will reject; the inline message explains
+    // why, and the next valid edit saves normally.
+    if (textFieldError(key, value)) {
+      cancel(key);
+      return;
+    }
     schedule(key, { [key]: value } as LeadFieldPatch);
   }
 
@@ -604,22 +650,34 @@ function LeadForm({
                   id="injuredFirstName"
                   value={draft.injuredFirstName}
                   disabled={!canEdit}
+                  aria-invalid={fieldErrors.injuredFirstName !== null}
                   onChange={(event) =>
                     changeText("injuredFirstName", event.target.value)
                   }
                   onBlur={() => flush("injuredFirstName")}
                 />
+                {fieldErrors.injuredFirstName ? (
+                  <p className="text-xs text-destructive">
+                    {fieldErrors.injuredFirstName}
+                  </p>
+                ) : null}
               </FormField>
               <FormField label="Last name" htmlFor="injuredLastName">
                 <Input
                   id="injuredLastName"
                   value={draft.injuredLastName}
                   disabled={!canEdit}
+                  aria-invalid={fieldErrors.injuredLastName !== null}
                   onChange={(event) =>
                     changeText("injuredLastName", event.target.value)
                   }
                   onBlur={() => flush("injuredLastName")}
                 />
+                {fieldErrors.injuredLastName ? (
+                  <p className="text-xs text-destructive">
+                    {fieldErrors.injuredLastName}
+                  </p>
+                ) : null}
               </FormField>
               <FormField label="Phone" htmlFor="injuredPhone">
                 <div className="flex items-center gap-1.5">
@@ -630,6 +688,7 @@ function LeadForm({
                     disabled={!canEdit}
                     placeholder="(555) 555-5555"
                     className="min-w-0 flex-1"
+                    aria-invalid={fieldErrors.injuredPhone !== null}
                     onChange={(event) =>
                       changeText("injuredPhone", event.target.value)
                     }
@@ -641,6 +700,11 @@ function LeadForm({
                     size="icon-sm"
                   />
                 </div>
+                {fieldErrors.injuredPhone ? (
+                  <p className="text-xs text-destructive">
+                    {fieldErrors.injuredPhone}
+                  </p>
+                ) : null}
               </FormField>
               <FormField label="Email" htmlFor="injuredEmail">
                 <div className="flex items-center gap-1.5">
@@ -651,6 +715,7 @@ function LeadForm({
                     disabled={!canEdit}
                     placeholder="name@example.com"
                     className="min-w-0 flex-1"
+                    aria-invalid={fieldErrors.injuredEmail !== null}
                     onChange={(event) =>
                       changeText("injuredEmail", event.target.value)
                     }
@@ -662,6 +727,11 @@ function LeadForm({
                     size="icon-sm"
                   />
                 </div>
+                {fieldErrors.injuredEmail ? (
+                  <p className="text-xs text-destructive">
+                    {fieldErrors.injuredEmail}
+                  </p>
+                ) : null}
               </FormField>
               <FormField label="Date of accident" htmlFor="dateOfAccident">
                 <DatePicker
@@ -736,11 +806,17 @@ function LeadForm({
                   value={draft.postcode}
                   disabled={!canEdit}
                   placeholder="12345"
+                  aria-invalid={fieldErrors.postcode !== null}
                   onChange={(event) =>
                     changeText("postcode", event.target.value)
                   }
                   onBlur={() => flush("postcode")}
                 />
+                {fieldErrors.postcode ? (
+                  <p className="text-xs text-destructive">
+                    {fieldErrors.postcode}
+                  </p>
+                ) : null}
               </FormField>
             </div>
           </section>
@@ -833,6 +909,7 @@ function LeadForm({
                   id="lead-injury-details"
                   value={draft.injuryDetails}
                   disabled={!canEdit}
+                  maxLength={MAX_TEXT_LENGTH}
                   className="min-h-20"
                   onChange={(event) =>
                     changeText("injuryDetails", event.target.value)
@@ -849,6 +926,7 @@ function LeadForm({
                   id="lead-accident-details"
                   value={draft.accidentDetails}
                   disabled={!canEdit}
+                  maxLength={MAX_TEXT_LENGTH}
                   className="min-h-20"
                   onChange={(event) =>
                     changeText("accidentDetails", event.target.value)

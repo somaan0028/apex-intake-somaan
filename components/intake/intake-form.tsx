@@ -46,6 +46,9 @@ import {
   type UpdateFn,
 } from "./types";
 
+/** Matches the endpoint's free-text guard. */
+const MAX_TEXT_LENGTH = 5000;
+
 interface StepProps {
   values: IntakeValues;
   update: UpdateFn;
@@ -211,6 +214,7 @@ function IncidentStep({ values, update }: StepProps) {
               : "I was prescribed… and started noticing…"
           }
           value={values.accidentDetails}
+          maxLength={MAX_TEXT_LENGTH}
           onChange={(event) => update("accidentDetails", event.target.value)}
         />
       </Field>
@@ -229,6 +233,7 @@ function IncidentStep({ values, update }: StepProps) {
               : "Back pain, a skin reaction, or a diagnosed condition."
           }
           value={values.injuryDetails}
+          maxLength={MAX_TEXT_LENGTH}
           onChange={(event) => update("injuryDetails", event.target.value)}
         />
       </Field>

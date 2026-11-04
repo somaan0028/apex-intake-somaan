@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { toNullableDate } from "@/lib/db/normalize";
 import { leads, type NewLead } from "@/lib/db/schema";
+import { clientIpFromHeaders } from "@/lib/leads/client-ip";
 import {
   INTAKE_FIELD_LABELS,
   validateIntakeSubmission,
@@ -72,6 +73,9 @@ export async function POST(request: Request) {
     source: data.source,
     medium: data.medium,
     content: data.content,
+    // Transport fact, not user input: the form never sends this and the body
+    // cannot set it. `x-forwarded-for` is populated from the connection.
+    ipaddress: clientIpFromHeaders(request.headers),
   };
 
   try {

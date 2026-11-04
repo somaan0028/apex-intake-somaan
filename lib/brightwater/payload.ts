@@ -10,6 +10,8 @@
  * The function returns a validation error instead of throwing, so the caller can
  * surface a descriptive message before spending a network round trip.
  */
+import { STATE_NAME_BY_CODE } from "@/lib/us-states";
+import { isValidEmail } from "@/lib/validation";
 import { BRIGHTWATER_TRACKING } from "./contract";
 
 /** The lead facts the payload needs; a full `Lead` row satisfies this. */
@@ -21,7 +23,6 @@ export interface BrightwaterLead {
   state: string | null;
   county: string | null;
   postcode: string | null;
-  source: string | null;
   ipaddress: string | null;
   trustedform: string | null;
   jornaya: string | null;
@@ -62,7 +63,7 @@ export function buildBrightwaterPayload(
 
   const missing: string[] = [];
   if (!firstname) missing.push("first name");
-  if (!email) missing.push("email");
+  if (!isValidEmail(email)) missing.push("valid email");
   if (phone1.length !== 10) missing.push("phone");
   if (missing.length > 0) {
     return {
@@ -75,6 +76,10 @@ export function buildBrightwaterPayload(
   const attorney = yesNo(lead.hasAttorney);
   const atFault = yesNo(lead.isAtFault);
   const settlement = yesNo(lead.hasReceivedSettlement);
+  // Brightwater expects the state's name, while the desk stores its code.
+  const state = lead.state
+    ? (STATE_NAME_BY_CODE[lead.state.trim().toUpperCase()] ?? lead.state)
+    : null;
 
   const fields: Record<string, string> = {
     // Required
@@ -90,10 +95,9 @@ export function buildBrightwaterPayload(
     ...withValue("lastname", lead.injuredLastName),
 
     // Location & attribution
-    ...withValue("state", lead.state),
+    ...withValue("state", state),
     ...withValue("county", lead.county),
     ...withValue("postcode", lead.postcode),
-    ...withValue("source", lead.source),
     ...withValue("ipaddress", lead.ipaddress),
     ...withValue("trustedform", lead.trustedform),
     ...withValue("journaya", lead.jornaya),
@@ -105,8 +109,9 @@ export function buildBrightwaterPayload(
     ...withValue("how_were_you_hurt", lead.injuryDetails),
     ...withValue("briefly_describe_accident", lead.accidentDetails),
 
-    // Accident date (also split into the year/month fields the API accepts)
-    ...withValue("date_of_accident", accidentDate),
+    // Accident date: the year and month ride in their own fields, so
+    // `date_of_accident` carries only the two-digit day.
+    ...withValue("date_of_accident", accidentDate?.slice(8, 10)),
     ...withValue("injury_year", accidentDate?.slice(0, 4)),
     ...withValue("injury_month", accidentDate?.slice(5, 7)),
   };
