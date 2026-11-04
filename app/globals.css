@@ -332,4 +332,13 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Tailwind v4 leaves native buttons with the default arrow cursor. Give
+     every enabled button and menu item the pointer users expect. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]):not([aria-disabled="true"]),
+  [role="option"]:not([data-disabled]):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }

@@ -190,7 +190,9 @@ their Lawmatics CRM.
   attribution, and Brightwater submission facts stay read-only by design. An agent
   claims or releases a lead with a button (they can only ever assign themselves);
   an admin keeps the full assignee selector. State is shown as "Colorado (CO)" via
-  `stateLabel()`.
+  `stateLabel()`. The stage and assignee are also editable inline in the grid
+  (`leads-table.tsx`): admins get both selects, agents get a stage select plus
+  Claim/Release, and each cell saves through the same `saveLeadFields` action.
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the

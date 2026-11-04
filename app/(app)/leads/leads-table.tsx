@@ -16,7 +16,15 @@
  * turned on from the Filters menu.
  */
 import { createColumnHelper } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type SyntheticEvent,
+} from "react";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   DataTable,
   useTableQuerySync,
@@ -24,6 +32,14 @@ import {
 } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   CASE_TYPE_LABELS,
   LEAD_STAGE_LABELS,
@@ -39,9 +55,16 @@ import {
   type LeadStage,
 } from "@/lib/db/schema";
 import type { AuthUser } from "@/lib/auth/session";
+import { saveLeadFields } from "@/lib/leads/actions";
 import { LEAD_SOURCES, UNASSIGNED } from "@/lib/leads/constants";
+import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
-import { can } from "@/lib/rbac";
+import {
+  can,
+  canAssignLead,
+  canChangeLeadStage,
+  canEditLead,
+} from "@/lib/rbac";
 import { BOOLEAN_FILTER_OPTIONS, type TableQuery } from "@/lib/table-query";
 import { LeadDialog } from "./lead-dialog";
 
@@ -62,6 +85,62 @@ const CASE_TYPE_BADGE: Record<CaseType, BadgeVariant> = {
   MASS_TORT: "secondary",
   OTHER: "outline",
 };
+
+const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
+  label: LEAD_STAGE_LABELS[value],
+  value,
+}));
+
+/** Optimistic inline values for a row, cleared once the grid catches up. */
+interface RowOverride {
+  stage?: LeadStage;
+  assignedToId?: number | null;
+}
+
+interface LeadTableContextValue {
+  viewer: AuthUser;
+  assignees: Array<{ id: number; name: string }>;
+  overrides: Record<number, RowOverride>;
+  saving: Record<number, boolean>;
+  save: (
+    lead: LeadRow,
+    patch: Pick<LeadFieldPatch, "stage" | "assignedToId">,
+  ) => Promise<boolean>;
+}
+
+const LeadTableContext = createContext<LeadTableContextValue | null>(null);
+
+function useLeadTable(): LeadTableContextValue {
+  const value = useContext(LeadTableContext);
+  if (!value) throw new Error("LeadTableContext is missing.");
+  return value;
+}
+
+/** The row with its inline overrides applied, for opening the dialog. */
+function applyOverride(
+  lead: LeadRow,
+  override: RowOverride | undefined,
+): LeadRow {
+  if (!override) return lead;
+  return {
+    ...lead,
+    ...(override.stage !== undefined ? { stage: override.stage } : {}),
+    ...(override.assignedToId !== undefined
+      ? { assignedToId: override.assignedToId }
+      : {}),
+  };
+}
+
+function stopRow(event: SyntheticEvent) {
+  event.stopPropagation();
+}
+
+function leadName(lead: LeadRow): string {
+  const name = [lead.injuredFirstName, lead.injuredLastName]
+    .filter(Boolean)
+    .join(" ");
+  return name || "lead";
+}
 
 /** Columns hidden on first render; the Columns menu can reveal them. */
 const DEFAULT_COLUMN_VISIBILITY = {
@@ -130,18 +209,14 @@ const columns = columnHelper.columns([
   }),
   columnHelper.accessor("stage", {
     header: "Stage",
-    cell: (info) => (
-      <Badge variant={STAGE_BADGE[info.getValue()]}>
-        {LEAD_STAGE_LABELS[info.getValue()]}
-      </Badge>
-    ),
+    cell: ({ row }) => <StageCell lead={row.original} />,
   }),
   // The id is `assignedTo` (not `assignedToName`) so the assignee filter, which
   // carries a user id, can hold its state on this column.
   columnHelper.accessor("assignedToName", {
     id: "assignedTo",
     header: "Assigned to",
-    cell: (info) => info.getValue() ?? EMPTY,
+    cell: ({ row }) => <AssigneeCell lead={row.original} />,
   }),
   columnHelper.accessor("createdAt", {
     header: "Date",
@@ -285,6 +360,8 @@ export function LeadsTable({
 }) {
   const { isPending, onQueryChange } = useTableQuerySync();
   const [selected, setSelected] = useState<LeadRow | null>(null);
+  const [overrides, setOverrides] = useState<Record<number, RowOverride>>({});
+  const [saving, setSaving] = useState<Record<number, boolean>>({});
 
   // Attribution (source + tracking ids) is admin-only. The server already blanks
   // the values; dropping the column and its filter keeps the grid from offering
@@ -301,8 +378,59 @@ export function LeadsTable({
     [canSeeAttribution],
   );
 
+  /**
+   * Inline stage/assignee save. The row updates immediately, the control is
+   * disabled until the action returns, and a rejection puts the old value back.
+   */
+  async function save(
+    lead: LeadRow,
+    patch: Pick<LeadFieldPatch, "stage" | "assignedToId">,
+  ): Promise<boolean> {
+    const id = lead.id;
+    setOverrides((previous) => ({
+      ...previous,
+      [id]: { ...previous[id], ...patch },
+    }));
+    setSaving((previous) => ({ ...previous, [id]: true }));
+
+    const result = await saveLeadFields(id, patch);
+
+    setSaving((previous) => {
+      const next = { ...previous };
+      delete next[id];
+      return next;
+    });
+
+    if (!result.ok) {
+      setOverrides((previous) => {
+        const next = { ...previous };
+        const current = { ...next[id] };
+        for (const key of Object.keys(patch) as Array<keyof RowOverride>) {
+          delete current[key];
+        }
+        if (Object.keys(current).length === 0) delete next[id];
+        else next[id] = current;
+        return next;
+      });
+      toast.error("Could not save the lead", {
+        description: result.error ?? "Please try again.",
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  const contextValue: LeadTableContextValue = {
+    viewer,
+    assignees,
+    overrides,
+    saving,
+    save,
+  };
+
   return (
-    <>
+    <LeadTableContext.Provider value={contextValue}>
       <DataTable
         columns={visibleColumns}
         data={leads}
@@ -318,15 +446,202 @@ export function LeadsTable({
         defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
         emptyMessage="No leads yet."
         emptyFilteredMessage="No leads match your filters."
-        onRowClick={(lead) => setSelected(lead)}
+        onRowClick={(lead) =>
+          setSelected(applyOverride(lead, overrides[lead.id]))
+        }
       />
 
       <LeadDialog
         lead={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          // The dialog revalidates the grid as it saves, so its values are the
+          // freshest source once it closes.
+          setOverrides({});
+        }}
         viewer={viewer}
         assignees={assignees}
       />
-    </>
+    </LeadTableContext.Provider>
   );
+}
+
+/** The stage badge, or a compact select when the viewer may change it. */
+function StageCell({ lead }: { lead: LeadRow }) {
+  const { viewer, overrides, saving, save } = useLeadTable();
+  const override = overrides[lead.id];
+  const stage = override?.stage ?? lead.stage;
+  const assignedToId =
+    override?.assignedToId !== undefined
+      ? override.assignedToId
+      : lead.assignedToId;
+  const subject = { ...lead, stage, assignedToId };
+  const editable = canEditLead(viewer, subject);
+  const isSaving = Boolean(saving[lead.id]);
+
+  if (!editable) {
+    return (
+      <Badge variant={STAGE_BADGE[stage]}>{LEAD_STAGE_LABELS[stage]}</Badge>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5" onKeyDown={stopRow}>
+      <Select
+        items={STAGE_OPTIONS}
+        value={stage}
+        onValueChange={(value) => {
+          if (!value) return;
+          void save(lead, { stage: value as LeadStage });
+        }}
+        disabled={isSaving}
+      >
+        <SelectTrigger
+          size="sm"
+          className="h-7 w-36"
+          aria-label={`Stage for ${leadName(lead)}`}
+          onClick={stopRow}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {STAGE_OPTIONS.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              disabled={
+                option.value !== stage &&
+                !canChangeLeadStage(viewer, subject, option.value)
+              }
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {isSaving ? (
+        <Loader2 className="size-3 animate-spin text-muted-foreground" />
+      ) : null}
+    </div>
+  );
+}
+
+/** The assignee selector for admins, the claim/release button for agents. */
+function AssigneeCell({ lead }: { lead: LeadRow }) {
+  const { viewer, assignees, overrides, saving, save } = useLeadTable();
+  const override = overrides[lead.id];
+  const assignedToId =
+    override?.assignedToId !== undefined
+      ? override.assignedToId
+      : lead.assignedToId;
+  const subject = { ...lead, assignedToId };
+  const isSaving = Boolean(saving[lead.id]);
+  const canAssignAny = can(viewer.role, "leads.assign.any");
+  const canClaim = canAssignLead(viewer, subject, viewer.id);
+  const canRelease = canAssignLead(viewer, subject, null);
+
+  function claim() {
+    if (isSaving) return;
+    void save(lead, { assignedToId: viewer.id });
+  }
+
+  function release() {
+    if (isSaving) return;
+    void save(lead, { assignedToId: null });
+  }
+
+  if (canAssignAny) {
+    const options = [
+      { label: "Unassigned", value: UNASSIGNED },
+      ...assignees.map((assignee) => ({
+        label: assigneeLabel(assignee, viewer.id),
+        value: String(assignee.id),
+      })),
+    ];
+
+    return (
+      <div className="flex items-center gap-1.5" onKeyDown={stopRow}>
+        <Select
+          items={options}
+          value={assignedToId === null ? UNASSIGNED : String(assignedToId)}
+          onValueChange={(value) => {
+            if (!value) return;
+            void save(lead, {
+              assignedToId: value === UNASSIGNED ? null : Number(value),
+            });
+          }}
+          disabled={isSaving}
+        >
+          <SelectTrigger
+            size="sm"
+            className="h-7 w-40"
+            aria-label={`Assignee for ${leadName(lead)}`}
+            onClick={stopRow}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {isSaving ? (
+          <Loader2 className="size-3 animate-spin text-muted-foreground" />
+        ) : null}
+      </div>
+    );
+  }
+
+  if (assignedToId === viewer.id && canRelease) {
+    return (
+      <div className="flex items-center gap-1.5" onKeyDown={stopRow}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          disabled={isSaving}
+          onClick={(event) => {
+            event.stopPropagation();
+            release();
+          }}
+        >
+          Release
+        </Button>
+        {isSaving ? (
+          <Loader2 className="size-3 animate-spin text-muted-foreground" />
+        ) : null}
+      </div>
+    );
+  }
+
+  if (assignedToId === null && canClaim) {
+    return (
+      <div className="flex items-center gap-1.5" onKeyDown={stopRow}>
+        <Button
+          size="sm"
+          className="h-7 px-2 text-xs"
+          disabled={isSaving}
+          onClick={(event) => {
+            event.stopPropagation();
+            claim();
+          }}
+        >
+          Claim
+        </Button>
+        {isSaving ? (
+          <Loader2 className="size-3 animate-spin text-muted-foreground" />
+        ) : null}
+      </div>
+    );
+  }
+
+  const name =
+    assignedToId === null
+      ? null
+      : (assignees.find((assignee) => assignee.id === assignedToId)?.name ??
+        lead.assignedToName);
+  return name ? <span>{name}</span> : EMPTY;
 }
