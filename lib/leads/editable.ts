@@ -13,6 +13,12 @@ export interface LeadFieldPatch {
   injuredLastName?: string;
   injuredPhone?: string;
   injuredEmail?: string;
+  /** The person who submitted the form, on an on-behalf lead. */
+  fillerFirstName?: string;
+  fillerLastName?: string;
+  fillerPhone?: string;
+  fillerEmail?: string;
+  relationshipToInjured?: string;
   /** `YYYY-MM-DD`, or an empty string to clear. */
   dateOfAccident?: string;
   state?: string;

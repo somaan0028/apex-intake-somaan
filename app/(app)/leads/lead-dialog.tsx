@@ -40,12 +40,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { LEAD_STAGES, type LeadStage } from "@/lib/db/schema";
+import { LEAD_STAGES, RELATIONSHIPS, type LeadStage } from "@/lib/db/schema";
 import { formatDateTime } from "@/lib/format";
 import {
   LEAD_STAGE_LABELS,
+  RELATIONSHIP_LABELS,
   assigneeLabel,
-  relationshipLabel,
 } from "@/lib/labels";
 import { sendLeadToFirm } from "@/lib/leads/actions";
 import { UNASSIGNED } from "@/lib/leads/constants";
@@ -86,13 +86,17 @@ const TRI_STATE_OPTIONS = [
   { label: "No", value: "no" },
 ];
 
+const RELATIONSHIP_OPTIONS = [
+  { label: "Not set", value: NONE },
+  ...RELATIONSHIPS.map((relationship) => ({
+    label: RELATIONSHIP_LABELS[relationship],
+    value: relationship,
+  })),
+];
+
 /** A value that may be missing, rendered as a dash. */
 function orDash(value: string | null | undefined): ReactNode {
   return value ? value : <span className="text-muted-foreground">—</span>;
-}
-
-function fullName(first: string | null, last: string | null): ReactNode {
-  return orDash([first, last].filter(Boolean).join(" "));
 }
 
 /** The picker's string for a nullable boolean. */
@@ -195,6 +199,11 @@ interface Draft {
   injuredLastName: string;
   injuredPhone: string;
   injuredEmail: string;
+  fillerFirstName: string;
+  fillerLastName: string;
+  fillerPhone: string;
+  fillerEmail: string;
+  relationshipToInjured: string;
   dateOfAccident: string;
   state: string;
   county: string;
@@ -211,6 +220,10 @@ type TextField =
   | "injuredLastName"
   | "injuredPhone"
   | "injuredEmail"
+  | "fillerFirstName"
+  | "fillerLastName"
+  | "fillerPhone"
+  | "fillerEmail"
   | "postcode"
   | "injuryDetails"
   | "accidentDetails";
@@ -288,6 +301,11 @@ function LeadForm({
     injuredLastName: lead.injuredLastName ?? "",
     injuredPhone: lead.injuredPhone ?? "",
     injuredEmail: lead.injuredEmail ?? "",
+    fillerFirstName: lead.fillerFirstName ?? "",
+    fillerLastName: lead.fillerLastName ?? "",
+    fillerPhone: lead.fillerPhone ?? "",
+    fillerEmail: lead.fillerEmail ?? "",
+    relationshipToInjured: lead.relationshipToInjured ?? "",
     dateOfAccident: toIsoDate(lead.dateOfAccident),
     state: lead.state ?? "",
     county: lead.county ?? "",
@@ -409,6 +427,12 @@ function LeadForm({
     const county = value === NONE ? "" : value;
     updateDraft("county", county);
     void saveNow({ county });
+  }
+
+  function changeRelationship(value: string) {
+    const relationship = value === NONE ? "" : value;
+    updateDraft("relationshipToInjured", relationship);
+    void saveNow({ relationshipToInjured: relationship });
   }
 
   function changeDate(value: string) {
@@ -582,16 +606,98 @@ function LeadForm({
           </section>
 
           {lead.isFillingForSomeoneElse ? (
-            <Section title="Submitted by someone else">
-              <Field label="Relationship">
-                {orDash(relationshipLabel(lead.relationshipToInjured))}
-              </Field>
-              <Field label="Contact name">
-                {fullName(lead.fillerFirstName, lead.fillerLastName)}
-              </Field>
-              <Field label="Contact phone">{orDash(lead.fillerPhone)}</Field>
-              <Field label="Contact email">{orDash(lead.fillerEmail)}</Field>
-            </Section>
+            <section className="grid gap-3">
+              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Submitted by someone else
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="First name" htmlFor="fillerFirstName">
+                  <Input
+                    id="fillerFirstName"
+                    value={draft.fillerFirstName}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      changeText("fillerFirstName", event.target.value)
+                    }
+                    onBlur={() => flush("fillerFirstName")}
+                  />
+                </FormField>
+                <FormField label="Last name" htmlFor="fillerLastName">
+                  <Input
+                    id="fillerLastName"
+                    value={draft.fillerLastName}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      changeText("fillerLastName", event.target.value)
+                    }
+                    onBlur={() => flush("fillerLastName")}
+                  />
+                </FormField>
+                <FormField label="Phone" htmlFor="fillerPhone">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      id="fillerPhone"
+                      type="tel"
+                      value={draft.fillerPhone}
+                      disabled={!canEdit}
+                      placeholder="(555) 555-5555"
+                      className="min-w-0 flex-1"
+                      onChange={(event) =>
+                        changeText("fillerPhone", event.target.value)
+                      }
+                      onBlur={() => flush("fillerPhone")}
+                    />
+                    <CopyButton
+                      value={draft.fillerPhone}
+                      label="Phone"
+                      size="icon-sm"
+                    />
+                  </div>
+                </FormField>
+                <FormField label="Email" htmlFor="fillerEmail">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      id="fillerEmail"
+                      type="email"
+                      value={draft.fillerEmail}
+                      disabled={!canEdit}
+                      placeholder="name@example.com"
+                      className="min-w-0 flex-1"
+                      onChange={(event) =>
+                        changeText("fillerEmail", event.target.value)
+                      }
+                      onBlur={() => flush("fillerEmail")}
+                    />
+                    <CopyButton
+                      value={draft.fillerEmail}
+                      label="Email"
+                      size="icon-sm"
+                    />
+                  </div>
+                </FormField>
+                <FormField label="Relationship" htmlFor="fillerRelationship">
+                  <Select
+                    items={RELATIONSHIP_OPTIONS}
+                    value={draft.relationshipToInjured || NONE}
+                    onValueChange={(value) => {
+                      if (value) changeRelationship(value);
+                    }}
+                    disabled={!canEdit}
+                  >
+                    <SelectTrigger id="fillerRelationship" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATIONSHIP_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </div>
+            </section>
           ) : null}
 
           <section className="grid gap-3">

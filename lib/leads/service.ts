@@ -25,7 +25,14 @@ import {
   toStateCode,
   toUsPhone,
 } from "@/lib/db/normalize";
-import { LEAD_STAGES, leads, type Lead, type LeadStage } from "@/lib/db/schema";
+import {
+  LEAD_STAGES,
+  RELATIONSHIPS,
+  leads,
+  type Lead,
+  type LeadStage,
+  type Relationship,
+} from "@/lib/db/schema";
 import { isValidEmail, normalizePostcode } from "@/lib/validation";
 import type { Actor } from "@/lib/rbac";
 import type { LeadFieldPatch } from "./editable";
@@ -69,6 +76,11 @@ export interface LeadUpdate {
   injuredLastName?: string | null;
   injuredPhone?: string | null;
   injuredEmail?: string | null;
+  fillerFirstName?: string | null;
+  fillerLastName?: string | null;
+  fillerPhone?: string | null;
+  fillerEmail?: string | null;
+  relationshipToInjured?: Relationship | null;
   dateOfAccident?: Date | null;
   state?: string | null;
   county?: string | null;
@@ -230,6 +242,48 @@ function normalizeLeadPatch(
       return { ok: false, error: "Enter a valid email address." };
     } else {
       update.injuredEmail = raw;
+    }
+  }
+
+  if (provided("fillerFirstName")) {
+    update.fillerFirstName = toNullableText(patch.fillerFirstName);
+  }
+  if (provided("fillerLastName")) {
+    update.fillerLastName = toNullableText(patch.fillerLastName);
+  }
+
+  if (provided("fillerPhone")) {
+    const raw = (patch.fillerPhone ?? "").trim();
+    if (raw === "") {
+      update.fillerPhone = null;
+    } else {
+      const phone = toUsPhone(raw);
+      if (!phone) {
+        return { ok: false, error: "Enter a 10-digit US phone number." };
+      }
+      update.fillerPhone = phone;
+    }
+  }
+
+  if (provided("fillerEmail")) {
+    const raw = (patch.fillerEmail ?? "").trim();
+    if (raw === "") {
+      update.fillerEmail = null;
+    } else if (!isValidEmail(raw)) {
+      return { ok: false, error: "Enter a valid email address." };
+    } else {
+      update.fillerEmail = raw;
+    }
+  }
+
+  if (provided("relationshipToInjured")) {
+    const raw = (patch.relationshipToInjured ?? "").trim();
+    if (raw === "") {
+      update.relationshipToInjured = null;
+    } else if (!(RELATIONSHIPS as readonly string[]).includes(raw)) {
+      return { ok: false, error: "Choose a relationship." };
+    } else {
+      update.relationshipToInjured = raw as Relationship;
     }
   }
 
