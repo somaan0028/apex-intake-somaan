@@ -76,6 +76,36 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Instructions a coding agent can read and apply by itself.
+ *
+ * When a token was just created it is included once, so the whole handoff is a
+ * single paste. Older tokens cannot be read back, so those instructions carry a
+ * placeholder the person replaces with a fresh token.
+ */
+function instructionsFor(endpoint: string, token: string | null): string {
+  const credential = token ?? "<your token>";
+  return `Connect to the Apex Intake Desk MCP server.
+
+Endpoint: ${endpoint}
+Transport: Streamable HTTP
+Authentication: send this header on every request:
+Authorization: Bearer ${credential}
+
+If your client reads a JSON config, add this server entry:
+{
+  "mcpServers": {
+    "apex-intake-desk": {
+      "type": "http",
+      "url": "${endpoint}",
+      "headers": { "Authorization": "Bearer ${credential}" }
+    }
+  }
+}
+
+The token acts as the signed-in Apex user, so the assistant can see and change exactly what that user can. Keep the token private and never commit it to a repository.`;
+}
+
 export function TokensCard({
   tokens,
   endpoint,
@@ -83,10 +113,10 @@ export function TokensCard({
   tokens: TokenRow[];
   endpoint: string;
 }) {
-  const [state, formAction, pending] = useActionState<CreateTokenState, FormData>(
-    createToken,
-    {},
-  );
+  const [state, formAction, pending] = useActionState<
+    CreateTokenState,
+    FormData
+  >(createToken, {});
 
   return (
     <div className="grid gap-6">
@@ -199,6 +229,16 @@ export function TokensCard({
   }
 }`}</code>
             </pre>
+          </div>
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-sm text-muted-foreground">
+              Paste these instructions into Claude Code, Cursor, or another
+              coding agent and it can set up the connection for you.
+            </p>
+            <CopyButton
+              value={instructionsFor(endpoint, state.token ?? null)}
+              label="Copy Instructions for AI"
+            />
           </div>
         </CardContent>
       </Card>
