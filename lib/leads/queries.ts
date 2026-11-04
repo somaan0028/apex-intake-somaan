@@ -30,11 +30,36 @@ import type { TableQuery } from "@/lib/table-query";
 import { LEAD_SOURCES, UNASSIGNED, type LeadSource } from "./constants";
 
 /**
- * A lead as the grid *and* the detail dialog consume it: every column, plus the
+ * Attribution/tracking fields, visible only to viewers holding
+ * `leads.view.attribution`. For everyone else they are omitted from the row
+ * entirely rather than sent as nulls.
+ */
+const ATTRIBUTION_KEYS = [
+  "ipaddress",
+  "trustedform",
+  "jornaya",
+  "source",
+] as const;
+type AttributionKey = (typeof ATTRIBUTION_KEYS)[number];
+
+/**
+ * A lead as the grid *and* the detail dialog consume it: its columns plus the
  * joined assignee's display name. It satisfies `LeadSubject`, so the dialog can
  * run the same RBAC policies the server does.
+ *
+ * The attribution fields are optional: `listLeads` only includes them for
+ * viewers allowed to see them, so for anyone else the keys are absent.
  */
-export type LeadRow = Lead & { assignedToName: string | null };
+export type LeadRow = Omit<Lead, AttributionKey> & {
+  assignedToName: string | null;
+} & Partial<Pick<Lead, AttributionKey>>;
+
+/** Copies a row without its attribution keys (for viewers who may not see them). */
+function withoutAttribution(row: LeadRow): LeadRow {
+  const copy = { ...row };
+  for (const key of ATTRIBUTION_KEYS) delete copy[key];
+  return copy;
+}
 
 /**
  * Sort keys the grid exposes. Typing the map as a complete `Record` makes a
@@ -105,6 +130,7 @@ export function listLeads(
   actor: Actor,
 ): ListPageResult<LeadRow> {
   const db = getDb();
+  const showAttribution = can(actor.role, "leads.view.attribution");
 
   // Search spans the matter id and the injured person's contact details.
   const conditions: Array<SQL | undefined> = [
@@ -124,7 +150,11 @@ export function listLeads(
   const stage = readFilter(query, "stage", isLeadStage);
   if (stage) conditions.push(eq(leads.stage, stage));
 
-  const source = readFilter(query, "source", isLeadSource);
+  // Source is attribution data: filtering by it would leak which leads came from
+  // where, so the condition is only applied for viewers allowed to see it.
+  const source = showAttribution
+    ? readFilter(query, "source", isLeadSource)
+    : null;
   if (source) conditions.push(eq(leads.source, source));
 
   // The assignee filter carries either a user id or the "unassigned" sentinel.
@@ -145,16 +175,23 @@ export function listLeads(
     booleanFilter(query, "hasReceivedSettlement", leads.hasReceivedSettlement),
   );
 
+  // Sorting by source is the same side-channel as filtering by it; fall back to
+  // the default order rather than order by a column the viewer can't see.
+  const pageQuery =
+    showAttribution || query.sort?.id !== "source"
+      ? query
+      : { ...query, sort: null };
+
   const plan = planListPage({
     db,
     table: leads,
     where: allOf(conditions),
-    query,
+    query: pageQuery,
     sortColumns: SORT_COLUMNS,
     defaultSort: LEADS_DEFAULT_SORT,
   });
 
-  const rows = db
+  const selected = db
     .select({ ...getTableColumns(leads), assignedToName: users.name })
     .from(leads)
     .leftJoin(users, eq(leads.assignedToId, users.id))
@@ -163,6 +200,12 @@ export function listLeads(
     .limit(plan.limit)
     .offset(plan.offset)
     .all();
+
+  // Omit the attribution fields for viewers who may not see them — the values
+  // never leave the server, so the grid and dialog have nothing to render.
+  const rows = showAttribution
+    ? selected
+    : selected.map(withoutAttribution);
 
   return { rows, total: plan.total, page: plan.page, sort: plan.sort };
 }

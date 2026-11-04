@@ -21,6 +21,7 @@ import {
   canEditLead,
   canSendLeadToFirm,
   canViewLead,
+  isLeadReadyToSend,
   type Actor,
   type LeadSubject,
   type Permission,
@@ -85,6 +86,15 @@ export function requireLeadAssignment(
 export function requireLeadSend(actor: Actor, lead: LeadSubject): void {
   if (!canSendLeadToFirm(actor, lead)) {
     throw new ForbiddenError("You can't send this lead to the firm.");
+  }
+}
+
+/** Throw unless `lead` has reached the stage from which it may be sent. */
+export function requireLeadReadyToSend(lead: { stage: LeadStage }): void {
+  if (!isLeadReadyToSend(lead)) {
+    throw new ForbiddenError(
+      "This lead must be at Retained before it can be sent to the firm.",
+    );
   }
 }
 

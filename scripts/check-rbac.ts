@@ -19,6 +19,7 @@ import {
   canManageUsers,
   canSendLeadToFirm,
   canViewLead,
+  isLeadReadyToSend,
   type Actor,
   type LeadSubject,
   type Permission,
@@ -46,18 +47,37 @@ const unassigned: LeadSubject = {
   assignedToId: null,
   caseType: "MVA",
   sentToFirmAt: null,
+  brightwaterLeadId: null,
 };
-const own: LeadSubject = { assignedToId: agent.id, caseType: "MVA", sentToFirmAt: null };
-const others: LeadSubject = { assignedToId: 99, caseType: "MVA", sentToFirmAt: null };
+const own: LeadSubject = {
+  assignedToId: agent.id,
+  caseType: "MVA",
+  sentToFirmAt: null,
+  brightwaterLeadId: null,
+};
+const others: LeadSubject = {
+  assignedToId: 99,
+  caseType: "MVA",
+  sentToFirmAt: null,
+  brightwaterLeadId: null,
+};
 const massTort: LeadSubject = {
   assignedToId: null,
   caseType: "MASS_TORT",
   sentToFirmAt: null,
+  brightwaterLeadId: null,
 };
 const alreadySent: LeadSubject = {
   assignedToId: null,
   caseType: "MVA",
   sentToFirmAt: new Date(),
+  brightwaterLeadId: null,
+};
+const alreadySentByLeadId: LeadSubject = {
+  assignedToId: null,
+  caseType: "MVA",
+  sentToFirmAt: null,
+  brightwaterLeadId: "123456",
 };
 
 // --- The grant matrix ------------------------------------------------------
@@ -131,6 +151,20 @@ check("agent cannot send to the firm", canSendLeadToFirm(agent, own), false);
 check("admin sends an unsent MVA lead", canSendLeadToFirm(admin, unassigned), true);
 check("MASS_TORT leads never go to the firm", canSendLeadToFirm(admin, massTort), false);
 check("an already-sent lead is not re-sent", canSendLeadToFirm(admin, alreadySent), false);
+check(
+  "a lead with a Brightwater id is not re-sent",
+  canSendLeadToFirm(admin, alreadySentByLeadId),
+  false,
+);
+check("a Retained lead is ready to send", isLeadReadyToSend({ stage: "RETAINED" }), true);
+check("a New lead is not ready to send", isLeadReadyToSend({ stage: "NEW" }), false);
+check(
+  "a Qualified lead is not ready to send",
+  isLeadReadyToSend({ stage: "QUALIFIED" }),
+  false,
+);
+check("agent cannot see attribution", can("USER", "leads.view.attribution"), false);
+check("admin can see attribution", can("ADMIN", "leads.view.attribution"), true);
 
 // --- Manage users ----------------------------------------------------------
 

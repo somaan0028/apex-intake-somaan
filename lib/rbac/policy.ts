@@ -21,10 +21,15 @@ export interface LeadSubject {
   assignedToId: number | null;
   caseType: CaseType | null;
   sentToFirmAt: Date | null;
+  /** Set once Brightwater has accepted the lead; a second signal of "already sent". */
+  brightwaterLeadId: string | null;
 }
 
 /** The stage that is gated behind `leads.send_to_firm`. */
 const SENT_STAGE: LeadStage = "SENT_TO_FIRM";
+
+/** The stage a lead must reach before it may be sent to the partner firm. */
+export const SEND_READY_STAGE: LeadStage = "RETAINED";
 
 /** May `actor` see `lead`? */
 export function canViewLead(actor: Actor, lead: LeadSubject): boolean {
@@ -95,14 +100,28 @@ export function canAssignLead(
 /**
  * May `actor` send `lead` to the partner firm?
  *
- * Only MVA leads go to Brightwater, and at most once.
+ * Only MVA leads go to Brightwater, and at most once. "Already sent" is checked
+ * on both signals — the timestamp and the returned lead id — so a partially
+ * recorded send can never be repeated.
  */
 export function canSendLeadToFirm(actor: Actor, lead: LeadSubject): boolean {
   return (
     can(actor.role, "leads.send_to_firm") &&
     lead.caseType === "MVA" &&
-    lead.sentToFirmAt === null
+    lead.sentToFirmAt === null &&
+    lead.brightwaterLeadId === null
   );
+}
+
+/**
+ * The workflow gate for sending: a lead must be Retained first.
+ *
+ * Kept separate from `canSendLeadToFirm` so the UI can still show the action and
+ * explain *why* it isn't available yet, while the server uses the same rule to
+ * refuse an early send.
+ */
+export function isLeadReadyToSend(lead: { stage: LeadStage }): boolean {
+  return lead.stage === SEND_READY_STAGE;
 }
 
 /** May `actor` manage intake users? */

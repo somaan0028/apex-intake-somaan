@@ -16,7 +16,7 @@
  * turned on from the Filters menu.
  */
 import { createColumnHelper } from "@tanstack/react-table";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DataTable,
   useTableQuerySync,
@@ -35,6 +35,7 @@ import {
 import type { AuthUser } from "@/lib/auth/session";
 import { LEAD_SOURCES, UNASSIGNED } from "@/lib/leads/constants";
 import type { LeadRow } from "@/lib/leads/queries";
+import { can } from "@/lib/rbac";
 import { BOOLEAN_FILTER_OPTIONS, type TableQuery } from "@/lib/table-query";
 import { LeadDialog } from "./lead-dialog";
 
@@ -193,6 +194,7 @@ const getRowId = (lead: LeadRow) => String(lead.id);
 function buildFilters(
   assignees: Array<{ id: number; name: string }>,
   viewerId: number,
+  showAttribution: boolean,
 ): DataTableFilter[] {
   return [
     {
@@ -213,12 +215,17 @@ function buildFilters(
         value,
       })),
     },
-    {
-      columnId: "source",
-      label: "Source",
-      allLabel: "Any",
-      options: LEAD_SOURCES.map((value) => ({ label: value, value })),
-    },
+    // Source is attribution data; the filter is only offered alongside the column.
+    ...(showAttribution
+      ? [
+          {
+            columnId: "source",
+            label: "Source",
+            allLabel: "Any",
+            options: LEAD_SOURCES.map((value) => ({ label: value, value })),
+          } satisfies DataTableFilter,
+        ]
+      : []),
     {
       columnId: "assignedTo",
       label: "Assigned to",
@@ -269,10 +276,25 @@ export function LeadsTable({
   const { isPending, onQueryChange } = useTableQuerySync();
   const [selected, setSelected] = useState<LeadRow | null>(null);
 
+  // Attribution (source + tracking ids) is admin-only. The server already blanks
+  // the values; dropping the column and its filter keeps the grid from offering
+  // something the viewer can't see.
+  const canSeeAttribution = can(viewer.role, "leads.view.attribution");
+  const visibleColumns = useMemo(
+    () =>
+      canSeeAttribution
+        ? columns
+        : columns.filter(
+            (column) =>
+              !("accessorKey" in column && column.accessorKey === "source"),
+          ),
+    [canSeeAttribution],
+  );
+
   return (
     <>
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         data={leads}
         rowCount={total}
         query={query}
@@ -281,7 +303,7 @@ export function LeadsTable({
         getRowId={getRowId}
         ariaLabel="Leads"
         searchPlaceholder="Search leads…"
-        filters={buildFilters(assignees, viewer.id)}
+        filters={buildFilters(assignees, viewer.id, canSeeAttribution)}
         defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
         defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
         emptyMessage="No leads yet."

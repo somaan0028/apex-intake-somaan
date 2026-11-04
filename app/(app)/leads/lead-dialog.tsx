@@ -36,21 +36,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 import { LEAD_STAGES, type LeadStage } from "@/lib/db/schema";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import {
   CASE_TYPE_LABELS,
   LEAD_STAGE_LABELS,
   assigneeLabel,
   relationshipLabel,
 } from "@/lib/labels";
-import { updateLead } from "@/lib/leads/actions";
+import { sendLeadToFirm, updateLead } from "@/lib/leads/actions";
 import { UNASSIGNED } from "@/lib/leads/constants";
 import type { LeadRow } from "@/lib/leads/queries";
 import {
+  SEND_READY_STAGE,
+  can,
   canAssignLead,
   canChangeLeadStage,
   canEditLead,
+  canSendLeadToFirm,
   type Actor,
 } from "@/lib/rbac";
 
@@ -154,6 +158,7 @@ function LeadForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [sending, startSending] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const currentAssignee =
@@ -161,7 +166,23 @@ function LeadForm({
   const [stage, setStage] = useState<LeadStage>(lead.stage);
   const [assignedTo, setAssignedTo] = useState(currentAssignee);
 
+  // Firm-submission facts live in local state so a successful send shows in the
+  // form immediately, without waiting for the grid refresh to round-trip.
+  const [sentAt, setSentAt] = useState<Date | null>(lead.sentToFirmAt);
+  const [brightwaterLeadId, setBrightwaterLeadId] = useState<string | null>(
+    lead.brightwaterLeadId,
+  );
+  // Moving with a successful send keeps the dirty check accurate afterwards.
+  const [stageBaseline, setStageBaseline] = useState<LeadStage>(lead.stage);
+
   const canEditStage = canEditLead(viewer, lead);
+  const canSeeAttribution = can(viewer.role, "leads.view.attribution");
+  const sent = sentAt !== null || brightwaterLeadId !== null;
+  const canSend = canSendLeadToFirm(viewer, {
+    ...lead,
+    sentToFirmAt: sentAt,
+    brightwaterLeadId,
+  });
 
   // The options are exactly what this viewer may set: admins get the whole team,
   // an agent gets only themselves (the UI adds the unassigned choice).
@@ -184,7 +205,7 @@ function LeadForm({
     });
   }
 
-  const dirty = stage !== lead.stage || assignedTo !== currentAssignee;
+  const dirty = stage !== stageBaseline || assignedTo !== currentAssignee;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -202,6 +223,54 @@ function LeadForm({
       } else {
         setError(result.error ?? "Something went wrong. Please try again.");
       }
+    });
+  }
+
+  /** Send to Brightwater, then reflect the result here and in the grid. */
+  function handleSend() {
+    // The firm only takes retained leads; explain rather than fire a doomed
+    // request. The server re-checks the persisted stage either way.
+    if (stage !== SEND_READY_STAGE) {
+      toast.warning("Lead is not retained", {
+        description:
+          "Move the lead to Retained before sending it to the firm.",
+      });
+      return;
+    }
+
+    // The server reads the saved stage, so an unsaved change would be refused.
+    if (stage !== stageBaseline) {
+      toast.warning("Save the stage change first", {
+        description: "Save the lead at Retained, then send it to the firm.",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("id", String(lead.id));
+
+    startSending(async () => {
+      const result = await sendLeadToFirm(formData);
+      if (!result.ok) {
+        toast.error("Could not send to firm", {
+          description: result.error ?? "Please try again.",
+        });
+        return;
+      }
+
+      const sentTime = result.sentToFirmAt
+        ? new Date(result.sentToFirmAt)
+        : new Date();
+      setSentAt(sentTime);
+      setBrightwaterLeadId(result.brightwaterLeadId ?? null);
+      setStage("SENT_TO_FIRM");
+      setStageBaseline("SENT_TO_FIRM");
+      toast.success("Lead sent to firm", {
+        description: result.brightwaterLeadId
+          ? `Brightwater accepted the lead (id ${result.brightwaterLeadId}).`
+          : "Brightwater accepted the lead.",
+      });
+      router.refresh();
     });
   }
 
@@ -303,6 +372,19 @@ function LeadForm({
             </div>
           </section>
 
+          {lead.isFillingForSomeoneElse ? (
+            <Section title="Submitted by someone else">
+              <Field label="Relationship">
+                {orDash(relationshipLabel(lead.relationshipToInjured))}
+              </Field>
+              <Field label="Contact name">
+                {fullName(lead.fillerFirstName, lead.fillerLastName)}
+              </Field>
+              <Field label="Contact phone">{orDash(lead.fillerPhone)}</Field>
+              <Field label="Contact email">{orDash(lead.fillerEmail)}</Field>
+            </Section>
+          ) : null}
+
           <Section title="Injured person">
             <Field label="Name">
               {fullName(lead.injuredFirstName, lead.injuredLastName)}
@@ -314,31 +396,10 @@ function LeadForm({
             </Field>
           </Section>
 
-          <Section title="Submitted by">
-            <Field label="Submitted">
-              {lead.isFillingForSomeoneElse
-                ? "Someone else"
-                : "Self (the injured person)"}
-            </Field>
-            {lead.isFillingForSomeoneElse ? (
-              <>
-                <Field label="Relationship">
-                  {orDash(relationshipLabel(lead.relationshipToInjured))}
-                </Field>
-                <Field label="Contact name">
-                  {fullName(lead.fillerFirstName, lead.fillerLastName)}
-                </Field>
-                <Field label="Contact phone">{orDash(lead.fillerPhone)}</Field>
-                <Field label="Contact email">{orDash(lead.fillerEmail)}</Field>
-              </>
-            ) : null}
-          </Section>
-
-          <Section title="Location &amp; source">
+          <Section title="Location">
             <Field label="State">{orDash(lead.state)}</Field>
             <Field label="County">{orDash(lead.county)}</Field>
             <Field label="Postcode">{orDash(lead.postcode)}</Field>
-            <Field label="Source">{orDash(lead.source)}</Field>
           </Section>
 
           <Section title="Case facts">
@@ -356,19 +417,40 @@ function LeadForm({
             </Field>
           </Section>
 
-          <Section title="Attribution">
-            <Field label="IP address">{orDash(lead.ipaddress)}</Field>
-            <Field label="TrustedForm">{orDash(lead.trustedform)}</Field>
-            <Field label="Jornaya">{orDash(lead.jornaya)}</Field>
-          </Section>
+          {canSeeAttribution ? (
+            <Section title="Attribution">
+              <Field label="IP address">{orDash(lead.ipaddress)}</Field>
+              <Field label="TrustedForm">{orDash(lead.trustedform)}</Field>
+              <Field label="Jornaya">{orDash(lead.jornaya)}</Field>
+              <Field label="Source">{orDash(lead.source)}</Field>
+            </Section>
+          ) : null}
 
           <Section title="Firm submission">
             <Field label="Sent to firm">
-              {lead.sentToFirmAt ? formatDate(lead.sentToFirmAt) : "Not sent"}
+              {sentAt ? formatDateTime(sentAt) : "Not sent"}
             </Field>
             <Field label="Brightwater lead id">
-              {orDash(lead.brightwaterLeadId)}
+              {orDash(brightwaterLeadId)}
             </Field>
+            {sent ? null : (
+              <div className="col-span-2 grid gap-2">
+                {lead.caseType !== "MVA" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Only MVA leads are sent to the firm.
+                  </p>
+                ) : canSend ? (
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={handleSend}
+                    disabled={sending}
+                  >
+                    {sending ? "Sending…" : "Send to Firm"}
+                  </Button>
+                ) : null}
+              </div>
+            )}
           </Section>
         </div>
 

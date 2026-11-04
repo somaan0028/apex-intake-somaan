@@ -39,6 +39,8 @@ export const PERMISSIONS = [
   "leads.release",
   /** Send / retry a lead to the partner firm. */
   "leads.send_to_firm",
+  /** See a lead's attribution/tracking fields (IP, TrustedForm, Jornaya, source). */
+  "leads.view.attribution",
   /** Create and manage intake users. */
   "users.manage",
 ] as const;
