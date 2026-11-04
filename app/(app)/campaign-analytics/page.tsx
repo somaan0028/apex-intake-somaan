@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, TrendingUp } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/session";
+import { LEAD_SOURCES } from "@/lib/leads/constants";
 import {
   ANALYTICS_RANGES,
   campaignAnalytics,
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
   title: "Campaign Analytics · Apex Intake Desk",
 };
 
-/** Percentage with no decimals; `—` when there is nothing to divide by. */
+/** Percentage with no decimals; an em dash when there is nothing to divide by. */
 function rate(value: number, total: number): string {
   if (total <= 0) return "—";
   return `${Math.round((value / total) * 100)}%`;
@@ -93,6 +94,15 @@ function KpiCard({
     </Card>
   );
 }
+
+/** Segment colours for the campaign mix, shared by the bar and its legend. */
+const MIX_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
 
 /**
  * One stacked bar for a composition. Reuses the Overview pipeline's idea: a
@@ -172,7 +182,9 @@ function DimensionTable({
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-2 pb-2 font-medium">Name</th>
                   <th className="px-2 pb-2 text-right font-medium">Leads</th>
-                  <th className="px-2 pb-2 text-right font-medium">Qualified</th>
+                  <th className="px-2 pb-2 text-right font-medium">
+                    Qualified
+                  </th>
                   <th className="px-2 pb-2 text-right font-medium">Retained</th>
                   <th className="px-2 pb-2 text-right font-medium">Sent</th>
                   <th className="px-2 pb-2 text-right font-medium">Disq.</th>
@@ -312,14 +324,17 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
         {points.map((point) => (
           <div
             key={point.key}
-            className="group relative flex min-w-0 flex-1 items-end"
+            className="group relative flex h-full min-w-0 flex-1 items-end"
           >
             <div
               title={`${point.label}: ${point.total} lead${point.total === 1 ? "" : "s"}`}
               aria-label={`${point.label}: ${point.total} lead${point.total === 1 ? "" : "s"}`}
               className="w-full rounded-t-sm bg-primary/70 transition-colors group-hover:bg-primary"
               style={{
-                height: `${Math.max(2, (point.total / peak) * 100)}%`,
+                // An empty bucket stays empty; otherwise keep a visible sliver.
+                height: point.total
+                  ? `${Math.max(2, (point.total / peak) * 100)}%`
+                  : "0%",
               }}
             />
           </div>
@@ -368,6 +383,13 @@ export default async function CampaignAnalyticsPage({
   const campaignLink = (key: string) =>
     key === "MVA" || key === "MASS_TORT" || key === "OTHER"
       ? `/leads?filter.caseType=${key}`
+      : null;
+
+  // The grid's source filter accepts only the known sources, so "Not tracked"
+  // and raw values get no link rather than one that silently does nothing.
+  const sourceLink = (key: string) =>
+    (LEAD_SOURCES as readonly string[]).includes(key)
+      ? `/leads?filter.source=${encodeURIComponent(key)}`
       : null;
 
   return (
@@ -429,16 +451,8 @@ export default async function CampaignAnalyticsPage({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <BestCard
-              label="Source"
-              row={bestSource}
-              labelFor={(key) => key}
-            />
-            <BestCard
-              label="Medium"
-              row={bestMedium}
-              labelFor={(key) => key}
-            />
+            <BestCard label="Source" row={bestSource} labelFor={(key) => key} />
+            <BestCard label="Medium" row={bestMedium} labelFor={(key) => key} />
             <BestCard
               label="Creative"
               row={bestContent}
@@ -459,20 +473,20 @@ export default async function CampaignAnalyticsPage({
           <ShareBar
             rows={data.byCampaign}
             total={data.totals.total}
-            colors={[
-              "var(--chart-1)",
-              "var(--chart-2)",
-              "var(--chart-3)",
-              "var(--chart-4)",
-            ]}
+            colors={MIX_COLORS}
           />
           <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-            {data.byCampaign.map((row) => (
-              <li key={row.key} className="flex items-center gap-2 py-1 text-sm">
+            {data.byCampaign.map((row, index) => (
+              <li
+                key={row.key}
+                className="flex items-center gap-2 py-1 text-sm"
+              >
                 <span
                   aria-hidden
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: "var(--chart-2)" }}
+                  style={{
+                    backgroundColor: MIX_COLORS[index % MIX_COLORS.length],
+                  }}
                 />
                 <span className="min-w-0 flex-1 truncate">
                   {campaignLabel(row.key)}
@@ -494,7 +508,7 @@ export default async function CampaignAnalyticsPage({
           total={data.totals.total}
           labelFor={(key) => key}
           emptyHint="No source data in this window."
-          linkFor={(key) => `/leads?filter.source=${encodeURIComponent(key)}`}
+          linkFor={sourceLink}
         />
         <DimensionTable
           title="Mediums"
@@ -549,8 +563,12 @@ export default async function CampaignAnalyticsPage({
                     <th className="px-2 pb-2 font-medium">Creative</th>
                     <th className="px-2 pb-2 font-medium">Campaign</th>
                     <th className="px-2 pb-2 text-right font-medium">Leads</th>
-                    <th className="px-2 pb-2 text-right font-medium">Qualified</th>
-                    <th className="px-2 pb-2 text-right font-medium">Retained</th>
+                    <th className="px-2 pb-2 text-right font-medium">
+                      Qualified
+                    </th>
+                    <th className="px-2 pb-2 text-right font-medium">
+                      Retained
+                    </th>
                     <th className="px-2 pb-2 text-right font-medium">Sent</th>
                   </tr>
                 </thead>
@@ -597,8 +615,8 @@ export default async function CampaignAnalyticsPage({
         <CardHeader>
           <CardTitle className="text-base">Source × campaign</CardTitle>
           <CardDescription>
-            Which channel produces which kind of case. Retained is the column
-            to watch.
+            Which channel produces which kind of case. Retained is the column to
+            watch.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -609,14 +627,19 @@ export default async function CampaignAnalyticsPage({
                   <th className="px-2 pb-2 font-medium">Source</th>
                   <th className="px-2 pb-2 font-medium">Campaign</th>
                   <th className="px-2 pb-2 text-right font-medium">Leads</th>
-                  <th className="px-2 pb-2 text-right font-medium">Qualified</th>
+                  <th className="px-2 pb-2 text-right font-medium">
+                    Qualified
+                  </th>
                   <th className="px-2 pb-2 text-right font-medium">Retained</th>
                   <th className="px-2 pb-2 text-right font-medium">Sent</th>
                 </tr>
               </thead>
               <tbody>
                 {data.sourceCampaign.map((row, index) => (
-                  <tr key={`${row.source}-${row.campaign}-${index}`} className="border-t">
+                  <tr
+                    key={`${row.source}-${row.campaign}-${index}`}
+                    className="border-t"
+                  >
                     <td className="px-2 py-2">{row.source}</td>
                     <td className="px-2 py-2 text-muted-foreground">
                       {campaignLabel(row.campaign)}

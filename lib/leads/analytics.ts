@@ -114,11 +114,14 @@ export interface CampaignAnalytics {
 
 /** `count(*)` as a plain number. */
 function totalLeads(where: SQL | undefined): number {
-  return getDb().select({ value: count() }).from(leads).where(where).get()?.value ?? 0;
+  return (
+    getDb().select({ value: count() }).from(leads).where(where).get()?.value ??
+    0
+  );
 }
 
 /** Funnel counts for one grouped expression. */
-function countsFor(where: SQL | undefined) {
+function countsFor() {
   return {
     total: count(),
     qualified: sql<number>`sum(case when ${leads.stage} in ('QUALIFIED', 'RETAINED', 'SENT_TO_FIRM') then 1 else 0 end)`,
@@ -155,7 +158,7 @@ function groupByDimension(
 ): DimensionRow[] {
   const key = dimensionColumn(column);
   const rows = getDb()
-    .select({ key, ...countsFor(where) })
+    .select({ key, ...countsFor() })
     .from(leads)
     .where(where)
     .groupBy(key)
@@ -171,11 +174,7 @@ function groupByDimension(
 
 /** The totals across the whole window. */
 function overallTotals(where: SQL | undefined): DimensionCounts {
-  const row = getDb()
-    .select(countsFor(where))
-    .from(leads)
-    .where(where)
-    .get();
+  const row = getDb().select(countsFor()).from(leads).where(where).get();
   return toCounts(row);
 }
 
@@ -184,7 +183,7 @@ function groupBySourceCampaign(where: SQL | undefined): SourceCampaignRow[] {
   const source = dimensionColumn(leads.source);
   const campaign = dimensionColumn(leads.caseType);
   const rows = getDb()
-    .select({ source, campaign, ...countsFor(where) })
+    .select({ source, campaign, ...countsFor() })
     .from(leads)
     .where(where)
     .groupBy(source, campaign)
@@ -208,7 +207,7 @@ function topCombinations(
   const content = dimensionColumn(leads.content);
   const campaign = dimensionColumn(leads.caseType);
   const rows = getDb()
-    .select({ source, medium, content, campaign, ...countsFor(where) })
+    .select({ source, medium, content, campaign, ...countsFor() })
     .from(leads)
     .where(where)
     .groupBy(source, medium, content, campaign)
@@ -345,9 +344,7 @@ function trendFor(range: AnalyticsRange, where: SQL | undefined): TrendPoint[] {
  * cheap against the indexed `case_type` and `stage` columns on a desktop-sized
  * dataset, and far easier to read than one clever union.
  */
-export function campaignAnalytics(
-  range: AnalyticsRange,
-): CampaignAnalytics {
+export function campaignAnalytics(range: AnalyticsRange): CampaignAnalytics {
   const where = rangeCondition(range);
 
   return {

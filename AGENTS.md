@@ -186,6 +186,14 @@ their Lawmatics CRM.
   question waiting in the composer; `chat-thread.tsx` folds that prompt in during render,
   keyed by a counter, rather than in an effect. The header button and the suggestions
   call the same handle — never add a second way to open the panel.
+- **Campaign Analytics** (`app/(app)/campaign-analytics/`) is admin-only: the sidebar
+  hides it and the page redirects without `analytics.view`, so a hand-typed URL cannot
+  reach attribution data. `lib/leads/analytics.ts` groups the same leads by campaign
+  (`case_type`), source, medium, and content, and every grouped row carries the funnel
+  counts so volume is read beside quality. Empty attribution collapses into a single
+  "Not tracked" bucket, and campaign labels go through `caseTypeLabel()`. Drilldown
+  links only target filters the grid actually accepts: canonical `caseType` codes and
+  sources in `LEAD_SOURCES`, never raw campaign values.
 - The **lead detail dialog** (`app/(app)/leads/lead-dialog.tsx`) auto-saves: every
   editable field writes through `saveLeadFields` (`lib/leads/actions.ts`) as it changes,
   so there is no Save button. Text fields debounce, selects and the date save
