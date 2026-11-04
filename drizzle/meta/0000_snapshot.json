@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "aa980bf6-924c-4184-8bae-2e170f74f59f",
+  "id": "096daae2-cd57-44c6-84e1-09e54e927ee7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "api_tokens": {
@@ -579,8 +579,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "jornaya": {
-          "name": "jornaya",
+        "journaya": {
+          "name": "journaya",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

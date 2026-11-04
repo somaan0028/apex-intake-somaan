@@ -128,7 +128,7 @@ export const leads = sqliteTable(
     content: text("content"),
     ipaddress: text("ipaddress"),
     trustedform: text("trustedform"),
-    jornaya: text("jornaya"),
+    journaya: text("journaya"),
 
     // --- Brightwater submission state ---
     /** Lead id returned by Brightwater on a successful send. */

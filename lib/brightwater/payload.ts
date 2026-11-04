@@ -25,7 +25,7 @@ export interface BrightwaterLead {
   postcode: string | null;
   ipaddress: string | null;
   trustedform: string | null;
-  jornaya: string | null;
+  journaya: string | null;
   dateOfAccident: Date | null;
   injuryDetails: string | null;
   accidentDetails: string | null;
@@ -100,7 +100,7 @@ export function buildBrightwaterPayload(
     ...withValue("postcode", lead.postcode),
     ...withValue("ipaddress", lead.ipaddress),
     ...withValue("trustedform", lead.trustedform),
-    ...withValue("journaya", lead.jornaya),
+    ...withValue("journaya", lead.journaya),
 
     // Case facts
     ...withValue("were_you_at_fault", atFault),

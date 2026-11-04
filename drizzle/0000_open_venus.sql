@@ -83,7 +83,7 @@ CREATE TABLE `leads` (
 	`content` text,
 	`ipaddress` text,
 	`trustedform` text,
-	`jornaya` text,
+	`journaya` text,
 	`brightwater_lead_id` text,
 	`sent_to_firm_at` integer,
 	FOREIGN KEY (`assigned_to_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,

@@ -39,7 +39,7 @@ export const PERMISSIONS = [
   "leads.release",
   /** Send / retry a lead to the partner firm. */
   "leads.send_to_firm",
-  /** See a lead's attribution/tracking fields (IP, TrustedForm, Jornaya, source). */
+  /** See a lead's attribution/tracking fields (IP, TrustedForm, Journaya, source). */
   "leads.view.attribution",
   /** See the Campaign Analytics dashboard (campaign/source/medium/content performance). */
   "analytics.view",

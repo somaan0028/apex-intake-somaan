@@ -134,7 +134,7 @@ function leadDetail(actor: Actor, lead: Lead) {
             source: lead.source,
             ipAddress: lead.ipaddress,
             trustedForm: lead.trustedform,
-            jornaya: lead.jornaya,
+            journaya: lead.journaya,
           },
         }
       : {}),

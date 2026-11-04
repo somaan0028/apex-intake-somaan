@@ -291,7 +291,7 @@ function seedLeads(db: AppDatabase): number {
         source: toNullableText(record.source),
         ipaddress: toNullableText(record.ipaddress),
         trustedform: toNullableText(record.trustedform),
-        jornaya: toNullableText(record.jornaya),
+        journaya: toNullableText(record.journaya),
 
         brightwaterLeadId: toNullableText(record.brightwater_lead_id),
         sentToFirmAt: toNullableDate(record.sent_to_firm_at),

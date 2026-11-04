@@ -49,7 +49,7 @@ import { LEAD_SOURCES, UNASSIGNED, type LeadSource } from "./constants";
 const ATTRIBUTION_KEYS = [
   "ipaddress",
   "trustedform",
-  "jornaya",
+  "journaya",
   "source",
   "medium",
   "content",

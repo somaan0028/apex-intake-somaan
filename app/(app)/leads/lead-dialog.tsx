@@ -1047,7 +1047,7 @@ function LeadForm({
             <Section title="Attribution">
               <Field label="IP address">{orDash(lead.ipaddress)}</Field>
               <Field label="TrustedForm">{orDash(lead.trustedform)}</Field>
-              <Field label="Jornaya">{orDash(lead.jornaya)}</Field>
+              <Field label="Journaya">{orDash(lead.journaya)}</Field>
               <Field label="Source">{orDash(lead.source)}</Field>
               <Field label="Medium">{orDash(lead.medium)}</Field>
               <Field label="Content">{orDash(lead.content)}</Field>
