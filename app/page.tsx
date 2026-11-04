@@ -18,7 +18,7 @@ export default function HomePage() {
           <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <ShieldCheck className="size-4" />
           </span>
-          Apex Lead Source
+          Apex Intake
         </span>
       </header>
 
