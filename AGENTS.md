@@ -79,7 +79,9 @@ their Lawmatics CRM.
 
 ## Data layer
 - Schema: one file per table in `lib/db/schema/`, re-exported by `lib/db/schema/index.ts`.
-- Boot: `instrumentation.ts` → `lib/db/bootstrap.ts` creates `data/apex.db`, applies
+- Boot: `instrumentation.ts` validates the required server secrets through
+  `lib/env.ts` (`OPENROUTER_API_KEY` and `CANDIDATE_TOKEN`), then
+  `lib/db/bootstrap.ts` creates `data/apex.db`, applies
   migrations, and imports CSVs from `lib/db/seed-data/` **only if the DB file is absent**.
 - Free-text fields are stored as `TEXT` (trimmed on import). The boolean columns
   (`is_at_fault`, `has_attorney`, `has_received_settlement`, `is_filling_for_someone_else`)
