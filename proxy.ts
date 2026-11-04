@@ -22,12 +22,24 @@ import { SESSION_COOKIE } from "@/lib/auth/session-cookie";
 const PUBLIC_PATHS = new Set(["/", "/login"]);
 const PUBLIC_API_PREFIX = "/api/public/";
 
+/**
+ * API routes that authenticate themselves rather than relying on the session
+ * cookie, so the guard below must let them through unauthenticated.
+ *
+ * `/api/mcp` checks a bearer access token of its own (see
+ * `app/api/mcp/route.ts`): its callers are AI agents, not browsers, so there is
+ * no cookie to find and nothing this guard could usefully decide.
+ */
+const SELF_AUTHENTICATING_API = new Set(["/api/mcp"]);
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has(SESSION_COOKIE);
 
   const isPublic =
-    PUBLIC_PATHS.has(pathname) || pathname.startsWith(PUBLIC_API_PREFIX);
+    PUBLIC_PATHS.has(pathname) ||
+    pathname.startsWith(PUBLIC_API_PREFIX) ||
+    SELF_AUTHENTICATING_API.has(pathname);
 
   if (!hasSession && !isPublic) {
     if (pathname.startsWith("/api/")) {

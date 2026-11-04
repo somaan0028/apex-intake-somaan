@@ -10,11 +10,13 @@
     "db:generate": "drizzle-kit generate",
     "db:reset": "tsx scripts/reset-db.ts",
     "db:studio": "drizzle-kit studio",
+    "mcp:token": "tsx scripts/mcp-token.ts",
     "geo:generate": "tsx scripts/generate-counties.ts",
     "rbac:check": "tsx scripts/check-rbac.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@tanstack/ai": "^1.0.1",
     "@tanstack/ai-openrouter": "^1.0.1",
     "@tanstack/ai-react": "^1.0.1",

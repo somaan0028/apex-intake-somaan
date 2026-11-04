@@ -41,6 +41,8 @@ their Lawmatics CRM.
 - Auth: email + shared demo password, hashed with Node `scrypt` (no native deps)
 - AI: TanStack AI (`@tanstack/ai`) with the OpenRouter adapter; provider/model skills
   are copied into `.agents/skills/`
+- MCP: `@modelcontextprotocol/server` (SDK v2) serving that same tool layer to external
+  agents over Streamable HTTP at `POST|GET|DELETE /api/mcp`
 
 ## Domain rules
 - Roles: `ADMIN` (all leads, any stage, assign, send, manage users) and `USER`
@@ -55,7 +57,9 @@ their Lawmatics CRM.
   duplicated). Brightwater receives the injured person's details.
 - `case_type` is `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in `lib/labels.ts`).
 - Public intake: the form posts to `POST /api/public/leads` (unauthenticated, allow-listed
-  in `proxy.ts`, validated by `lib/leads/intake.ts`); every other API route is protected.
+  in `proxy.ts`, validated by `lib/leads/intake.ts`); every other API route is protected
+  by the session cookie — except `/api/mcp`, which authenticates itself with a bearer
+  access token (see **MCP server**) and is allow-listed in `proxy.ts` for that reason.
 
 ## Data layer
 - Schema: one file per table in `lib/db/schema/`, re-exported by `lib/db/schema/index.ts`.
@@ -71,6 +75,9 @@ their Lawmatics CRM.
 - `state` (2-letter code) and `county` are validated against the fixed lists in
   `lib/us-states.ts` / `lib/us-counties.ts`; the seeder throws on anything unrecognised.
 - Passwords are a single `scrypt$params$salt$hash` string (per-user salt).
+- `api_tokens` (one row per personal access token for external agents) stores only the
+  SHA-256 hash of the token plus a display `prefix`, its owner and `last_used_at`; the raw
+  token is shown once and never persisted.
 
 ## AI assistant
 - The panel is a **non-modal** slide-over in the app shell (`components/ai/`), opened from
@@ -87,14 +94,15 @@ their Lawmatics CRM.
 - **The tool layer is the one capability surface** (`lib/ai/tools.ts`,
   `buildAiTools(actor)`). Each tool calls the same service the UI calls
   (`lib/leads/service.ts`), so the assistant can do exactly what the signed-in user can
-  and nothing more. It takes only an `Actor`, so the planned MCP server can expose the
-  same set to an external agent unchanged — never add a second tool implementation.
+  and nothing more. It takes only an `Actor`, and `lib/mcp/server.ts` exposes that same
+  set to external agents unchanged — never add a second tool implementation.
 - **The server owns the transcript.** `lib/ai/store.ts` persists turns to `chats` /
   `chat_messages` (schema `lib/db/schema/chats.ts`), and the chat route rebuilds the
-  model input from storage instead of trusting the browser's message list — the same
-  path an MCP client (which has no browser transcript) will need. Assistant turns
-  record the model plus prompt/completion/total tokens and the provider-reported USD
-  cost, ready for an admin analytics view.
+  model input from storage instead of trusting the browser's message list, so a
+  tampered body cannot inject a fake assistant turn. Assistant turns record the model
+  plus prompt/completion/total tokens and the provider-reported USD cost, ready for an
+  admin analytics view. (The MCP server keeps no transcript at all: an external agent
+  owns its own conversation and calls one tool at a time.)
 - `@`-mentions (`lib/ai/mentions.ts`) are resolved server-side: labels come from the
   database and references the viewer may not see are dropped. Leads reuse the grid's
   visibility query; users are scoped like the assignee lists (admins: everyone,
@@ -107,6 +115,32 @@ their Lawmatics CRM.
 - Assistant replies are rendered as Markdown (`components/ai/markdown.tsx`), since the
   model writes `**bold**` and lists. Only assistant messages go through it — a user's own
   words are shown as typed.
+
+## MCP server
+- `POST|GET|DELETE /api/mcp` (App Router handler, `lib/mcp/server.ts`) serves the **same**
+  tools to external agents — Claude, Cursor, the MCP Inspector — with no second
+  implementation. The factory registered with `createMcpHandler` loops over
+  `buildAiTools(actor)` and registers each tool as it is, so anything added there reaches
+  both surfaces at once and the two can never drift. The only per-tool configuration is
+  the annotation map (which tools are read-only).
+- **Auth is a personal access token, not OAuth.** `api_tokens` (§ Data layer) stores only
+  a SHA-256 hash; the route resolves the `Authorization: Bearer` value to a **fresh
+  `users` row on every request**, so an agent's abilities are always its owner's current
+  ones and a role change or revoked token applies on the very next call. Tokens are
+  minted at `/settings` or with `npm run mcp:token -- <email> [label]`, and the raw value
+  is shown once. Nothing OAuth-shaped is advertised, because this server issues its own
+  tokens rather than running an authorization server — pointing a client at discovery
+  would be a dead end.
+- A token carries **no permissions of its own**. Every call runs through the same services
+  and `lib/auth/authorize.ts` checks the UI uses, so an agent can do what its owner can
+  and nothing more. A refusal returns `isError` with the policy's own sentence (e.g.
+  "You can't send this lead to the firm.") rather than a generic failure.
+- The handler trusts its caller by design: it validates no token, `Host`, or `Origin`
+  header. Verification happens in the route; keep it that way, and keep `/api/mcp` in
+  `proxy.ts`'s allow-list or the cookie guard will 401 every agent before the route runs.
+- `McpServer` takes `(serverInfo, options)` as **two** arguments. Folding `instructions`
+  into the first object type-checks and silently buries it inside `serverInfo` on the
+  wire, where no client reads it — the option belongs in the second argument.
 
 ## Conventions
 - **While the schema is still being built, do not stack migrations** — regenerate the single

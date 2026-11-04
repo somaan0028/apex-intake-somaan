@@ -7,4 +7,5 @@
 export * from "./users";
 export * from "./leads";
 export * from "./sessions";
+export * from "./api-tokens";
 export * from "./chats";

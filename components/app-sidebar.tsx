@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, LayoutDashboard, LogOut, Users } from "lucide-react";
+import { ClipboardList, LayoutDashboard, LogOut, Settings, Users } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import type { AuthUser } from "@/lib/auth/session";
 import { initials } from "@/lib/format";
@@ -37,6 +37,8 @@ const NAV_ITEMS: ReadonlyArray<{
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard, permission: null },
   { title: "Leads", url: "/leads", icon: ClipboardList, permission: null },
   { title: "Users", url: "/users", icon: Users, permission: "users.manage" },
+  // Everyone manages their own access tokens, so this is not permission-gated.
+  { title: "Settings", url: "/settings", icon: Settings, permission: null },
 ];
 
 export function AppSidebar({ user }: { user: AuthUser }) {
