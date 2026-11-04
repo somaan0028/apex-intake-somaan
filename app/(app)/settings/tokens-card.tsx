@@ -65,7 +65,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-muted-foreground">{label}</Label>
+      <Label className="font-semibold text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
         <code className="flex-1 truncate rounded-md border bg-muted/50 px-2.5 py-1.5 font-mono text-xs">
           {value}
@@ -122,7 +122,9 @@ export function TokensCard({
     <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Assistant access tokens</CardTitle>
+          <CardTitle className="font-semibold">
+            Assistant access tokens
+          </CardTitle>
           <CardDescription>
             Let an external AI assistant — Claude, Cursor, or anything that
             speaks the Model Context Protocol — work on your leads. It signs in
@@ -135,7 +137,7 @@ export function TokensCard({
           {state.token ? (
             <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
               <div className="space-y-1">
-                <p className="text-sm font-medium">Your new token</p>
+                <p className="text-sm font-semibold">Your new token</p>
                 <p className="text-xs text-muted-foreground">
                   Copy it now — this is the only time it is shown. If you lose
                   it, revoke this one and create another.
@@ -146,7 +148,9 @@ export function TokensCard({
           ) : null}
 
           <form action={formAction} className="space-y-2">
-            <Label htmlFor="token-name">Name</Label>
+            <Label htmlFor="token-name" className="font-semibold">
+              Name
+            </Label>
             <div className="flex gap-2">
               <Input
                 // Remounting on success clears the field without extra state.
@@ -182,7 +186,9 @@ export function TokensCard({
                   className="flex flex-wrap items-center gap-2 p-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{token.name}</p>
+                    <p className="truncate text-sm font-semibold">
+                      {token.name}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       <span className="font-mono">{token.prefix}…</span> ·
                       created {formatDate(token.createdAt)} ·{" "}
@@ -207,7 +213,7 @@ export function TokensCard({
 
       <Card>
         <CardHeader>
-          <CardTitle>Connect an assistant</CardTitle>
+          <CardTitle className="font-semibold">Connect an assistant</CardTitle>
           <CardDescription>
             Let a coding agent set this up for you, or copy the endpoint and
             config into a client yourself.
@@ -215,7 +221,7 @@ export function TokensCard({
         </CardHeader>
         <CardContent className="space-y-5">
           <section className="space-y-2">
-            <h3 className="text-sm font-medium">Automatic setup</h3>
+            <h3 className="text-sm font-semibold">Automatic setup</h3>
             <p className="text-sm text-muted-foreground">
               Paste these instructions into Claude Code, Cursor, or another
               coding agent and it can set up the connection for you.
@@ -228,7 +234,7 @@ export function TokensCard({
 
           <section className="space-y-4 border-t pt-4">
             <div className="space-y-1">
-              <h3 className="text-sm font-medium">Manual setup</h3>
+              <h3 className="text-sm font-semibold">Manual setup</h3>
               <p className="text-sm text-muted-foreground">
                 Add this endpoint and send a token in the
                 <code className="mx-1 font-mono text-xs">Authorization</code>
@@ -237,7 +243,9 @@ export function TokensCard({
             </div>
             <CopyField label="Endpoint" value={endpoint} />
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground">Client config</Label>
+              <Label className="font-semibold text-muted-foreground">
+                Client config
+              </Label>
               <pre className="overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs">
                 <code>{`{
   "mcpServers": {
