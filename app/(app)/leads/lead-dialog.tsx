@@ -18,7 +18,17 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -47,7 +57,7 @@ import {
   RELATIONSHIP_LABELS,
   assigneeLabel,
 } from "@/lib/labels";
-import { sendLeadToFirm } from "@/lib/leads/actions";
+import { deleteLead, sendLeadToFirm } from "@/lib/leads/actions";
 import { UNASSIGNED } from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
@@ -56,6 +66,7 @@ import {
   can,
   canAssignLead,
   canChangeLeadStage,
+  canDeleteLead,
   canEditLead,
   canSendLeadToFirm,
   type Actor,
@@ -300,6 +311,8 @@ function LeadForm({
 }) {
   const router = useRouter();
   const [sending, startSending] = useTransition();
+  const [deleting, startDeleting] = useTransition();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const { status, error, saveNow, schedule, flush, cancel, flushAll } =
     useLeadAutoSave(lead.id);
 
@@ -347,6 +360,7 @@ function LeadForm({
   };
 
   const canEdit = canEditLead(viewer, subject);
+  const canDelete = canDeleteLead(viewer);
   const canSeeAttribution = can(viewer.role, "leads.view.attribution");
   const canAssignAny = can(viewer.role, "leads.assign.any");
   const canClaim = canAssignLead(viewer, subject, viewer.id);
@@ -545,6 +559,26 @@ function LeadForm({
           ? `Brightwater accepted the lead (id ${result.brightwaterLeadId}).`
           : "Brightwater accepted the lead.",
       });
+      router.refresh();
+    });
+  }
+
+  /** Delete after the confirmation, then close the now-stale dialog. */
+  function handleDelete() {
+    const formData = new FormData();
+    formData.set("id", String(lead.id));
+
+    startDeleting(async () => {
+      const result = await deleteLead(formData);
+      setConfirmingDelete(false);
+      if (!result.ok) {
+        toast.error("Could not delete the lead", {
+          description: result.error ?? "Please try again.",
+        });
+        return;
+      }
+      toast.success("Lead deleted");
+      onClose();
       router.refresh();
     });
   }
@@ -1122,17 +1156,55 @@ function LeadForm({
         ) : null}
 
         <DialogFooter className="sm:justify-between">
-          <p className="text-xs text-muted-foreground">
-            Changes save automatically.
-          </p>
-          <div className="flex items-center justify-end gap-3">
+          {canDelete ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-3 sm:ml-auto">
+            <p className="text-xs text-muted-foreground">
+              Changes save automatically.
+            </p>
             <SaveState status={status} />
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={deleting}
+            >
               Close
             </Button>
           </div>
         </DialogFooter>
       </div>
+
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent forceBackdrop>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this lead?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the lead and their details. This
+              can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete lead"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

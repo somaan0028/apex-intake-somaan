@@ -14,15 +14,18 @@ import {
   BRIGHTWATER_TIMEOUT_MS,
   asBrightwaterResponse,
 } from "./contract";
-import {
-  buildBrightwaterPayload,
-  type BrightwaterLead,
-} from "./payload";
+import { buildBrightwaterPayload, type BrightwaterLead } from "./payload";
 
 /** Outcome of a submission attempt. Never throws for an expected failure. */
 export type BrightwaterSendResult =
   | { ok: true; leadId: string | null; processTime: number | null }
-  | { ok: false; error: string; code?: number };
+  | {
+      ok: false;
+      error: string;
+      code?: number;
+      /** Brightwater's own rejection text, when it returned one. */
+      response?: string;
+    };
 
 /**
  * Send one lead to Brightwater and report the result.
@@ -83,6 +86,9 @@ export async function sendLeadToBrightwater(
     return {
       ok: false,
       code: parsed.code,
+      // Only a provider rejection carries a "why". Network and HTTP failures
+      // leave this unset so the activity log can call them unexpected errors.
+      response: parsed.response.trim() || undefined,
       error:
         parsed.response ||
         `Brightwater rejected the lead (code ${parsed.code}).`,

@@ -50,7 +50,7 @@ import {
 } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
 import {
-  DATE_RANGE_PRESET_OPTIONS,
+  DATE_RANGE_ANY_OPTIONS,
   DateRangeFilter,
 } from "@/components/date-range-filter";
 import { Badge } from "@/components/ui/badge";
@@ -725,6 +725,7 @@ export function LeadsTable({
 
   const addedWithin = query.filters.addedWithin;
   const addedPreset =
+    addedWithin === "any" ||
     addedWithin === "24h" ||
     addedWithin === "3d" ||
     addedWithin === "7d" ||
@@ -802,7 +803,7 @@ export function LeadsTable({
   const dateFilter = (
     <DateRangeFilter
       label="Added"
-      options={DATE_RANGE_PRESET_OPTIONS}
+      options={DATE_RANGE_ANY_OPTIONS}
       preset={addedPreset}
       from={query.filters.addedFrom ?? defaultAddedFrom()}
       to={query.filters.addedTo ?? ""}
@@ -2026,4 +2027,3 @@ function StageVisibilityMenu({
     </DropdownMenu>
   );
 }
-

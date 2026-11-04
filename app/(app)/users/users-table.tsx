@@ -9,6 +9,7 @@
  */
 import { createColumnHelper } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import {
   DataTable,
@@ -56,10 +57,26 @@ const columns = columnHelper.columns([
       </Badge>
     ),
   }),
+  columnHelper.accessor("assignedLeadCount", {
+    header: "Assigned leads",
+    cell: (info) => (
+      // The row itself opens the edit dialog; the link must navigate only.
+      <Link
+        href={`/leads?filter.assignedTo=${info.row.original.id}&filter.addedWithin=any`}
+        className="font-medium underline underline-offset-4 hover:text-foreground"
+        aria-label={`View leads assigned to ${info.row.original.name}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {info.getValue()}
+      </Link>
+    ),
+  }),
   columnHelper.accessor("createdAt", {
     header: "Added",
     cell: (info) => (
-      <span className="text-muted-foreground">{formatDate(info.getValue())}</span>
+      <span className="text-muted-foreground">
+        {formatDate(info.getValue())}
+      </span>
     ),
   }),
 ]);

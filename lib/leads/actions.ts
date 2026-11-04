@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import type { LeadFieldPatch } from "./editable";
 import {
+  deleteLeadForActor,
   saveLeadFieldsForActor,
   sendLeadForActor,
   type LeadMutationResult,
@@ -39,6 +40,28 @@ export async function saveLeadFields(
 
   const result = saveLeadFieldsForActor(actor, id, patch);
   if (result.ok) revalidatePath("/leads");
+  return result;
+}
+
+/** Permanently delete a lead (admin only). */
+export async function deleteLead(
+  formData: FormData,
+): Promise<LeadMutationResult> {
+  const actor = await requireUser();
+
+  const id = Number(String(formData.get("id") ?? "").trim());
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, error: "Unknown lead." };
+  }
+
+  const result = deleteLeadForActor(actor, id);
+  if (result.ok) {
+    // The lead disappears from every view that counts or lists it.
+    revalidatePath("/leads");
+    revalidatePath("/dashboard");
+    revalidatePath("/activity");
+    revalidatePath("/campaign-analytics");
+  }
   return result;
 }
 

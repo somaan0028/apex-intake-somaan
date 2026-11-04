@@ -129,6 +129,16 @@ export function isLeadReadyToSend(lead: { stage: LeadStage }): boolean {
   return lead.stage === SEND_READY_STAGE;
 }
 
+/**
+ * May `actor` permanently delete `lead`?
+ *
+ * Deletion is admin-only: it removes the record an agent may only be working
+ * through the pipeline, and no part of the workflow is expected to undo it.
+ */
+export function canDeleteLead(actor: Actor): boolean {
+  return can(actor.role, "leads.delete");
+}
+
 /** May `actor` manage intake users? */
 export function canManageUsers(actor: Actor): boolean {
   return can(actor.role, "users.manage");

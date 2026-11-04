@@ -3,7 +3,9 @@
  *
  * Callers pass structured details, never a finished sentence: the description
  * is built here so every surface words an event the same way, and so no caller
- * can accidentally bake a person's name into a row that outlives a rename.
+ * can accidentally bake a person's current name into a row that outlives a
+ * rename. The one deliberate exception is `lead:deleted`: the row is gone, so
+ * the deletion description must keep the name it had at that moment.
  *
  * A logging failure propagates to the caller. The lead/user mutations run their
  * write and this insert in one transaction, so an action cannot be applied
@@ -54,6 +56,17 @@ export type ActivityInput =
       leadId: number;
       /** Whether the firm accepted the lead. */
       succeeded: boolean;
+      /** Brightwater's rejection text, only when the provider returned one. */
+      providerResponse?: string | null;
+    })
+  | (ActivityBase & {
+      type: "lead:deleted";
+      leadId: number;
+      /**
+       * The lead's name at deletion time. Stored in the description because the
+       * lead row is gone and can no longer supply a name to readers.
+       */
+      leadName: string;
     })
   | (ActivityBase & {
       type: "user:added" | "user:deleted";
@@ -73,10 +86,17 @@ function describeActivity(input: ActivityInput): string {
       return "Assigned lead.";
     case "lead:unassigned":
       return "Unassigned lead.";
-    case "lead:send_to_firm":
-      return input.succeeded
-        ? "Successfully sent lead to firm."
-        : "Failed to send lead to firm.";
+    case "lead:send_to_firm": {
+      if (input.succeeded) return "Successfully sent lead to firm.";
+      // Keep the description one line even if the provider's reason contains
+      // line breaks. The reason is the useful part for anyone reading later.
+      const response = input.providerResponse?.replace(/\s+/g, " ").trim();
+      return response
+        ? `Failed to send lead to firm. Response: ${response}`
+        : "Failed to send lead to firm. Unexpected error occurred.";
+    }
+    case "lead:deleted":
+      return `Deleted lead: ${input.leadName}.`;
     case "user:added":
       return "Added user.";
     case "user:deleted":

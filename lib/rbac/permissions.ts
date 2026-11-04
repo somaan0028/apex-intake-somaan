@@ -39,6 +39,8 @@ export const PERMISSIONS = [
   "leads.release",
   /** Send / retry a lead to the partner firm. */
   "leads.send_to_firm",
+  /** Permanently delete a lead. */
+  "leads.delete",
   /** See a lead's attribution/tracking fields (IP, TrustedForm, Journaya, source). */
   "leads.view.attribution",
   /** See every user's activity, not just your own. */

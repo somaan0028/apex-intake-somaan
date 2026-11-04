@@ -11,12 +11,14 @@ import { and, eq, isNull } from "drizzle-orm";
 import {
   ForbiddenError,
   requireLeadAssignment,
+  requireLeadDelete,
   requireLeadEdit,
   requireLeadReadyToSend,
   requireLeadSend,
   requireLeadStageChange,
   requireLeadView,
 } from "@/lib/auth/authorize";
+import { leadLabel } from "@/lib/activities/queries";
 import { recordActivity } from "@/lib/activities/record";
 import { sendLeadToBrightwater } from "@/lib/brightwater";
 import { getDb } from "@/lib/db";
@@ -645,6 +647,44 @@ export function saveLeadFieldsForActor(
 }
 
 /**
+ * Permanently delete a lead.
+ *
+ * Activity rows reference the lead by a plain integer (no foreign key), so the
+ * audit trail survives the delete and readers show "Deleted lead" afterwards.
+ */
+export function deleteLeadForActor(
+  actor: Actor,
+  id: number,
+  options: LeadMutationOptions = {},
+): LeadMutationResult {
+  try {
+    const lead = requireVisibleLead(actor, id);
+    requireLeadDelete(actor);
+
+    // Capture the name before the row disappears: the activity description is
+    // the only place readers can learn which lead was deleted.
+    const leadName = leadLabel(lead);
+
+    getDb().transaction(() => {
+      getDb().delete(leads).where(eq(leads.id, id)).run();
+      recordActivity({
+        type: "lead:deleted",
+        leadId: id,
+        doerId: actor.id,
+        isAi: options.isAi,
+        leadName,
+      });
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
+/**
  * Send a lead to Brightwater, then record the outcome.
  *
  * Guarded three ways before the network call: the actor must hold
@@ -685,6 +725,7 @@ export async function sendLeadForActor(
       doerId: actor.id,
       isAi: options.isAi,
       succeeded: false,
+      providerResponse: result.response,
     });
     return { ok: false, error: result.error };
   }

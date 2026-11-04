@@ -248,7 +248,9 @@ export function listLeads(
   if (windowDays) {
     const from = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     conditions.push(gte(leads.createdAt, from));
-  } else {
+  } else if (addedWithin !== "any") {
+    // "Any time" is an explicit request for the whole backlog; every other
+    // non-preset value still gets a lower bound.
     const addedFrom = parseFilterDate(query.filters.addedFrom);
     if (addedFrom) {
       conditions.push(gte(leads.createdAt, addedFrom));

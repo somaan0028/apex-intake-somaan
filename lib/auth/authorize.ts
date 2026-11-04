@@ -17,6 +17,7 @@ import {
   canAssignLead,
   canChangeLeadStage,
   canChangeUserRole,
+  canDeleteLead,
   canDeleteUser,
   canEditLead,
   canSendLeadToFirm,
@@ -86,6 +87,13 @@ export function requireLeadAssignment(
 export function requireLeadSend(actor: Actor, lead: LeadSubject): void {
   if (!canSendLeadToFirm(actor, lead)) {
     throw new ForbiddenError("You can't send this lead to the firm.");
+  }
+}
+
+/** Throw unless `actor` may permanently delete `lead`. */
+export function requireLeadDelete(actor: Actor): void {
+  if (!canDeleteLead(actor)) {
+    throw new ForbiddenError("You can't delete this lead.");
   }
 }
 

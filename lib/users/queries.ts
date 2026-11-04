@@ -5,7 +5,7 @@
  * happen in SQL, and the grid is handed one page at a time. Nothing here ever
  * selects `password_hash`.
  */
-import { asc, count, eq, type SQL } from "drizzle-orm";
+import { asc, count, eq, inArray, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import {
@@ -26,6 +26,8 @@ export type UserRow = {
   email: string;
   role: UserRole;
   createdAt: Date;
+  /** How many leads this user currently owns. */
+  assignedLeadCount: number;
 };
 
 /** Sort keys the grid exposes (see the columns in `users-table.tsx`). */
@@ -81,7 +83,35 @@ export function listUsers(query: TableQuery): ListPageResult<UserRow> {
     .offset(plan.offset)
     .all();
 
-  return { rows, total: plan.total, page: plan.page, sort: plan.sort };
+  // Count only the users on this page, in one grouped query. A correlated
+  // subquery per row would be correct too, but this keeps the page bounded.
+  const counts =
+    rows.length === 0
+      ? []
+      : db
+          .select({ userId: leads.assignedToId, value: count() })
+          .from(leads)
+          .where(
+            inArray(
+              leads.assignedToId,
+              rows.map((row) => row.id),
+            ),
+          )
+          .groupBy(leads.assignedToId)
+          .all();
+  const countByUser = new Map(
+    counts.map((row) => [row.userId, row.value] as const),
+  );
+
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      assignedLeadCount: countByUser.get(row.id) ?? 0,
+    })),
+    total: plan.total,
+    page: plan.page,
+    sort: plan.sort,
+  };
 }
 
 /**

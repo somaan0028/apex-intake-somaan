@@ -7,7 +7,7 @@ CREATE TABLE `activities` (
 	`lead_id` integer,
 	`user_id` integer,
 	`created_at` integer NOT NULL,
-	CONSTRAINT "activities_type_check" CHECK("activities"."type" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'user:added', 'user:deleted'))
+	CONSTRAINT "activities_type_check" CHECK("activities"."type" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'lead:deleted', 'user:added', 'user:deleted'))
 );
 --> statement-breakpoint
 CREATE INDEX `activities_doer_created_idx` ON `activities` (`doer_id`,`created_at`);--> statement-breakpoint

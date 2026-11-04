@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "95f43e44-4a5c-43ce-974d-69d2539896b7",
+  "id": "27c72a9c-07dd-4ec6-a8f1-b98bdd896010",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activities": {
@@ -95,7 +95,7 @@
       "checkConstraints": {
         "activities_type_check": {
           "name": "activities_type_check",
-          "value": "\"activities\".\"type\" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'user:added', 'user:deleted')"
+          "value": "\"activities\".\"type\" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'lead:deleted', 'user:added', 'user:deleted')"
         }
       }
     },

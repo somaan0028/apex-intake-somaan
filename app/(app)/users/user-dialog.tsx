@@ -50,8 +50,7 @@ import type { UserRow } from "@/lib/users/queries";
 
 /** Which dialog to show: none, create, or edit a specific user. */
 export type UserDialogState =
-  | { mode: "create" }
-  | { mode: "edit"; user: UserRow };
+  { mode: "create" } | { mode: "edit"; user: UserRow };
 
 const ROLE_OPTIONS = USER_ROLES.map((role: UserRole) => ({
   label: USER_ROLE_LABELS[role],
@@ -198,7 +197,9 @@ function UserForm({
             name="password"
             type="password"
             autoComplete="new-password"
-            placeholder={user ? "Leave blank to keep current" : "At least 8 characters"}
+            placeholder={
+              user ? "Leave blank to keep current" : "At least 8 characters"
+            }
             required={!user}
           />
           {user ? (
@@ -271,7 +272,7 @@ function UserForm({
       </form>
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <AlertDialogContent>
+        <AlertDialogContent forceBackdrop>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this user?</AlertDialogTitle>
             <AlertDialogDescription>
