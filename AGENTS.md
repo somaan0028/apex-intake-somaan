@@ -202,7 +202,9 @@ their Lawmatics CRM.
   attribution, and Brightwater submission facts stay read-only by design. On a
   lead filed for someone else, the filler's name, phone, email and relationship
   are editable under the same `leads.edit.*` permission as the injured person's
-  fields. An agent
+  fields. On laptop widths the sections spread across a wide grid, so the whole
+  record is visible without scrolling; below that it stays one column with its
+  own scroll area. An agent
   claims or releases a lead with a button (they can only ever assign themselves);
   an admin keeps the full assignee selector. State is shown as "Colorado (CO)" via
   `stateLabel()`. The stage and assignee are also editable inline in the grid

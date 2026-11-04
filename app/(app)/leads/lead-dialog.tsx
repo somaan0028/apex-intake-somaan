@@ -139,13 +139,27 @@ function Field({
 }
 
 /** A titled group of read-only fields. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  columns = 2,
+  className,
+  children,
+}: {
+  title: string;
+  columns?: 2 | 3 | 4;
+  className?: string;
+  children: ReactNode;
+}) {
+  const columnClass =
+    columns === 4 ? "lg:grid-cols-4" : columns === 3 ? "lg:grid-cols-3" : "";
   return (
-    <section className="grid gap-3">
+    <section className={className ? `grid gap-3 ${className}` : "grid gap-3"}>
       <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {title}
       </h3>
-      <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3">{children}</dl>
+      <dl className={`grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 ${columnClass}`}>
+        {children}
+      </dl>
     </section>
   );
 }
@@ -254,7 +268,7 @@ export function LeadDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl lg:max-w-6xl">
         <LeadForm
           key={lead.id}
           lead={lead}
@@ -502,13 +516,13 @@ function LeadForm({
       </DialogHeader>
 
       <div className="grid gap-4">
-        <div className="grid max-h-[60vh] gap-5 overflow-y-auto pr-1">
+        <div className="grid max-h-[calc(100svh-10rem)] gap-4 overflow-y-auto pr-1 sm:max-h-[calc(100svh-8rem)] lg:grid-cols-12 lg:items-start lg:gap-x-6">
           {/* Stage + assignment. */}
-          <section className="grid gap-3">
+          <section className="grid gap-3 lg:col-span-3">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Case
             </h3>
-            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <FormField label="Stage" htmlFor="lead-stage">
                 <Select
                   items={STAGE_OPTIONS}
@@ -606,11 +620,11 @@ function LeadForm({
           </section>
 
           {lead.isFillingForSomeoneElse ? (
-            <section className="grid gap-3">
+            <section className="grid gap-3 lg:col-span-4">
               <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 Submitted by someone else
               </h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <FormField label="First name" htmlFor="fillerFirstName">
                   <Input
                     id="fillerFirstName"
@@ -700,11 +714,19 @@ function LeadForm({
             </section>
           ) : null}
 
-          <section className="grid gap-3">
+          <section
+            className={`grid gap-3 ${
+              lead.isFillingForSomeoneElse ? "lg:col-span-5" : "lg:col-span-9"
+            }`}
+          >
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Injured person
             </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div
+              className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+                lead.isFillingForSomeoneElse ? "" : "lg:grid-cols-3"
+              }`}
+            >
               <FormField label="First name" htmlFor="injuredFirstName">
                 <Input
                   id="injuredFirstName"
@@ -783,11 +805,11 @@ function LeadForm({
             </div>
           </section>
 
-          <section className="grid gap-3">
+          <section className="grid gap-3 lg:col-span-3">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Location
             </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <FormField label="State" htmlFor="lead-state">
                 <Select
                   items={STATE_OPTIONS}
@@ -851,11 +873,11 @@ function LeadForm({
             </div>
           </section>
 
-          <section className="grid gap-3">
+          <section className="grid gap-3 lg:col-span-9">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Case facts
             </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FormField label="At fault" htmlFor="lead-at-fault">
                 <Select
                   items={TRI_STATE_OPTIONS}
@@ -939,7 +961,7 @@ function LeadForm({
                   id="lead-injury-details"
                   value={draft.injuryDetails}
                   disabled={!canEdit}
-                  className="min-h-20"
+                  className="min-h-16"
                   onChange={(event) =>
                     changeText("injuryDetails", event.target.value)
                   }
@@ -955,7 +977,7 @@ function LeadForm({
                   id="lead-accident-details"
                   value={draft.accidentDetails}
                   disabled={!canEdit}
-                  className="min-h-20"
+                  className="min-h-16"
                   onChange={(event) =>
                     changeText("accidentDetails", event.target.value)
                   }
@@ -966,7 +988,7 @@ function LeadForm({
           </section>
 
           {canSeeAttribution ? (
-            <Section title="Attribution">
+            <Section title="Attribution" columns={4} className="lg:col-span-8">
               <Field label="IP address">{orDash(lead.ipaddress)}</Field>
               <Field label="TrustedForm">{orDash(lead.trustedform)}</Field>
               <Field label="Jornaya">{orDash(lead.jornaya)}</Field>
@@ -976,7 +998,11 @@ function LeadForm({
             </Section>
           ) : null}
 
-          <Section title="Firm submission">
+          <Section
+            title="Firm submission"
+            columns={canSeeAttribution ? 2 : 3}
+            className={canSeeAttribution ? "lg:col-span-4" : "lg:col-span-12"}
+          >
             <Field label="Sent to firm">
               {sentAt ? formatDateTime(sentAt) : "Not sent"}
             </Field>
@@ -984,7 +1010,11 @@ function LeadForm({
               {orDash(brightwaterLeadId)}
             </Field>
             {sent ? null : (
-              <div className="col-span-2 grid gap-2">
+              <div
+                className={`col-span-2 grid gap-2 ${
+                  canSeeAttribution ? "" : "lg:col-span-3"
+                }`}
+              >
                 {lead.caseType !== "MVA" ? (
                   <p className="text-xs text-muted-foreground">
                     Only MVA leads are sent to the firm.
