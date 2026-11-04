@@ -7,12 +7,12 @@
  * `components/ai/ai-assistant.tsx`). Pages are rendered *inside* that shell, so
  * they can't receive it as a prop — the shell publishes this handle through
  * context instead, and a page can ask for the panel to open with a question
- * already in the composer.
+ * already sent.
  */
 import { createContext, useContext } from "react";
 
 export interface AiAssistantHandle {
-  /** Open the panel. A `prompt` is placed in the composer, ready to send. */
+  /** Open the panel. A `prompt` is sent as the next message right away. */
   open: (prompt?: string) => void;
 }
 

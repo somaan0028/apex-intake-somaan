@@ -12,9 +12,9 @@
  *
  * `AiAssistantProvider` owns the state and publishes `open(prompt)` through
  * context (`./assistant-context`), so a page like the Overview can open the
- * panel with a suggested question already in the composer. It also owns the
- * conversation list: which chat is open, the "past chats" view, and starting or
- * deleting a conversation.
+ * panel with a suggested question already sent. It also owns the conversation
+ * list: which chat is open, the "past chats" view, and starting or deleting a
+ * conversation.
  */
 import { History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import {
@@ -146,7 +146,12 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       .catch(() => startChat());
   }, [chatId, openChat, refreshChats, startChat]);
 
-  /** The handle pages use: show the panel, optionally with a question waiting. */
+  /**
+   * The handle pages use: show the panel, optionally sending a question right
+   * away. The prompt is handed to the thread as a one-shot draft; `consumeDraft`
+   * clears it once sent so remounting the thread (a new chat, a reopened panel)
+   * never sends the same question twice.
+   */
   const openWithPrompt = useCallback(
     (prompt?: string) => {
       if (prompt) {
@@ -156,6 +161,12 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     },
     [reveal],
   );
+
+  const consumeDraft = useCallback((seq: number) => {
+    setDraft((previous) =>
+      previous.seq === seq ? { ...previous, text: "" } : previous,
+    );
+  }, []);
 
   const handle = useMemo(() => ({ open: openWithPrompt }), [openWithPrompt]);
 
@@ -191,7 +202,11 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
           side="right"
           showCloseButton={false}
           showOverlay={false}
-          className="w-full gap-0 p-0 shadow-2xl sm:w-[26rem] sm:max-w-[26rem]"
+          // The base sheet pins `data-[side=right]:w-3/4` and `…:sm:max-w-sm`.
+          // Tailwind emits those variant utilities after a plain `w-full`, so
+          // the panel kept 75% of a phone screen; repeat the same variants here
+          // to override them (the merge in `cn` then drops the base ones).
+          className="w-full gap-0 p-0 shadow-2xl data-[side=right]:w-full data-[side=right]:max-w-none sm:w-[26rem] data-[side=right]:sm:w-[26rem] sm:max-w-[26rem] data-[side=right]:sm:max-w-[26rem]"
         >
           <SheetHeader className="flex shrink-0 flex-row items-center gap-1 border-b p-3 pr-2">
             <Sparkles className="size-4 shrink-0 text-muted-foreground" />
@@ -282,6 +297,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
               chatId={chatId}
               initialMessages={initialMessages}
               draft={draft}
+              onDraftConsumed={consumeDraft}
               onTurnComplete={() => void refreshChats()}
             />
           ) : null}
