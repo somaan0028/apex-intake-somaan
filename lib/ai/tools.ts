@@ -17,7 +17,11 @@ import { z } from "zod";
 import { ForbiddenError } from "@/lib/auth/authorize";
 import { getDb } from "@/lib/db";
 import { CASE_TYPES, LEAD_STAGES, users, type Lead } from "@/lib/db/schema";
-import { CASE_TYPE_LABELS, LEAD_STAGE_LABELS, relationshipLabel } from "@/lib/labels";
+import {
+  LEAD_STAGE_LABELS,
+  caseTypeLabel,
+  relationshipLabel,
+} from "@/lib/labels";
 import { UNASSIGNED } from "@/lib/leads/constants";
 import { listLeads } from "@/lib/leads/queries";
 import {
@@ -72,7 +76,7 @@ function leadSummary(lead: {
   return {
     leadId: lead.id,
     stage: LEAD_STAGE_LABELS[lead.stage],
-    caseType: lead.caseType ? CASE_TYPE_LABELS[lead.caseType] : null,
+    caseType: lead.caseType ? caseTypeLabel(lead.caseType) : null,
     injuredPerson: personName(lead.injuredFirstName, lead.injuredLastName),
     phone: lead.injuredPhone,
     email: lead.injuredEmail,
@@ -91,7 +95,7 @@ function leadDetail(actor: Actor, lead: Lead) {
   return {
     leadId: lead.id,
     stage: LEAD_STAGE_LABELS[lead.stage],
-    caseType: lead.caseType ? CASE_TYPE_LABELS[lead.caseType] : null,
+    caseType: lead.caseType ? caseTypeLabel(lead.caseType) : null,
     createdOn: isoDate(lead.createdAt),
     assignedTo: assigneeName(lead.assignedToId),
     assignedToId: lead.assignedToId,
@@ -138,7 +142,9 @@ function leadDetail(actor: Actor, lead: Lead) {
 }
 
 /** Run a tool body, turning a permission refusal into a readable result. */
-async function guarded<T>(fn: () => T | Promise<T>): Promise<T | { error: string }> {
+async function guarded<T>(
+  fn: () => T | Promise<T>,
+): Promise<T | { error: string }> {
   try {
     return await fn();
   } catch (error) {
@@ -171,7 +177,10 @@ export function buildAiTools(actor: Actor) {
         .describe(
           "Free text matched against the injured person's name, email and phone.",
         ),
-      stage: z.enum(LEAD_STAGES).optional().describe("Exact stage to filter on."),
+      stage: z
+        .enum(LEAD_STAGES)
+        .optional()
+        .describe("Exact stage to filter on."),
       caseType: z
         .enum(CASE_TYPES)
         .optional()
@@ -259,7 +268,9 @@ export function buildAiTools(actor: Actor) {
         .int()
         .positive()
         .nullable()
-        .describe("The user id to assign to, or null to return the lead to the open pool."),
+        .describe(
+          "The user id to assign to, or null to return the lead to the open pool.",
+        ),
     }),
   }).server(async (input) =>
     guarded(async () => {
@@ -310,7 +321,8 @@ export function buildAiTools(actor: Actor) {
   }).server(async (input) =>
     guarded(async () => {
       const result = await sendLeadForActor(actor, input.leadId);
-      if (!result.ok) return { error: result.error ?? "The lead could not be sent." };
+      if (!result.ok)
+        return { error: result.error ?? "The lead could not be sent." };
       return {
         ok: true,
         leadId: input.leadId,

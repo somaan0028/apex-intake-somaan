@@ -9,17 +9,16 @@
  * public, so nothing from the client is trusted. It canonicalises every value
  * (state code, county spelling, phone, dates) and returns field-level errors.
  */
-import {
-  CASE_TYPES,
-  RELATIONSHIPS,
-  type CaseType,
-  type Relationship,
-} from "@/lib/db/schema";
+import { CASE_TYPES, RELATIONSHIPS, type Relationship } from "@/lib/db/schema";
 import { toCounty, toStateCode, toUsPhone } from "@/lib/db/normalize";
 import { isValidEmail, normalizePostcode } from "@/lib/validation";
-
-/** Matches the "Website" value used by existing leads for web-submitted leads. */
-export const WEB_SOURCE = "Website";
+import {
+  EMPTY_UTM,
+  MAX_UTM_LENGTH,
+  caseTypeFromCampaign,
+  leadSourceFromUtm,
+  type UtmParams,
+} from "./utm";
 
 /** Guard against outsized free-text payloads. */
 const MAX_TEXT_LENGTH = 5000;
@@ -52,8 +51,8 @@ export const INTAKE_FIELD_LABELS: Record<string, string> = {
 export interface IntakeSubmission {
   /** Mirrors `leads.is_filling_for_someone_else`. */
   isFillingForSomeoneElse: boolean;
-  /** Mirrors `leads.case_type`. */
-  caseType: CaseType;
+  /** Mirrors `leads.case_type`. A known code, or a raw campaign value. */
+  caseType: string;
   /** `YYYY-MM-DD`. */
   dateOfAccident: string | null;
   state: string;
@@ -73,6 +72,12 @@ export interface IntakeSubmission {
   fillerLastName: string | null;
   fillerPhone: string | null;
   fillerEmail: string | null;
+  /** Mirrors `leads.source`, resolved from `utm_source` (empty when absent). */
+  source: string | null;
+  /** Mirrors `leads.medium` (`utm_medium`), stored verbatim. */
+  medium: string | null;
+  /** Mirrors `leads.content` (`utm_content`), stored verbatim. */
+  content: string | null;
 }
 
 export type IntakeValidation =
@@ -119,6 +124,21 @@ function normalizeDate(value: string): string | null {
   return null;
 }
 
+/** Untrusted `tracking` block: keep only the four known params, bounded and trimmed. */
+function parseTracking(input: unknown): UtmParams {
+  if (!isRecord(input)) return EMPTY_UTM;
+  const read = (value: unknown): string | null => {
+    const trimmed = asTrimmedString(value);
+    return trimmed === "" ? null : trimmed.slice(0, MAX_UTM_LENGTH);
+  };
+  return {
+    source: read(input.source),
+    campaign: read(input.campaign),
+    medium: read(input.medium),
+    content: read(input.content),
+  };
+}
+
 /** Validate + canonicalise an untrusted intake payload. */
 export function validateIntakeSubmission(input: unknown): IntakeValidation {
   if (!isRecord(input)) {
@@ -134,12 +154,27 @@ export function validateIntakeSubmission(input: unknown): IntakeValidation {
   }
   const forSomeoneElse = isFillingForSomeoneElse === true;
 
+  // --- Ad tracking ---------------------------------------------------------
+  // Never fatal: bad or missing tracking must not stop someone submitting.
+  const tracking = parseTracking(input.tracking);
+
   // --- Case type -----------------------------------------------------------
   const rawCaseType = asTrimmedString(input.caseType);
-  const caseType = (CASE_TYPES as readonly string[]).includes(rawCaseType)
-    ? (rawCaseType as CaseType)
+  const submittedCaseType = (CASE_TYPES as readonly string[]).includes(
+    rawCaseType,
+  )
+    ? rawCaseType
     : null;
-  if (!caseType) errors.caseType = "Please choose a case type.";
+  if (!submittedCaseType) errors.caseType = "Please choose a case type.";
+
+  // A campaign decides the case type when we recognise it (the form has already
+  // preselected it, but the user may have changed it, so their choice wins).
+  // An unrecognised campaign is stored as-is, which is why `case_type` is not
+  // constrained to the enum.
+  const campaignCaseType = caseTypeFromCampaign(tracking.campaign);
+  const caseType = campaignCaseType
+    ? submittedCaseType
+    : (tracking.campaign ?? submittedCaseType);
 
   // --- Location ------------------------------------------------------------
   const state = toStateCode(asTrimmedString(input.state));
@@ -252,7 +287,7 @@ export function validateIntakeSubmission(input: unknown): IntakeValidation {
     ok: true,
     data: {
       isFillingForSomeoneElse: forSomeoneElse,
-      caseType: caseType as CaseType,
+      caseType: caseType as string,
       dateOfAccident,
       state: state as string,
       county,
@@ -271,6 +306,9 @@ export function validateIntakeSubmission(input: unknown): IntakeValidation {
       fillerLastName,
       fillerPhone,
       fillerEmail,
+      source: leadSourceFromUtm(tracking.source),
+      medium: tracking.medium,
+      content: tracking.content,
     },
   };
 }

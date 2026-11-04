@@ -1,0 +1,106 @@
+CREATE TABLE `api_tokens` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`name` text NOT NULL,
+	`token_hash` text NOT NULL,
+	`prefix` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`last_used_at` integer,
+	`expires_at` integer,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `api_tokens_token_hash_unique` ON `api_tokens` (`token_hash`);--> statement-breakpoint
+CREATE INDEX `api_tokens_user_id_idx` ON `api_tokens` (`user_id`);--> statement-breakpoint
+CREATE TABLE `chat_messages` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`chat_id` text NOT NULL,
+	`external_id` text,
+	`role` text NOT NULL,
+	`content` text NOT NULL,
+	`mentions` text,
+	`model` text,
+	`prompt_tokens` integer,
+	`completion_tokens` integer,
+	`total_tokens` integer,
+	`cost_usd` real,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`chat_id`) REFERENCES `chats`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "chat_messages_role_check" CHECK("chat_messages"."role" in ('user', 'assistant'))
+);
+--> statement-breakpoint
+CREATE INDEX `chat_messages_chat_id_idx` ON `chat_messages` (`chat_id`,`id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `chat_messages_external_id_unique` ON `chat_messages` (`chat_id`,`external_id`);--> statement-breakpoint
+CREATE TABLE `chats` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` integer NOT NULL,
+	`title` text DEFAULT 'New chat' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `chats_user_updated_idx` ON `chats` (`user_id`,`updated_at`);--> statement-breakpoint
+CREATE TABLE `users` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`email` text NOT NULL,
+	`role` text DEFAULT 'USER' NOT NULL,
+	`password_hash` text NOT NULL,
+	`created_at` integer NOT NULL,
+	CONSTRAINT "users_role_check" CHECK("users"."role" in ('ADMIN', 'USER'))
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint
+CREATE TABLE `leads` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`matter_id` text NOT NULL,
+	`created_at` integer,
+	`case_type` text,
+	`stage` text DEFAULT 'NEW' NOT NULL,
+	`assigned_to_id` integer,
+	`filler_first_name` text,
+	`filler_last_name` text,
+	`filler_phone` text,
+	`filler_email` text,
+	`is_filling_for_someone_else` integer DEFAULT false NOT NULL,
+	`injured_first_name` text,
+	`injured_last_name` text,
+	`injured_phone` text,
+	`injured_email` text,
+	`relationship_to_injured` text,
+	`date_of_accident` integer,
+	`state` text,
+	`county` text,
+	`postcode` text,
+	`injury_details` text,
+	`accident_details` text,
+	`is_at_fault` integer,
+	`has_attorney` integer,
+	`has_received_settlement` integer,
+	`source` text,
+	`medium` text,
+	`content` text,
+	`ipaddress` text,
+	`trustedform` text,
+	`jornaya` text,
+	`brightwater_lead_id` text,
+	`sent_to_firm_at` integer,
+	FOREIGN KEY (`assigned_to_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "leads_relationship_check" CHECK("leads"."relationship_to_injured" in ('SPOUSE', 'PARENT', 'STEP_PARENT', 'CHILD', 'STEP_CHILD', 'SIBLING', 'GRANDPARENT', 'GRANDCHILD', 'AUNT_UNCLE', 'NIECE', 'NEPHEW', 'COUSIN', 'IN_LAW', 'FRIEND', 'COLLEAGUE', 'NEIGHBOR', 'OTHER'))
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `leads_matter_id_unique` ON `leads` (`matter_id`) WHERE "leads"."matter_id" <> '';--> statement-breakpoint
+CREATE INDEX `leads_stage_idx` ON `leads` (`stage`);--> statement-breakpoint
+CREATE INDEX `leads_assigned_to_idx` ON `leads` (`assigned_to_id`);--> statement-breakpoint
+CREATE INDEX `leads_case_type_idx` ON `leads` (`case_type`);--> statement-breakpoint
+CREATE INDEX `leads_filler_email_idx` ON `leads` (`filler_email`);--> statement-breakpoint
+CREATE TABLE `sessions` (
+	`token_hash` text PRIMARY KEY NOT NULL,
+	`user_id` integer NOT NULL,
+	`expires_at` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `sessions_user_id_idx` ON `sessions` (`user_id`);

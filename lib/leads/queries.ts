@@ -5,7 +5,17 @@
  * and paging all in SQL, one page at a time. The shared plumbing lives in
  * `lib/db/list-query.ts`.
  */
-import { eq, getTableColumns, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  eq,
+  getTableColumns,
+  isNotNull,
+  isNull,
+  notInArray,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import { can, type Actor } from "@/lib/rbac";
@@ -39,6 +49,8 @@ const ATTRIBUTION_KEYS = [
   "trustedform",
   "jornaya",
   "source",
+  "medium",
+  "content",
 ] as const;
 type AttributionKey = (typeof ATTRIBUTION_KEYS)[number];
 
@@ -145,7 +157,19 @@ export function listLeads(
   ];
 
   const caseType = readFilter(query, "caseType", isCaseType);
-  if (caseType) conditions.push(eq(leads.caseType, caseType));
+  if (caseType === "OTHER") {
+    // "Other" is a bucket, not just the literal code: it covers every stored
+    // case type that is not one of the ad campaigns, including a raw campaign
+    // value we did not recognise (e.g. `workers_comp`).
+    conditions.push(
+      and(
+        isNotNull(leads.caseType),
+        notInArray(leads.caseType, ["MVA", "MASS_TORT"]),
+      ),
+    );
+  } else if (caseType) {
+    conditions.push(eq(leads.caseType, caseType));
+  }
 
   const stage = readFilter(query, "stage", isLeadStage);
   if (stage) conditions.push(eq(leads.stage, stage));
@@ -203,9 +227,7 @@ export function listLeads(
 
   // Omit the attribution fields for viewers who may not see them — the values
   // never leave the server, so the grid and dialog have nothing to render.
-  const rows = showAttribution
-    ? selected
-    : selected.map(withoutAttribution);
+  const rows = showAttribution ? selected : selected.map(withoutAttribution);
 
   return { rows, total: plan.total, page: plan.page, sort: plan.sort };
 }

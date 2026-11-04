@@ -14,7 +14,7 @@ import {
 import { requireUser } from "@/lib/auth/session";
 import { LEAD_STAGES } from "@/lib/db/schema";
 import { formatDate } from "@/lib/format";
-import { CASE_TYPE_LABELS, LEAD_STAGE_LABELS } from "@/lib/labels";
+import { LEAD_STAGE_LABELS, caseTypeLabel } from "@/lib/labels";
 import { leadMetrics, recentLeads } from "@/lib/leads/metrics";
 import { can } from "@/lib/rbac";
 import { AssistantInvite } from "./assistant-invite";
@@ -180,7 +180,7 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {lead.caseType ? CASE_TYPE_LABELS[lead.caseType] : "—"}
+                        {lead.caseType ? caseTypeLabel(lead.caseType) : "—"}
                         {" · "}
                         {formatDate(lead.createdAt)}
                       </p>

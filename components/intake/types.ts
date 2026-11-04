@@ -13,7 +13,12 @@ import type { LucideIcon } from "lucide-react";
 import { CarFront, Pill, Shapes, UserRound, UsersRound } from "lucide-react";
 import type { CaseType, Relationship } from "@/lib/db/schema";
 import type { IntakeSubmission } from "@/lib/leads/intake";
-import { isValidEmail, isValidPhone, normalizePostcode } from "@/lib/validation";
+import { EMPTY_UTM, type UtmParams } from "@/lib/leads/utm";
+import {
+  isValidEmail,
+  isValidPhone,
+  normalizePostcode,
+} from "@/lib/validation";
 
 export interface IntakeValues {
   /** Mirrors `leads.is_filling_for_someone_else`; `null` = unanswered. */
@@ -110,7 +115,7 @@ export const FILLING_FOR_OPTIONS: readonly ChoiceOption<boolean>[] = [
   {
     value: false,
     label: "Myself",
-    description: "I'm the person who was injured",
+    description: "I'm the person who was affected",
     icon: UserRound,
   },
   {
@@ -239,8 +244,7 @@ export function isStepComplete(key: StepKey, v: IntakeValues): boolean {
       return (
         v.dateOfAccident !== "" &&
         v.state !== "" &&
-        (v.postcode.trim() === "" ||
-          normalizePostcode(v.postcode) !== null)
+        (v.postcode.trim() === "" || normalizePostcode(v.postcode) !== null)
       );
     case "incident":
       return v.accidentDetails.trim().length >= 5;
@@ -277,8 +281,20 @@ const orNull = (value: string) => {
   return trimmed === "" ? null : trimmed;
 };
 
+/**
+ * What the form posts. Source/medium/content are derived on the server from
+ * `tracking` (a public URL is not the place to let the client pick attribution).
+ */
+export type IntakePayload = Omit<
+  IntakeSubmission,
+  "source" | "medium" | "content"
+> & { tracking: UtmParams };
+
 /** Map the form's state onto the submission payload (field names already match). */
-export function buildIntakeSubmission(values: IntakeValues): IntakeSubmission {
+export function buildIntakeSubmission(
+  values: IntakeValues,
+  tracking: UtmParams = EMPTY_UTM,
+): IntakePayload {
   const forSomeoneElse = values.isFillingForSomeoneElse === true;
   return {
     isFillingForSomeoneElse: forSomeoneElse,
@@ -304,5 +320,6 @@ export function buildIntakeSubmission(values: IntakeValues): IntakeSubmission {
     fillerLastName: forSomeoneElse ? orNull(values.fillerLastName) : null,
     fillerPhone: forSomeoneElse ? orNull(values.fillerPhone) : null,
     fillerEmail: forSomeoneElse ? orNull(values.fillerEmail) : null,
+    tracking,
   };
 }

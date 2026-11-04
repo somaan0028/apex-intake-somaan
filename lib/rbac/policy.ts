@@ -10,7 +10,7 @@
  * from the database for this request — never a payload echoed back from the
  * client, or a caller could claim ownership they don't have.
  */
-import type { CaseType, LeadStage, UserRole } from "@/lib/db/schema";
+import type { LeadStage, UserRole } from "@/lib/db/schema";
 import { can, type Actor } from "./permissions";
 
 /**
@@ -19,7 +19,7 @@ import { can, type Actor } from "./permissions";
  */
 export interface LeadSubject {
   assignedToId: number | null;
-  caseType: CaseType | null;
+  caseType: string | null;
   sentToFirmAt: Date | null;
   /** Set once Brightwater has accepted the lead; a second signal of "already sent". */
   brightwaterLeadId: string | null;

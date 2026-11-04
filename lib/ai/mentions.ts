@@ -15,7 +15,7 @@
 import { and, asc, eq, like, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { CASE_TYPE_LABELS, LEAD_STAGE_LABELS } from "@/lib/labels";
+import { LEAD_STAGE_LABELS, caseTypeLabel } from "@/lib/labels";
 import { listLeads } from "@/lib/leads/queries";
 import { findLead } from "@/lib/leads/service";
 import { can, canViewLead, type Actor } from "@/lib/rbac";
@@ -82,7 +82,7 @@ export function searchMentionables(
     label: leadLabel(lead),
     description: [
       LEAD_STAGE_LABELS[lead.stage],
-      lead.caseType ? CASE_TYPE_LABELS[lead.caseType] : null,
+      lead.caseType ? caseTypeLabel(lead.caseType) : null,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -142,7 +142,7 @@ export function resolveMentions(
         label: leadLabel(lead),
         description: [
           LEAD_STAGE_LABELS[lead.stage],
-          lead.caseType ? CASE_TYPE_LABELS[lead.caseType] : null,
+          lead.caseType ? caseTypeLabel(lead.caseType) : null,
         ]
           .filter(Boolean)
           .join(" · "),

@@ -24,7 +24,13 @@ import {
 } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
 import { Badge } from "@/components/ui/badge";
-import { CASE_TYPE_LABELS, LEAD_STAGE_LABELS, assigneeLabel } from "@/lib/labels";
+import {
+  CASE_TYPE_LABELS,
+  LEAD_STAGE_LABELS,
+  assigneeLabel,
+  caseTypeLabel,
+  stateLabel,
+} from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import {
   CASE_TYPES,
@@ -114,7 +120,9 @@ const columns = columnHelper.columns([
     cell: (info) => {
       const value = info.getValue();
       return value ? (
-        <Badge variant={CASE_TYPE_BADGE[value]}>{CASE_TYPE_LABELS[value]}</Badge>
+        <Badge variant={CASE_TYPE_BADGE[value as CaseType] ?? "outline"}>
+          {caseTypeLabel(value)}
+        </Badge>
       ) : (
         EMPTY
       );
@@ -138,7 +146,9 @@ const columns = columnHelper.columns([
   columnHelper.accessor("createdAt", {
     header: "Date",
     cell: (info) => (
-      <span className="text-muted-foreground">{formatDate(info.getValue())}</span>
+      <span className="text-muted-foreground">
+        {formatDate(info.getValue())}
+      </span>
     ),
   }),
   columnHelper.accessor("isFillingForSomeoneElse", {
@@ -164,7 +174,7 @@ const columns = columnHelper.columns([
   }),
   columnHelper.accessor("state", {
     header: "State",
-    cell: (info) => <span>{info.getValue() ?? "—"}</span>,
+    cell: (info) => <span>{stateLabel(info.getValue()) || "—"}</span>,
   }),
   columnHelper.accessor("county", {
     header: "County",

@@ -1,10 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Loader2,
+  ShieldCheck,
+} from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,6 +26,11 @@ import { US_STATES } from "@/lib/us-states";
 import { COUNTIES_BY_STATE } from "@/lib/us-counties";
 import { RELATIONSHIP_LABELS } from "@/lib/labels";
 import { normalizePostcode } from "@/lib/validation";
+import {
+  caseTypeFromCampaign,
+  readUtmParams,
+  type UtmParams,
+} from "@/lib/leads/utm";
 import { Field, OptionCards, StepHeader, YesNoField } from "./fields";
 import {
   CASE_TYPE_OPTIONS,
@@ -47,6 +59,10 @@ const STATE_ITEMS = US_STATES.map((state) => ({
 const RELATIONSHIP_ITEMS = Object.entries(RELATIONSHIP_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
+
+/** Shown under the case-type title when the ad campaign preselected it. */
+const AUTO_SELECTED_NOTE =
+  "This option has been auto selected based on the ad that you clicked on. Feel free to change it if you'd like";
 
 /* ------------------------------------------------------------------ steps */
 
@@ -92,13 +108,12 @@ function WhenWhereStep({ values, update }: StepProps) {
         htmlFor="dateOfAccident"
         hint="An approximate date is fine."
       >
-        <Input
+        <DatePicker
           id="dateOfAccident"
-          type="date"
-          max={today || undefined}
           value={values.dateOfAccident}
-          onChange={(event) => update("dateOfAccident", event.target.value)}
-          className="h-11"
+          onChange={(value) => update("dateOfAccident", value)}
+          max={today || undefined}
+          placeholder="Choose a date"
         />
       </Field>
 
@@ -341,9 +356,6 @@ function InjuredStep({ values, update }: StepProps) {
         <Field
           label={forSomeoneElse ? "Their phone" : "Phone number"}
           htmlFor="injuredPhone"
-          hint={
-            forSomeoneElse ? undefined : "We'll text or call to follow up."
-          }
         >
           <Input
             id="injuredPhone"
@@ -404,11 +416,7 @@ function FillerStep({ values, update }: StepProps) {
         </Field>
       </div>
 
-      <Field
-        label="Phone number"
-        htmlFor="fillerPhone"
-        hint="We'll text or call to follow up."
-      >
+      <Field label="Phone number" htmlFor="fillerPhone">
         <Input
           id="fillerPhone"
           type="tel"
@@ -451,8 +459,8 @@ function IntakeSuccess({ firstName }: { firstName: string }) {
           {firstName ? `Thanks, ${firstName}` : "Thank you"}
         </h2>
         <p className="max-w-sm text-sm text-muted-foreground text-pretty">
-          We&apos;ve received your information. A member of our team will contact
-          you shortly.
+          We&apos;ve received your information. A member of our team will
+          contact you shortly.
         </p>
       </CardContent>
     </Card>
@@ -471,12 +479,32 @@ export function IntakeForm() {
     "idle",
   );
   const [formError, setFormError] = React.useState<string | null>(null);
+  // Ad tracking is read from the landing URL lazily, in event handlers only, so
+  // the server and client markup stay identical on first paint.
+  const utmRef = React.useRef<UtmParams | null>(null);
+  const [campaignPreset, setCampaignPreset] = React.useState<
+    IntakeValues["caseType"] | null
+  >(null);
+
+  function currentUtm(): UtmParams {
+    if (!utmRef.current) {
+      utmRef.current = readUtmParams(
+        new URLSearchParams(window.location.search),
+      );
+    }
+    return utmRef.current;
+  }
 
   // Steps vary with the answers (filing for self skips the submitter step).
   const stepKeys = getStepKeys(values);
   const index = Math.min(step, stepKeys.length - 1);
   const currentKey = stepKeys[index];
   const meta = stepMeta(currentKey, values);
+  // The note only makes sense while the campaign's choice is still selected.
+  const autoSelected =
+    currentKey === "caseType" &&
+    campaignPreset !== null &&
+    values.caseType === campaignPreset;
   const canContinue = isStepComplete(currentKey, values);
   const isLastStep = index === stepKeys.length - 1;
   const submitting = status === "submitting";
@@ -489,6 +517,17 @@ export function IntakeForm() {
   }
 
   function stepBy(delta: number) {
+    // The ad campaign choices the case type the first time that step is shown.
+    // Preselect only; a value already chosen is left alone.
+    if (delta > 0 && currentKey === "fillingFor") {
+      const fromCampaign = caseTypeFromCampaign(currentUtm().campaign);
+      if (fromCampaign) {
+        setCampaignPreset(fromCampaign);
+        setValues((prev) =>
+          prev.caseType ? prev : { ...prev, caseType: fromCampaign },
+        );
+      }
+    }
     setDirection(delta >= 0 ? "forward" : "back");
     setStep(Math.max(0, Math.min(stepKeys.length - 1, index + delta)));
   }
@@ -500,12 +539,13 @@ export function IntakeForm() {
       const response = await fetch("/api/public/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildIntakeSubmission(values)),
+        body: JSON.stringify(buildIntakeSubmission(values, currentUtm())),
       });
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { error?: string; errors?: Record<string, string> }
-          | null;
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+          errors?: Record<string, string>;
+        } | null;
         setFormError(
           payload?.error ?? "Something went wrong. Please try again.",
         );
@@ -552,9 +592,16 @@ export function IntakeForm() {
   return (
     <Card className="w-full overflow-hidden">
       <CardContent className="flex flex-col gap-6 p-5 sm:p-7">
-        <StepHeader title={meta.title} subtitle={meta.subtitle} />
+        <StepHeader
+          title={meta.title}
+          subtitle={autoSelected ? AUTO_SELECTED_NOTE : meta.subtitle}
+        />
 
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="flex flex-col gap-6"
+        >
           <div
             key={currentKey}
             className={cn(
@@ -607,7 +654,11 @@ export function IntakeForm() {
                 size="lg"
                 disabled={!canContinue || submitting}
               >
-                {submitting ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+                {submitting ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <ShieldCheck />
+                )}
                 {submitting ? "Submitting…" : "Submit"}
               </Button>
             ) : (

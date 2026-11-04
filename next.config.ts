@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // The public intake form is shown to clients; the dev indicator floats over it
+  // and exposes the stack, so turn it off. Compile/runtime errors still surface.
+  devIndicators: false,
   // `better-sqlite3` ships a native `.node` binding, so it must be treated as an
   // external package and required at runtime instead of being bundled by Next.
   serverExternalPackages: ["better-sqlite3"],

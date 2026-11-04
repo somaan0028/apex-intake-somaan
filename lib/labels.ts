@@ -17,12 +17,41 @@ import type {
   Relationship,
   UserRole,
 } from "@/lib/db/schema";
+import { US_STATES } from "@/lib/us-states";
 
 export const CASE_TYPE_LABELS: Record<CaseType, string> = {
   MVA: "MVA",
   MASS_TORT: "Mass Tort",
   OTHER: "Other",
 };
+
+/**
+ * Label for a stored case type.
+ *
+ * `case_type` normally holds one of the codes above, but an unrecognised ad
+ * campaign is stored verbatim, so fall back to a readable form of the raw value
+ * ("workers_comp" → "Workers comp").
+ */
+export function caseTypeLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  const known = CASE_TYPE_LABELS[value as CaseType];
+  if (known) return known;
+  const words = value.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Label for a stored state code. The full name is shown alongside the code
+ * ("Colorado (CO)") so the two-letter abbreviations are never ambiguous; an
+ * unrecognised value is returned unchanged.
+ */
+export function stateLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  const state = US_STATES.find(
+    (entry) => entry.code === value.trim().toUpperCase(),
+  );
+  return state ? `${state.name} (${state.code})` : value;
+}
 
 export const LEAD_STAGE_LABELS: Record<LeadStage, string> = {
   NEW: "New",

@@ -66,11 +66,17 @@ export const leads = sqliteTable(
   "leads",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    /** External matter id from Lawmatics, e.g. `APX-10001`. Unique per lead. */
+    /** External matter id from Lawmatics, e.g. `APX-10001`. Unique when present;
+     *  public form submissions leave it empty. */
     matterId: text("matter_id").notNull(),
     createdAt: integer("created_at", { mode: "timestamp" }),
-    /** Case type the lead is (see `CASE_TYPES`). */
-    caseType: text("case_type").$type<CaseType>(),
+    /**
+     * Case type. Normally a canonical code from `CASE_TYPES`, but an ad
+     * campaign the desk doesn't recognise (`utm_campaign`) is stored verbatim,
+     * so the raw campaign value is never lost. Read it through
+     * `caseTypeLabel()` rather than indexing a label map directly.
+     */
+    caseType: text("case_type"),
     /** Pipeline stage; defaults to `NEW`. */
     stage: text("stage").$type<LeadStage>().notNull().default("NEW"),
     /** Intake agent currently owning the lead (null = unassigned). */
@@ -87,14 +93,16 @@ export const leads = sqliteTable(
     })
       .notNull()
       .default(false),
-      
+
     // --- Injured person (always populated) ---
     injuredFirstName: text("injured_first_name"),
     injuredLastName: text("injured_last_name"),
     injuredPhone: text("injured_phone"),
     injuredEmail: text("injured_email"),
     /** The filler's relationship to the injured person (on-behalf leads only). */
-    relationshipToInjured: text("relationship_to_injured").$type<Relationship>(),
+    relationshipToInjured: text(
+      "relationship_to_injured",
+    ).$type<Relationship>(),
 
     // --- Accident / case facts ---
     /** Accident date, stored as a Unix timestamp (seconds). */
@@ -114,6 +122,10 @@ export const leads = sqliteTable(
 
     // --- Attribution / tracking ---
     source: text("source"),
+    /** `utm_medium` from the ad that brought the visitor in, stored verbatim. */
+    medium: text("medium"),
+    /** `utm_content` from the ad that brought the visitor in, stored verbatim. */
+    content: text("content"),
     ipaddress: text("ipaddress"),
     trustedform: text("trustedform"),
     jornaya: text("jornaya"),
@@ -125,7 +137,11 @@ export const leads = sqliteTable(
     sentToFirmAt: integer("sent_to_firm_at", { mode: "timestamp" }),
   },
   (table) => [
-    uniqueIndex("leads_matter_id_unique").on(table.matterId),
+    // Matter ids are unique among imported leads; web submissions leave the
+    // field empty, and several empty values must not collide.
+    uniqueIndex("leads_matter_id_unique")
+      .on(table.matterId)
+      .where(sql`${table.matterId} <> ''`),
     index("leads_stage_idx").on(table.stage),
     index("leads_assigned_to_idx").on(table.assignedToId),
     index("leads_case_type_idx").on(table.caseType),
@@ -135,14 +151,6 @@ export const leads = sqliteTable(
       "leads_relationship_check",
       sql`${table.relationshipToInjured} in (${sql.join(
         RELATIONSHIPS.map((value) => sql.raw(`'${value}'`)),
-        sql`, `,
-      )})`,
-    ),
-    // Enforce the fixed case-type set at the storage level (NULL is allowed).
-    check(
-      "leads_case_type_check",
-      sql`${table.caseType} in (${sql.join(
-        CASE_TYPES.map((value) => sql.raw(`'${value}'`)),
         sql`, `,
       )})`,
     ),

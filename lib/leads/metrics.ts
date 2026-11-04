@@ -11,17 +11,9 @@
  * much is in front of me, what is unclaimed, what is new, and what is waiting on
  * an action.
  */
-import {
-  and,
-  count,
-  desc,
-  eq,
-  gte,
-  isNull,
-  type SQL,
-} from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { LEAD_STAGES, leads, type CaseType, type LeadStage } from "@/lib/db/schema";
+import { LEAD_STAGES, leads, type LeadStage } from "@/lib/db/schema";
 import type { Actor } from "@/lib/rbac";
 import { leadsVisibilityCondition } from "./queries";
 
@@ -46,7 +38,10 @@ export interface LeadMetrics {
 }
 
 /** Count the visible leads matching `conditions`. */
-function countVisible(actor: Actor, ...conditions: Array<SQL | undefined>): number {
+function countVisible(
+  actor: Actor,
+  ...conditions: Array<SQL | undefined>
+): number {
   return (
     getDb()
       .select({ value: count() })
@@ -100,7 +95,7 @@ export function leadMetrics(actor: Actor): LeadMetrics {
 export interface RecentLead {
   id: number;
   injuredName: string | null;
-  caseType: CaseType | null;
+  caseType: string | null;
   stage: LeadStage;
   createdAt: Date | null;
 }

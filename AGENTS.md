@@ -55,11 +55,23 @@ their Lawmatics CRM.
 - Person data is split by role: `injured*` is always the injured person; `filler*` is
   the form submitter, populated only when `isFillingForSomeoneElse` is true (never
   duplicated). Brightwater receives the injured person's details.
-- `case_type` is `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in `lib/labels.ts`).
+- `case_type` is normally `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in
+  `lib/labels.ts`), but an ad campaign we do not recognise is stored **verbatim** in this
+  column, so read it through `caseTypeLabel()` rather than indexing `CASE_TYPE_LABELS`
+  directly. The grid's `OTHER` filter is a bucket: it returns every stored case type that
+  is not `MVA` or `MASS_TORT`, including those raw campaign values.
 - Public intake: the form posts to `POST /api/public/leads` (unauthenticated, allow-listed
   in `proxy.ts`, validated by `lib/leads/intake.ts`); every other API route is protected
   by the session cookie — except `/api/mcp`, which authenticates itself with a bearer
   access token (see **MCP server**) and is allow-listed in `proxy.ts` for that reason.
+- Ad tracking: the form reads `utm_source`, `utm_campaign`, `utm_medium` and `utm_content`
+  from the landing URL and posts them as `tracking`; `lib/leads/utm.ts` holds the mappings
+  (`google` → `Google Ads`, `mva` → `MVA`, …) and is shared by the preselect and the
+  server, so both agree. `utm_source` becomes `source` (unmapped values stored as-is;
+  with no `utm_source` the source stays empty), `utm_campaign` preselects the case type
+  on step 2 when recognised, and `utm_medium` / `utm_content` are stored verbatim in the
+  `medium` / `content` columns for later analytics. Tracking is never fatal: junk or
+  missing params cannot block a submission.
 
 ## Data layer
 - Schema: one file per table in `lib/db/schema/`, re-exported by `lib/db/schema/index.ts`.
@@ -72,6 +84,13 @@ their Lawmatics CRM.
   session timestamps) are stored as **Unix timestamps in seconds** (Drizzle `timestamp` mode).
 - Phone numbers are normalised to `(XXX) XXX-XXXX`.
 - `relationship_to_injured` is a fixed set (`RELATIONSHIPS`), enforced by a CHECK.
+  `case_type` has **no** CHECK: it also carries raw campaign values (see Domain rules).
+- `source`, `medium` and `content` are attribution fields (admin-only like the rest):
+  `source` comes from `utm_source` via `lib/leads/utm.ts`, while `medium` and `content`
+  are the raw `utm_medium` / `utm_content` values, stored only for later analytics.
+- `matter_id` is the Lawmatics business key and is only meaningful on imported leads.
+  Public form submissions store an empty string; the unique index is partial
+  (`WHERE matter_id <> ''`) so any number of those can coexist.
 - `state` (2-letter code) and `county` are validated against the fixed lists in
   `lib/us-states.ts` / `lib/us-counties.ts`; the seeder throws on anything unrecognised.
 - Passwords are a single `scrypt$params$salt$hash` string (per-user salt).
@@ -163,6 +182,15 @@ their Lawmatics CRM.
   question waiting in the composer; `chat-thread.tsx` folds that prompt in during render,
   keyed by a counter, rather than in an effect. The header button and the suggestions
   call the same handle — never add a second way to open the panel.
+- The **lead detail dialog** (`app/(app)/leads/lead-dialog.tsx`) auto-saves: every
+  editable field writes through `saveLeadFields` (`lib/leads/actions.ts`) as it changes,
+  so there is no Save button. Text fields debounce, selects and the date save
+  immediately, and `use-lead-autosave.ts` queues writes so an older patch cannot land
+  after a newer one; the footer reports "Saving…" / "Saved". The Lawmatics id,
+  attribution, and Brightwater submission facts stay read-only by design. An agent
+  claims or releases a lead with a button (they can only ever assign themselves);
+  an admin keeps the full assignee selector. State is shown as "Colorado (CO)" via
+  `stateLabel()`.
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the
@@ -178,6 +206,10 @@ their Lawmatics CRM.
   the shell renders the viewer's name in the sidebar.
 
 ## Conventions
+- **Dates use `DatePicker`** (`components/ui/date-picker.tsx`), never a native
+  `<input type="date">`: the trigger reads like an input, month/year are dropdowns, and
+  day cells are sized for touch in `components/ui/calendar.tsx`. Every calendar in the
+  app goes through that pair.
 - **While the schema is still being built, do not stack migrations** — regenerate the single
   `drizzle/0000_*.sql` instead (delete `drizzle/` and run `npm run db:generate`). Add
   incremental migrations only once the schema is frozen.

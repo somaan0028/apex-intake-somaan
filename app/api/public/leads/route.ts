@@ -4,7 +4,6 @@ import { toNullableDate } from "@/lib/db/normalize";
 import { leads, type NewLead } from "@/lib/db/schema";
 import {
   INTAKE_FIELD_LABELS,
-  WEB_SOURCE,
   validateIntakeSubmission,
 } from "@/lib/leads/intake";
 
@@ -45,7 +44,8 @@ export async function POST(request: Request) {
 
   // Field names already mirror the columns, so the insert is near-direct.
   const lead: NewLead = {
-    matterId: `WEB-${crypto.randomUUID()}`,
+    // Matter ids come from the Lawmatics export; a public submission has none.
+    matterId: "",
     createdAt: new Date(),
     caseType: data.caseType,
     stage: "NEW",
@@ -69,7 +69,9 @@ export async function POST(request: Request) {
     isAtFault: data.isAtFault,
     hasAttorney: data.hasAttorney,
     hasReceivedSettlement: data.hasReceivedSettlement,
-    source: WEB_SOURCE,
+    source: data.source,
+    medium: data.medium,
+    content: data.content,
   };
 
   try {

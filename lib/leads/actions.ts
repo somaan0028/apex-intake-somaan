@@ -3,69 +3,41 @@
 /**
  * Server Actions for editing a lead.
  *
- * These are thin HTTP-facing wrappers: they parse the form payload, hand the
- * work to the shared service in `lib/leads/service.ts` (which the AI tools also
- * call), and revalidate the grid. The service re-checks every change against the
- * row freshly loaded from the database — the dialog's disabled controls are a
+ * These are thin HTTP-facing wrappers: they parse the payload, hand the work to
+ * the shared service in `lib/leads/service.ts` (which the AI tools also call),
+ * and revalidate the grid. The service re-checks every change against the row
+ * freshly loaded from the database — the dialog's disabled controls are a
  * convenience, not the boundary.
  */
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
-import { LEAD_STAGES, type LeadStage } from "@/lib/db/schema";
-import { UNASSIGNED } from "./constants";
+import type { LeadFieldPatch } from "./editable";
 import {
+  saveLeadFieldsForActor,
   sendLeadForActor,
-  updateLeadForActor,
   type LeadMutationResult,
   type SendLeadResult,
 } from "./service";
 
 export type { LeadMutationResult as LeadActionResult, SendLeadResult };
 
-function readText(formData: FormData, key: string): string {
-  return String(formData.get(key) ?? "").trim();
-}
-
-function isLeadStage(value: string): value is LeadStage {
-  return (LEAD_STAGES as readonly string[]).includes(value);
-}
-
 /**
- * Parses the assignee select value: the unassigned sentinel (or blank) becomes
- * `null`, a numeric id becomes a number, anything else is rejected.
+ * Auto-save one or more editable fields of a lead.
+ *
+ * The dialog sends only the fields that changed. The service canonicalises and
+ * validates them, and refuses any field the signed-in user may not edit.
  */
-function parseAssignee(value: string): number | null | undefined {
-  if (value === "" || value === UNASSIGNED) return null;
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : undefined;
-}
-
-/** Update the editable fields of a lead — its stage and its assignee. */
-export async function updateLead(
-  formData: FormData,
+export async function saveLeadFields(
+  id: number,
+  patch: LeadFieldPatch,
 ): Promise<LeadMutationResult> {
   const actor = await requireUser();
 
-  const id = Number(readText(formData, "id"));
   if (!Number.isInteger(id) || id <= 0) {
     return { ok: false, error: "Unknown lead." };
   }
 
-  const stageValue = readText(formData, "stage");
-  if (!isLeadStage(stageValue)) {
-    return { ok: false, error: "Unknown stage." };
-  }
-
-  const assignee = parseAssignee(readText(formData, "assignedToId"));
-  if (assignee === undefined) {
-    return { ok: false, error: "Unknown assignee." };
-  }
-
-  const result = updateLeadForActor(actor, {
-    id,
-    stage: stageValue,
-    assignedToId: assignee,
-  });
+  const result = saveLeadFieldsForActor(actor, id, patch);
   if (result.ok) revalidatePath("/leads");
   return result;
 }
@@ -76,7 +48,7 @@ export async function sendLeadToFirm(
 ): Promise<SendLeadResult> {
   const actor = await requireUser();
 
-  const id = Number(readText(formData, "id"));
+  const id = Number(String(formData.get("id") ?? "").trim());
   if (!Number.isInteger(id) || id <= 0) {
     return { ok: false, error: "Unknown lead." };
   }
