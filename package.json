@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 8080",
+    "setup": "tsx scripts/setup.ts",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:reset": "tsx scripts/reset-db.ts",

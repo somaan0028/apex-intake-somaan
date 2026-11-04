@@ -44,6 +44,15 @@ their Lawmatics CRM.
 - MCP: `@modelcontextprotocol/server` (SDK v2) serving that same tool layer to external
   agents over Streamable HTTP at `POST|GET|DELETE /api/mcp`
 
+## Setup
+- A clean clone runs with `./start.sh`: install, `npm run setup`, build, then serve on
+  port 8080. Development stays on 3000.
+- `scripts/setup.ts` writes `.env` with only the two required keys and seeds the
+  database when it is absent. It keeps real values across reruns; optional settings
+  (`DATABASE_PATH`, `AUTH_COOKIE_SECURE`, `AI_MODEL`) belong in `.env.local`.
+- Placeholder credentials satisfy the boot check, but the AI assistant and Brightwater
+  need real values. Pass them in the shell or edit `.env`.
+
 ## Domain rules
 - Roles: `ADMIN` (all leads, any stage, assign, send, manage users) and `USER`
   (unassigned + own leads, up to `RETAINED`).
