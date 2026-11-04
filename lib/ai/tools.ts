@@ -246,11 +246,15 @@ export function buildAiTools(actor: Actor) {
   }).server(async (input) =>
     guarded(async () => {
       const lead = requireVisibleLead(actor, input.leadId);
-      const result = updateLeadForActor(actor, {
-        id: lead.id,
-        stage: input.stage,
-        assignedToId: lead.assignedToId,
-      });
+      const result = updateLeadForActor(
+        actor,
+        {
+          id: lead.id,
+          stage: input.stage,
+          assignedToId: lead.assignedToId,
+        },
+        { isAi: true },
+      );
       return result.ok
         ? { ok: true, leadId: lead.id, stage: LEAD_STAGE_LABELS[input.stage] }
         : { error: result.error ?? "The stage could not be changed." };
@@ -275,11 +279,15 @@ export function buildAiTools(actor: Actor) {
   }).server(async (input) =>
     guarded(async () => {
       const lead = requireVisibleLead(actor, input.leadId);
-      const result = updateLeadForActor(actor, {
-        id: lead.id,
-        stage: lead.stage,
-        assignedToId: input.assigneeUserId,
-      });
+      const result = updateLeadForActor(
+        actor,
+        {
+          id: lead.id,
+          stage: lead.stage,
+          assignedToId: input.assigneeUserId,
+        },
+        { isAi: true },
+      );
       return result.ok
         ? {
             ok: true,
@@ -320,7 +328,9 @@ export function buildAiTools(actor: Actor) {
     }),
   }).server(async (input) =>
     guarded(async () => {
-      const result = await sendLeadForActor(actor, input.leadId);
+      const result = await sendLeadForActor(actor, input.leadId, {
+        isAi: true,
+      });
       if (!result.ok)
         return { error: result.error ?? "The lead could not be sent." };
       return {

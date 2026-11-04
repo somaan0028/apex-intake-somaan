@@ -41,7 +41,6 @@ import {
   SlidersHorizontal,
   Table2,
   Trash2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -50,11 +49,14 @@ import {
   type DataTableFilter,
 } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
+import {
+  DATE_RANGE_PRESET_OPTIONS,
+  DateRangeFilter,
+} from "@/components/date-range-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CopyButton } from "@/components/ui/copy-button";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -164,13 +166,6 @@ const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
 const KANBAN_SORT_OPTIONS = [
   { label: "Newest to Oldest", value: "newest" },
   { label: "Oldest to Newest", value: "oldest" },
-];
-
-const ADDED_PRESET_OPTIONS = [
-  { label: "Within 24 hours", value: "24h" },
-  { label: "Within 3 days", value: "3d" },
-  { label: "Within 7 days", value: "7d" },
-  { label: "Custom range", value: "custom" },
 ];
 
 /** Sentinel for "no filter" in the compact panel's selects. */
@@ -806,6 +801,8 @@ export function LeadsTable({
 
   const dateFilter = (
     <DateRangeFilter
+      label="Added"
+      options={DATE_RANGE_PRESET_OPTIONS}
       preset={addedPreset}
       from={query.filters.addedFrom ?? defaultAddedFrom()}
       to={query.filters.addedTo ?? ""}
@@ -2030,80 +2027,3 @@ function StageVisibilityMenu({
   );
 }
 
-/** The added-date range. The lower bound is required; the upper is optional. */
-function DateRangeFilter({
-  preset,
-  from,
-  to,
-  onPresetChange,
-  onChange,
-}: {
-  preset: string;
-  from: string;
-  to: string;
-  onPresetChange: (preset: string) => void;
-  onChange: (from: string, to: string) => void;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
-        Added
-      </span>
-      <Select
-        items={ADDED_PRESET_OPTIONS}
-        value={preset}
-        onValueChange={(value) => {
-          if (value) onPresetChange(value);
-        }}
-      >
-        <SelectTrigger size="sm" className="w-40" aria-label="Added date range">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {ADDED_PRESET_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {preset === "custom" ? (
-        <div className="flex items-center gap-1.5">
-          <DatePicker
-            value={from}
-            max={to || today}
-            placeholder="From"
-            className="h-8 w-36"
-            onChange={(value) => {
-              if (!value) return;
-              onChange(value, to && to < value ? value : to);
-            }}
-          />
-          <span className="text-sm text-muted-foreground">to</span>
-          <DatePicker
-            value={to}
-            min={from || undefined}
-            max={today}
-            placeholder="Any date"
-            className="h-8 w-36"
-            onChange={(value) => onChange(from, value)}
-          />
-          {to ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Clear end date"
-              onClick={() => onChange(from, "")}
-            >
-              <X />
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}

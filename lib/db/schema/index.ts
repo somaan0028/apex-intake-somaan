@@ -6,6 +6,7 @@
  */
 export * from "./users";
 export * from "./leads";
+export * from "./activities";
 export * from "./sessions";
 export * from "./api-tokens";
 export * from "./chats";

@@ -10,6 +10,7 @@
  */
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { recordActivity } from "@/lib/activities/record";
 import {
   ForbiddenError,
   requirePermission,
@@ -104,15 +105,25 @@ export async function createUser(
       .get();
     if (existing) return { ok: false, error: "That email is already in use." };
 
-    db.insert(users)
-      .values({
-        name: parsed.name,
-        email: parsed.email,
-        role: parsed.role,
-        passwordHash: hashPassword(parsed.password),
-        createdAt: new Date(),
-      })
-      .run();
+    db.transaction(() => {
+      const created = db
+        .insert(users)
+        .values({
+          name: parsed.name,
+          email: parsed.email,
+          role: parsed.role,
+          passwordHash: hashPassword(parsed.password),
+          createdAt: new Date(),
+        })
+        .returning({ id: users.id })
+        .get();
+
+      recordActivity({
+        type: "user:added",
+        doerId: actor.id,
+        userId: created.id,
+      });
+    });
 
     revalidatePath("/users");
     return { ok: true };
@@ -203,7 +214,14 @@ export async function deleteUser(
       };
     }
 
-    db.delete(users).where(eq(users.id, id)).run();
+    db.transaction(() => {
+      db.delete(users).where(eq(users.id, id)).run();
+      recordActivity({
+        type: "user:deleted",
+        doerId: actor.id,
+        userId: id,
+      });
+    });
 
     revalidatePath("/users");
     return { ok: true };

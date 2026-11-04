@@ -17,6 +17,7 @@ import {
   requireLeadStageChange,
   requireLeadView,
 } from "@/lib/auth/authorize";
+import { recordActivity } from "@/lib/activities/record";
 import { sendLeadToBrightwater } from "@/lib/brightwater";
 import { getDb } from "@/lib/db";
 import {
@@ -41,6 +42,15 @@ import type { LeadFieldPatch } from "./editable";
 export interface LeadMutationResult {
   ok: boolean;
   error?: string;
+}
+
+/**
+ * How a mutation was requested. The UI leaves this empty; the AI/MCP tool
+ * layer sets `isAi` so the activity log can tell the two apart without
+ * changing who the doer is.
+ */
+export interface LeadMutationOptions {
+  isAi?: boolean;
 }
 
 /** Result of a firm submission; on success carries the recorded values. */
@@ -114,10 +124,14 @@ function sameValue(current: unknown, next: unknown): boolean {
 export function updateLeadForActor(
   actor: Actor,
   input: { id: number } & LeadUpdate,
+  options: LeadMutationOptions = {},
 ): LeadMutationResult {
   try {
-    const lead = requireVisibleLead(actor, input.id);
-    return applyLeadUpdate(actor, lead, input);
+    // `id` selects the row; it is not an editable field and must not be treated
+    // as one (otherwise claiming a lead would require full edit rights).
+    const { id, ...update } = input;
+    const lead = requireVisibleLead(actor, id);
+    return applyLeadUpdate(actor, lead, update, options);
   } catch (error) {
     if (error instanceof ForbiddenError)
       return { ok: false, error: error.message };
@@ -278,6 +292,7 @@ function applyLeadUpdate(
   actor: Actor,
   lead: Lead,
   update: LeadUpdate,
+  options: LeadMutationOptions = {},
 ): LeadMutationResult {
   const validated = validateLeadUpdate(lead, update);
   if (!validated.ok) return validated;
@@ -327,7 +342,58 @@ function applyLeadUpdate(
 
   if (Object.keys(set).length === 0) return { ok: true };
 
-  getDb().update(leads).set(set).where(eq(leads.id, lead.id)).run();
+  getDb().transaction(() => {
+    getDb().update(leads).set(set).where(eq(leads.id, lead.id)).run();
+
+    if (stageChanged) {
+      recordActivity({
+        type: "lead:stage_update",
+        leadId: lead.id,
+        doerId: actor.id,
+        isAi: options.isAi,
+        from: lead.stage,
+        to: update.stage!,
+      });
+    }
+
+    if (assigneeChanged) {
+      const next = update.assignedToId ?? null;
+      if (next === null) {
+        if (lead.assignedToId === actor.id) {
+          recordActivity({
+            type: "lead:released",
+            leadId: lead.id,
+            doerId: actor.id,
+            isAi: options.isAi,
+          });
+        } else {
+          recordActivity({
+            type: "lead:unassigned",
+            leadId: lead.id,
+            doerId: actor.id,
+            isAi: options.isAi,
+            userId: lead.assignedToId,
+          });
+        }
+      } else if (lead.assignedToId === null && next === actor.id) {
+        recordActivity({
+          type: "lead:claimed",
+          leadId: lead.id,
+          doerId: actor.id,
+          isAi: options.isAi,
+        });
+      } else {
+        recordActivity({
+          type: "lead:assigned",
+          leadId: lead.id,
+          doerId: actor.id,
+          isAi: options.isAi,
+          userId: next,
+        });
+      }
+    }
+  });
+
   return { ok: true };
 }
 
@@ -564,12 +630,13 @@ export function saveLeadFieldsForActor(
   actor: Actor,
   id: number,
   patch: LeadFieldPatch,
+  options: LeadMutationOptions = {},
 ): LeadMutationResult {
   try {
     const lead = requireVisibleLead(actor, id);
     const normalized = normalizeLeadPatch(lead, patch);
     if (!normalized.ok) return normalized;
-    return applyLeadUpdate(actor, lead, normalized.update);
+    return applyLeadUpdate(actor, lead, normalized.update, options);
   } catch (error) {
     if (error instanceof ForbiddenError)
       return { ok: false, error: error.message };
@@ -589,16 +656,43 @@ export function saveLeadFieldsForActor(
 export async function sendLeadForActor(
   actor: Actor,
   id: number,
+  options: LeadMutationOptions = {},
 ): Promise<SendLeadResult> {
+  let lead: Lead;
   try {
-    const lead = requireVisibleLead(actor, id);
+    lead = requireVisibleLead(actor, id);
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
+
+  // A refusal before the network call is not a submission; it is not logged.
+  try {
     requireLeadSend(actor, lead);
     requireLeadReadyToSend(lead);
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
 
-    const result = await sendLeadToBrightwater(lead);
-    if (!result.ok) return { ok: false, error: result.error };
+  const result = await sendLeadToBrightwater(lead);
+  if (!result.ok) {
+    recordActivity({
+      type: "lead:send_to_firm",
+      leadId: lead.id,
+      doerId: actor.id,
+      isAi: options.isAi,
+      succeeded: false,
+    });
+    return { ok: false, error: result.error };
+  }
 
-    const sentToFirmAt = new Date();
+  const sentToFirmAt = new Date();
+  let recorded = false;
+
+  getDb().transaction(() => {
     const update = getDb()
       .update(leads)
       .set({
@@ -615,14 +709,30 @@ export async function sendLeadForActor(
       )
       .run();
 
-    if (update.changes === 0) {
-      return { ok: false, error: "This lead was already sent to the firm." };
-    }
+    if (update.changes === 0) return;
+    recorded = true;
 
-    return { ok: true, sentToFirmAt, brightwaterLeadId: result.leadId };
-  } catch (error) {
-    if (error instanceof ForbiddenError)
-      return { ok: false, error: error.message };
-    throw error;
+    recordActivity({
+      type: "lead:send_to_firm",
+      leadId: lead.id,
+      doerId: actor.id,
+      isAi: options.isAi,
+      succeeded: true,
+    });
+  });
+
+  if (!recorded) {
+    // Someone else recorded a send between our read and our update. The firm
+    // request did go out, so this is still a failed submission attempt.
+    recordActivity({
+      type: "lead:send_to_firm",
+      leadId: lead.id,
+      doerId: actor.id,
+      isAi: options.isAi,
+      succeeded: false,
+    });
+    return { ok: false, error: "This lead was already sent to the firm." };
   }
+
+  return { ok: true, sentToFirmAt, brightwaterLeadId: result.leadId };
 }

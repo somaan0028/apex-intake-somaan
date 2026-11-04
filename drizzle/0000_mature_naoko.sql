@@ -1,3 +1,18 @@
+CREATE TABLE `activities` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`type` text NOT NULL,
+	`description` text NOT NULL,
+	`doer_id` integer NOT NULL,
+	`is_ai` integer DEFAULT false NOT NULL,
+	`lead_id` integer,
+	`user_id` integer,
+	`created_at` integer NOT NULL,
+	CONSTRAINT "activities_type_check" CHECK("activities"."type" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'user:added', 'user:deleted'))
+);
+--> statement-breakpoint
+CREATE INDEX `activities_doer_created_idx` ON `activities` (`doer_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `activities_lead_id_idx` ON `activities` (`lead_id`);--> statement-breakpoint
+CREATE INDEX `activities_created_at_idx` ON `activities` (`created_at`);--> statement-breakpoint
 CREATE TABLE `api_tokens` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` integer NOT NULL,

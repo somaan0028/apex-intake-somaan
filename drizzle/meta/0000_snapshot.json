@@ -1,9 +1,104 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "096daae2-cd57-44c6-84e1-09e54e927ee7",
+  "id": "95f43e44-4a5c-43ce-974d-69d2539896b7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "activities": {
+      "name": "activities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "doer_id": {
+          "name": "doer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_ai": {
+          "name": "is_ai",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "lead_id": {
+          "name": "lead_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "activities_doer_created_idx": {
+          "name": "activities_doer_created_idx",
+          "columns": [
+            "doer_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "activities_lead_id_idx": {
+          "name": "activities_lead_id_idx",
+          "columns": [
+            "lead_id"
+          ],
+          "isUnique": false
+        },
+        "activities_created_at_idx": {
+          "name": "activities_created_at_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "activities_type_check": {
+          "name": "activities_type_check",
+          "value": "\"activities\".\"type\" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'user:added', 'user:deleted')"
+        }
+      }
+    },
     "api_tokens": {
       "name": "api_tokens",
       "columns": {

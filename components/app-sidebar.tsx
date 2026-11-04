@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   ChartColumn,
   ChevronsUpDown,
   ClipboardList,
@@ -80,11 +81,7 @@ const ACCOUNT_ITEMS: ReadonlyArray<{
   url: string;
   icon: typeof LayoutDashboard;
   permission: Permission | null;
-}> = [
-  { title: "Profile", url: "/profile", icon: UserRound, permission: null },
-  // Everyone manages their own access tokens, so this is not permission-gated.
-  { title: "Settings", url: "/settings", icon: Settings, permission: null },
-];
+}> = [{ title: "Profile", url: "/profile", icon: UserRound, permission: null }];
 
 export function AppSidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
@@ -126,7 +123,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
@@ -142,9 +139,37 @@ export function AppSidebar({ user }: { user: AuthUser }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Activity and Settings sit at the bottom, just above the account menu. */}
+        <SidebarGroup className="mt-auto pb-1">
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isCurrent("/activity")}
+                  tooltip="Activity"
+                  render={<Link href="/activity" />}
+                >
+                  <Activity />
+                  <span>Activity</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isCurrent("/settings")}
+                  tooltip="Settings"
+                  render={<Link href="/settings" />}
+                >
+                  <Settings />
+                  <span>Settings</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="pt-1">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -155,7 +180,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   <SidebarMenuButton
                     size="lg"
                     tooltip={user.name}
-                    className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+                    className="border border-sidebar-border data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
                   />
                 }
               >
