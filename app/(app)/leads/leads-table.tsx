@@ -89,6 +89,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CASE_TYPE_LABELS,
   LEAD_STAGE_LABELS,
@@ -1008,11 +1009,19 @@ export function LeadsTable({
         showColumnMenu={view === "table"}
         renderContent={
           view === "kanban" ? (
-            <LeadsKanban
-              leads={leads}
-              hiddenStages={hiddenStages}
-              onOpen={(lead) => setSelected(lead)}
-            />
+            viewsReady ? (
+              <LeadsKanban
+                leads={leads}
+                hiddenStages={hiddenStages}
+                onOpen={(lead) => setSelected(lead)}
+              />
+            ) : (
+              // The saved stages live in localStorage, so the server cannot know
+              // them on the first paint. Hold the board until the mount effect
+              // has read them, or every stage would flash before the saved
+              // selection applies.
+              <KanbanSkeleton />
+            )
           ) : undefined
         }
         onRowClick={
@@ -1556,6 +1565,35 @@ const STAGE_COLOR: Record<LeadStage, string> = {
   SENT_TO_FIRM: "var(--stage-sent_to_firm)",
   DISQUALIFIED: "var(--stage-disqualified)",
 };
+
+/**
+ * The board's first-paint stand-in.
+ *
+ * Stage visibility is browser-local, so the server render cannot know which
+ * columns to show. Drawing the columns from `hiddenStages` immediately would
+ * flash every stage before the restore effect runs; this keeps the space and
+ * shows no stage names until the saved state is ready.
+ */
+function KanbanSkeleton() {
+  return (
+    <div className="flex min-h-[calc(100svh-13rem)] items-start gap-2.5 overflow-hidden pr-4 pb-2 xl:min-h-[calc(100svh-17rem)]">
+      <p role="status" className="sr-only">
+        Loading your board…
+      </p>
+      {LEAD_STAGES.map((stage) => (
+        <div
+          key={stage}
+          aria-hidden
+          className="flex min-w-52 flex-1 flex-col gap-2 rounded-xl border bg-muted/20 p-2.5"
+        >
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * The Kanban board.

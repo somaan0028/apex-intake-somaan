@@ -202,9 +202,7 @@ their Lawmatics CRM.
   attribution, and Brightwater submission facts stay read-only by design. On a
   lead filed for someone else, the filler's name, phone, email and relationship
   are editable under the same `leads.edit.*` permission as the injured person's
-  fields. On laptop widths the sections spread across a wide grid, so the whole
-  record is visible without scrolling; below that it stays one column with its
-  own scroll area. An agent
+  fields. An agent
   claims or releases a lead with a button (they can only ever assign themselves);
   an admin keeps the full assignee selector. State is shown as "Colorado (CO)" via
   `stateLabel()`. The stage and assignee are also editable inline in the grid
@@ -233,7 +231,9 @@ their Lawmatics CRM.
   stages, page). A bare `/leads` visit restores the last state and its saved view;
   a URL with filters is treated as explicit. The heart opens the save dialog and
   stays red only while the page still matches that saved view. **Clear Filters**
-  resets the filter values and search but never deletes a saved view.
+  resets the filter values and search but never deletes a saved view. Stage
+  visibility is browser-local too, so the Kanban board shows a skeleton until the
+  mount effect has read it; without that, every stage would flash on refresh.
 - Below `xl`, the leads toolbar collapses into one **Options** sheet: search stays
   inline, and view, sort, saved views, filters, columns, stages, and Clear all
   move into the sheet. `DataTable`'s `mobileControls` prop owns that switch, and
