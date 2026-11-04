@@ -1,20 +1,29 @@
 "use client";
 
 /**
- * The assistant entry point: a button in the header that slides a chat panel in
- * from the right.
+ * The assistant panel, its entry point, and the handle pages open it through.
  *
- * The panel is deliberately **non-modal**: it floats over the page without a
- * dimming backdrop or a blur, the page behind stays usable, and it only closes
- * when the user closes it. Clicking elsewhere — or moving to another page, since
- * it lives in the app shell — leaves it open, so it feels like a teammate that
- * travels with you rather than a task you enter and leave.
+ * The panel lives in the app shell and is deliberately **non-modal**: it floats
+ * over the page without a dimming backdrop or a blur, the page behind stays
+ * usable, and it only closes when the user closes it. Clicking elsewhere — or
+ * moving to another page, since it lives in the shell — leaves it open, so it
+ * feels like a teammate that travels with you rather than a task you enter and
+ * leave.
  *
- * It also owns the conversation list: which chat is open, the "past chats" view,
- * and starting or deleting a conversation.
+ * `AiAssistantProvider` owns the state and publishes `open(prompt)` through
+ * context (`./assistant-context`), so a page like the Overview can open the
+ * panel with a suggested question already in the composer. It also owns the
+ * conversation list: which chat is open, the "past chats" view, and starting or
+ * deleting a conversation.
  */
 import { History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -27,7 +36,8 @@ import { getChatList, loadChat, removeChat } from "@/lib/ai/actions";
 import type { ChatSummary, StoredMessage } from "@/lib/ai/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ChatThread } from "./chat-thread";
+import { AiAssistantContext, useAiAssistant } from "./assistant-context";
+import { ChatThread, type ComposerDraft } from "./chat-thread";
 
 /** Remembers the conversation to reopen, so a page reload resumes it. */
 const LAST_CHAT_KEY = "apex.ai.lastChatId";
@@ -37,7 +47,28 @@ function newChatId(): string {
   return crypto.randomUUID();
 }
 
-export function AiAssistant() {
+/** The header button. Kept separate so the provider can wrap the whole shell. */
+export function AiAssistantButton() {
+  const { open } = useAiAssistant();
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="ml-auto"
+      // Stable hook for automation; the label below is what users hear.
+      id="open-ai-assistant"
+      aria-label="Open the AI assistant"
+      title="AI assistant"
+      onClick={() => open()}
+    >
+      <Sparkles />
+    </Button>
+  );
+}
+
+export function AiAssistantProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -45,6 +76,7 @@ export function AiAssistant() {
   const [initialMessages, setInitialMessages] = useState<StoredMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ComposerDraft>({ text: "", seq: 0 });
 
   // Remember the active conversation; this is a state → external-system sync,
   // so an effect is the right place for it.
@@ -89,11 +121,11 @@ export function AiAssistant() {
   }, []);
 
   /**
-   * Opening the panel is a user action, so the bootstrap runs here rather than
+   * Showing the panel is a user action, so the bootstrap runs here rather than
    * in an effect: resume the conversation the user last had, else the most
    * recent one, else start fresh.
    */
-  const handleOpen = useCallback(() => {
+  const reveal = useCallback(() => {
     setOpen(true);
     if (chatId !== null) {
       void refreshChats();
@@ -114,6 +146,19 @@ export function AiAssistant() {
       .catch(() => startChat());
   }, [chatId, openChat, refreshChats, startChat]);
 
+  /** The handle pages use: show the panel, optionally with a question waiting. */
+  const openWithPrompt = useCallback(
+    (prompt?: string) => {
+      if (prompt) {
+        setDraft((previous) => ({ text: prompt, seq: previous.seq + 1 }));
+      }
+      reveal();
+    },
+    [reveal],
+  );
+
+  const handle = useMemo(() => ({ open: openWithPrompt }), [openWithPrompt]);
+
   const deleteChat = useCallback(
     async (id: string) => {
       await removeChat(id);
@@ -131,18 +176,8 @@ export function AiAssistant() {
   );
 
   return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="ml-auto"
-        aria-label="Open the AI assistant"
-        title="AI assistant"
-        onClick={handleOpen}
-      >
-        <Sparkles />
-      </Button>
+    <AiAssistantContext.Provider value={handle}>
+      {children}
 
       <Sheet
         open={open}
@@ -246,11 +281,12 @@ export function AiAssistant() {
               key={chatId}
               chatId={chatId}
               initialMessages={initialMessages}
+              draft={draft}
               onTurnComplete={() => void refreshChats()}
             />
           ) : null}
         </SheetContent>
       </Sheet>
-    </>
+    </AiAssistantContext.Provider>
   );
 }

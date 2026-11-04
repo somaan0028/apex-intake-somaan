@@ -142,8 +142,56 @@ their Lawmatics CRM.
   into the first object type-checks and silently buries it inside `serverInfo` on the
   wire, where no client reads it — the option belongs in the second argument.
 
+## Pages
+- **Overview** (`app/(app)/dashboard/`) is the at-a-glance page: headline numbers, the
+  pipeline, the newest intake, and the assistant's invitation. Every number comes from
+  `lib/leads/metrics.ts`, which scopes its counts with the same
+  `leadsVisibilityCondition` the grid uses, so an agent's totals never include leads they
+  could not open. The counts each link into the pre-filtered grid
+  (`/leads?filter.<columnId>=<value>`), and the "ready for Brightwater" callout is shown
+  only to a role that can actually send.
+- The **pipeline** is one stacked bar rather than a bar per stage: the stages are a
+  composition of a single total, so a shared bar compares them at a glance, and no label
+  has to fit inside a 1%-wide segment. Each segment carries a `title` and an
+  `aria-label`, and the legend below states every value and share. Segment colours are
+  `--stage-*` variables in `app/globals.css` — defined per theme there, because the
+  stages must stay distinguishable side by side, which opacity on one colour cannot do.
+  Adding a stage means adding a variable in both theme blocks.
+- The Overview's assistant card is a Client Component only because opening the panel is
+  an interaction. `AiAssistantProvider` (in the app shell) publishes `open(prompt)`
+  through `components/ai/assistant-context.tsx`, so any page can open the panel with a
+  question waiting in the composer; `chat-thread.tsx` folds that prompt in during render,
+  keyed by a counter, rather than in an effect. The header button and the suggestions
+  call the same handle — never add a second way to open the panel.
+- **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
+  change their own name and password, and an admin their own email and role as well. The
+  rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the
+  caller may not set instead of trusting the form — a hidden input is not a permission.
+  A password change requires the current password for everyone, admins included, and the
+  last-admin invariant still blocks a self-demotion.
+- **Profile / Settings / Log out live in the account menu**, opened by the profile button at
+  the bottom of the sidebar (`components/app-sidebar.tsx`). The trigger *is* the profile
+  row, so clicking your own name opens the menu rather than navigating on its own; the
+  menu opens upward (`side="top"`) and carries the full email, which no longer fits under
+  the name in the sidebar (that line shows the role instead).
+- A name change revalidates the whole layout (`revalidatePath("/", "layout")`), because
+  the shell renders the viewer's name in the sidebar.
+
 ## Conventions
 - **While the schema is still being built, do not stack migrations** — regenerate the single
   `drizzle/0000_*.sql` instead (delete `drizzle/` and run `npm run db:generate`). Add
   incremental migrations only once the schema is frozen.
 - Keep modules small, commented, and consistent with the existing structure.
+- Rendering `Button` as a link or any non-`<button>` needs `nativeButton={false}` (see
+  `components/ui/pagination.tsx`); without it Base UI logs an accessibility warning and
+  the rendered semantics are wrong. The inverse applies too: `DropdownMenuItem` and
+  friends default to `nativeButton={false}`, so an item that renders a real `<button>`
+  must pass `nativeButton`.
+- Base UI menu parts must be grouped: a `DropdownMenuLabel` outside a
+  `DropdownMenuGroup` throws `MenuGroupContext is missing` at runtime, not at build time,
+  so it only shows up when the menu is first opened.
+- **Restart `next dev` after editing server modules or the app shell, before trusting the
+  browser.** Edited server code has more than once kept serving the old version, and a
+  stale client bundle presents as a page that renders but does nothing — no console
+  error, no server error, event handlers simply never attach. If the UI looks dead after
+  an edit, restart the dev server first rather than debugging the component.

@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
-import { AiAssistant } from "@/components/ai/ai-assistant";
+import {
+  AiAssistantButton,
+  AiAssistantProvider,
+} from "@/components/ai/ai-assistant";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -23,16 +26,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar user={user} />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <span aria-hidden className="h-4 w-px bg-border" />
-          <span className="text-sm font-medium">Apex Intake Desk</span>
-          <AiAssistant />
-        </header>
-        <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
-      </SidebarInset>
+      {/* Wraps the shell so any page inside it can ask the assistant to open
+          (see `components/ai/assistant-context.tsx`); the panel itself lives
+          here so it survives navigation between pages. */}
+      <AiAssistantProvider>
+        <AppSidebar user={user} />
+        <SidebarInset>
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <span aria-hidden className="h-4 w-px bg-border" />
+            <span className="text-sm font-medium">Apex Intake Desk</span>
+            <AiAssistantButton />
+          </header>
+          <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
+        </SidebarInset>
+      </AiAssistantProvider>
     </SidebarProvider>
   );
 }

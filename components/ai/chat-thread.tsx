@@ -21,7 +21,13 @@ import {
   useChat,
   type UIMessage,
 } from "@tanstack/ai-react";
-import { Loader2, RotateCcw, SendHorizontal, Square, Wrench } from "lucide-react";
+import {
+  Loader2,
+  RotateCcw,
+  SendHorizontal,
+  Square,
+  Wrench,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -61,7 +67,8 @@ const STARTER_PROMPTS = [
 const MENTION_PATTERN = /(^|\s)(@|lead:|user:)([^\s]*)$/;
 
 /** Classes shared by the textarea and its mirror, so they line up exactly. */
-const INPUT_BOX = "border px-2.5 py-2 text-sm leading-6 break-words whitespace-pre-wrap";
+const INPUT_BOX =
+  "border px-2.5 py-2 text-sm leading-6 break-words whitespace-pre-wrap";
 
 /**
  * A tag in the composer.
@@ -72,7 +79,8 @@ const INPUT_BOX = "border px-2.5 py-2 text-sm leading-6 break-words whitespace-p
  * character after the tag out of line with the transparent textarea text
  * underneath, so the caret and selection would visibly drift.
  */
-const COMPOSER_TAG = "text-primary underline decoration-primary/50 underline-offset-4";
+const COMPOSER_TAG =
+  "text-primary underline decoration-primary/50 underline-offset-4";
 
 /** A tag inside a sent message, which is ordinary DOM and may style freely. */
 const MESSAGE_TAG = "font-bold";
@@ -91,7 +99,12 @@ function toInitialMessages(messages: StoredMessage[]): UIMessage[] {
 function readMentionQuery(
   value: string,
   caret: number,
-): { start: number; end: number; kind: MentionKind | null; query: string } | null {
+): {
+  start: number;
+  end: number;
+  kind: MentionKind | null;
+  query: string;
+} | null {
   const match = MENTION_PATTERN.exec(value.slice(0, caret));
   if (!match) return null;
   const trigger = match[2] ?? "";
@@ -109,7 +122,9 @@ function textOf(message: UIMessage | undefined): string {
   if (!message) return "";
   return message.parts
     .map((part) =>
-      part.type === "text" ? ((part as { content?: string }).content ?? "") : "",
+      part.type === "text"
+        ? ((part as { content?: string }).content ?? "")
+        : "",
     )
     .join("");
 }
@@ -167,7 +182,11 @@ function AssistantMessage({ message }: { message: UIMessage }) {
           state?: string;
         };
         return (
-          <ToolCallChip key={call.id ?? index} name={call.name} state={call.state} />
+          <ToolCallChip
+            key={call.id ?? index}
+            name={call.name}
+            state={call.state}
+          />
         );
       })}
       {hasText ? <Markdown content={text} /> : null}
@@ -175,13 +194,24 @@ function AssistantMessage({ message }: { message: UIMessage }) {
   );
 }
 
+/** A prompt a page asked the assistant to start with, and a counter identifying
+ * the request. The counter is what lets the composer apply each request exactly
+ * once, even if the same question is asked twice. */
+export interface ComposerDraft {
+  text: string;
+  seq: number;
+}
+
 export function ChatThread({
   chatId,
   initialMessages,
+  draft,
   onTurnComplete,
 }: {
   chatId: string;
   initialMessages: StoredMessage[];
+  /** Text to place in the composer, chosen elsewhere (e.g. Overview suggestions). */
+  draft?: ComposerDraft;
   /** Called after each completed turn, so the panel can refresh titles/order. */
   onTurnComplete?: () => void;
 }) {
@@ -200,12 +230,12 @@ export function ChatThread({
     onFinish: () => onTurnComplete?.(),
   });
 
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(draft?.text ?? "");
+  const [appliedDraftSeq, setAppliedDraftSeq] = useState(draft?.seq ?? 0);
   const [mentions, setMentions] = useState<MentionRef[]>([]);
   const [sessionMentions, setSessionMentions] = useState<MentionRef[]>([]);
-  const [mentionQuery, setMentionQuery] = useState<ReturnType<
-    typeof readMentionQuery
-  >>(null);
+  const [mentionQuery, setMentionQuery] =
+    useState<ReturnType<typeof readMentionQuery>>(null);
   const [suggestionState, setSuggestionState] = useState<{
     query: string;
     kind: MentionKind | null;
@@ -216,6 +246,15 @@ export function ChatThread({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // A question chosen elsewhere (a suggestion on the Overview page) is folded
+  // into the composer. Adjusting state during render is React's documented
+  // alternative to an effect here: the counter means each request lands exactly
+  // once, and it converges on the next render.
+  if (draft && draft.seq !== appliedDraftSeq) {
+    setAppliedDraftSeq(draft.seq);
+    setInput(draft.text);
+  }
 
   // Every reference this conversation has shown, so a tag renders as a tag when
   // a past chat is reloaded — the transcript carries its own references.
@@ -387,10 +426,9 @@ export function ChatThread({
         {isEmpty ? (
           <div className="grid gap-3 py-6">
             <p className="text-sm text-muted-foreground">
-              Ask about your leads, the team, or what needs doing next. Reference
-              a record with <span className="font-medium">@</span>, or{" "}
-              <span className="font-medium">lead:</span> /{" "}
-              <span className="font-medium">user:</span>.
+              What would you like to know? To point the assistant at a specific
+              lead or teammate, type <span className="font-medium">@</span> and
+              pick them from the list.
             </p>
             <div className="grid gap-1.5">
               {STARTER_PROMPTS.map((prompt) => (
@@ -444,7 +482,8 @@ export function ChatThread({
 
         {error ? (
           <p role="alert" className="mt-4 text-sm text-destructive">
-            {error.message || "The assistant could not reply. Please try again."}
+            {error.message ||
+              "The assistant could not reply. Please try again."}
           </p>
         ) : null}
 
@@ -454,8 +493,8 @@ export function ChatThread({
             className="mt-4 flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"
           >
             <span className="flex-1">
-              The assistant returned no reply. This is usually a temporary hiccup
-              from the model.
+              The assistant returned no reply. This is usually a temporary
+              hiccup from the model.
             </span>
             <Button
               type="button"
