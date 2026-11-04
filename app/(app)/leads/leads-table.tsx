@@ -22,8 +22,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
+  type PointerEvent as ReactPointerEvent,
   type SyntheticEvent,
 } from "react";
 import {
@@ -31,6 +33,7 @@ import {
   Columns3,
   Eye,
   FilterX,
+  GripVertical,
   Heart,
   Loader2,
   Mail,
@@ -1574,9 +1577,135 @@ function LeadsKanban({
   const { viewer, overrides, saving, save } = useLeadTable();
   const [dragId, setDragId] = useState<number | null>(null);
   const [hoverStage, setHoverStage] = useState<LeadStage | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollFrame = useRef<number | null>(null);
+  const autoScrollPoint = useRef<{
+    x: number;
+    y: number;
+    direction: number;
+  } | null>(null);
+  const pointerLead = useRef<LeadRow | null>(null);
 
   const effective = (lead: LeadRow): LeadRow =>
     applyOverride(lead, overrides[lead.id]);
+
+  /**
+   * The stage column under a screen point. Native HTML drag events carry no
+   * usable position for this, so the pointer drag (touch and mouse on the
+   * handle) hit-tests the DOM instead.
+   */
+  function stageAtPoint(x: number, y: number): LeadStage | null {
+    const element = document.elementFromPoint(x, y);
+    const column = element?.closest<HTMLElement>("[data-stage]");
+    const value = column?.dataset.stage;
+    return value && (LEAD_STAGES as readonly string[]).includes(value)
+      ? (value as LeadStage)
+      : null;
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollFrame.current !== null) {
+      cancelAnimationFrame(autoScrollFrame.current);
+      autoScrollFrame.current = null;
+    }
+    autoScrollPoint.current = null;
+  }
+
+  /** Keep the board scrolling while a drag is held near either edge. */
+  function autoScrollTick() {
+    const scroller = boardRef.current;
+    const point = autoScrollPoint.current;
+    if (!scroller || !point || point.direction === 0) {
+      autoScrollFrame.current = null;
+      return;
+    }
+    setHoverStage(stageAtPoint(point.x, point.y));
+    const before = scroller.scrollLeft;
+    scroller.scrollLeft = before + point.direction * 8;
+    // Stop at the ends instead of spinning frames that change nothing.
+    if (scroller.scrollLeft === before) {
+      autoScrollFrame.current = null;
+      return;
+    }
+    autoScrollFrame.current = requestAnimationFrame(autoScrollTick);
+  }
+
+  /** One move path for native drops and pointer drags, refusals included. */
+  function moveLead(lead: LeadRow, stage: LeadStage) {
+    const subject = effective(lead);
+    if (subject.stage === stage) return;
+
+    if (
+      stage === "SENT_TO_FIRM" &&
+      subject.sentToFirmAt === null &&
+      subject.brightwaterLeadId === null
+    ) {
+      toast.error("Can't move this lead", {
+        description: "Send it to the firm before marking it Sent to Firm.",
+      });
+      return;
+    }
+
+    if (!canChangeLeadStage(viewer, subject, stage)) {
+      toast.error("Can't move this lead", {
+        description: `You can't move it to ${LEAD_STAGE_LABELS[stage]}.`,
+      });
+      return;
+    }
+
+    void save(lead, { stage });
+  }
+
+  function startPointerDrag(
+    lead: LeadRow,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    if (saving[lead.id]) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointerLead.current = lead;
+    setDragId(lead.id);
+  }
+
+  function movePointerDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!pointerLead.current) return;
+    const { clientX: x, clientY: y } = event;
+    setHoverStage(stageAtPoint(x, y));
+
+    const scroller = boardRef.current;
+    if (!scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    // A narrow edge band scrolls the board; the rest must not move under the
+    // finger or a drop would land on a column the person never chose.
+    const edge = 32;
+    const withinBoard = y >= rect.top && y <= rect.bottom;
+    const direction = !withinBoard
+      ? 0
+      : x < rect.left + edge
+        ? -1
+        : x > rect.right - edge
+          ? 1
+          : 0;
+    autoScrollPoint.current = { x, y, direction };
+    if (direction !== 0 && autoScrollFrame.current === null) {
+      autoScrollFrame.current = requestAnimationFrame(autoScrollTick);
+    }
+  }
+
+  function endPointerDrag(
+    lead: LeadRow,
+    event: ReactPointerEvent<HTMLButtonElement>,
+    drop: boolean,
+  ) {
+    if (pointerLead.current?.id !== lead.id) return;
+    const stage = drop ? stageAtPoint(event.clientX, event.clientY) : null;
+    pointerLead.current = null;
+    stopAutoScroll();
+    setDragId(null);
+    setHoverStage(null);
+    if (stage) moveLead(lead, stage);
+  }
 
   const visibleStages = LEAD_STAGES.filter(
     (stage) => !hiddenStages.includes(stage),
@@ -1602,196 +1731,228 @@ function LeadsKanban({
   }
 
   return (
-    <div className="flex min-h-[calc(100svh-13rem)] items-start gap-2.5 overflow-x-auto pr-4 pb-2 xl:min-h-[calc(100svh-17rem)]">
-      {visibleStages.map((stage) => {
-        const cards = byStage.get(stage) ?? [];
-        const canDrop = Boolean(
-          draggedSubject &&
-          draggedSubject.stage !== stage &&
-          canChangeLeadStage(viewer, draggedSubject, stage) &&
-          (stage !== "SENT_TO_FIRM" ||
-            draggedSubject.sentToFirmAt !== null ||
-            draggedSubject.brightwaterLeadId !== null),
-        );
+    <>
+      <div
+        ref={boardRef}
+        className="flex min-h-[calc(100svh-13rem)] items-start gap-2.5 overflow-x-auto pr-4 pb-2 xl:min-h-[calc(100svh-17rem)]"
+      >
+        {visibleStages.map((stage) => {
+          const cards = byStage.get(stage) ?? [];
+          const canDrop = Boolean(
+            draggedSubject &&
+            draggedSubject.stage !== stage &&
+            canChangeLeadStage(viewer, draggedSubject, stage) &&
+            (stage !== "SENT_TO_FIRM" ||
+              draggedSubject.sentToFirmAt !== null ||
+              draggedSubject.brightwaterLeadId !== null),
+          );
 
-        return (
-          <section
-            key={stage}
-            data-stage={stage}
-            className={cn(
-              "flex min-w-52 flex-1 flex-col overflow-hidden rounded-xl border bg-muted/20 transition-colors",
-              hoverStage === stage && canDrop && "border-ring bg-accent/30",
-              hoverStage === stage &&
-                draggedSubject &&
-                !canDrop &&
-                "border-destructive/50 bg-destructive/5",
-            )}
-            onDragOver={(event) => {
-              // Always allow the drop event so a refused drop can explain why.
-              // `dropEffect: none` would cancel the drop before `onDrop` runs.
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              if (hoverStage !== stage) setHoverStage(stage);
-            }}
-            onDragLeave={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+          return (
+            <section
+              key={stage}
+              data-stage={stage}
+              className={cn(
+                "flex min-w-52 flex-1 flex-col overflow-hidden rounded-xl border bg-muted/20 transition-colors",
+                hoverStage === stage && canDrop && "border-ring bg-accent/30",
+                hoverStage === stage &&
+                  draggedSubject &&
+                  !canDrop &&
+                  "border-destructive/50 bg-destructive/5",
+              )}
+              onDragOver={(event) => {
+                // Always allow the drop event so a refused drop can explain why.
+                // `dropEffect: none` would cancel the drop before `onDrop` runs.
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                if (hoverStage !== stage) setHoverStage(stage);
+              }}
+              onDragLeave={(event) => {
+                if (
+                  !event.currentTarget.contains(event.relatedTarget as Node)
+                ) {
+                  setHoverStage(null);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
                 setHoverStage(null);
-              }
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setHoverStage(null);
-              setDragId(null);
+                setDragId(null);
 
-              const id = Number(event.dataTransfer.getData("text/plain"));
-              const lead = leads.find((row) => row.id === id);
-              if (!lead) return;
+                const id = Number(event.dataTransfer.getData("text/plain"));
+                const lead = leads.find((row) => row.id === id);
+                if (!lead) return;
 
-              const subject = effective(lead);
-              if (subject.stage === stage) return;
-
-              if (
-                stage === "SENT_TO_FIRM" &&
-                subject.sentToFirmAt === null &&
-                subject.brightwaterLeadId === null
-              ) {
-                toast.error("Can't move this lead", {
-                  description:
-                    "Send it to the firm before marking it Sent to Firm.",
-                });
-                return;
-              }
-
-              if (!canChangeLeadStage(viewer, subject, stage)) {
-                toast.error("Can't move this lead", {
-                  description: `You can't move it to ${LEAD_STAGE_LABELS[stage]}.`,
-                });
-                return;
-              }
-
-              void save(lead, { stage });
-            }}
-          >
-            <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: STAGE_COLOR[stage] }}
-                />
-                <span className="text-sm font-medium">
-                  {LEAD_STAGE_LABELS[stage]}
+                moveLead(lead, stage);
+              }}
+            >
+              <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: STAGE_COLOR[stage] }}
+                  />
+                  <span className="text-sm font-medium">
+                    {LEAD_STAGE_LABELS[stage]}
+                  </span>
+                </div>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {cards.length}
                 </span>
               </div>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {cards.length}
-              </span>
-            </div>
 
-            <div className="flex flex-col gap-2 p-2">
-              {cards.length === 0 ? (
-                <p className="px-2 py-8 text-center text-xs text-muted-foreground">
-                  No leads here.
-                </p>
-              ) : (
-                cards.map((lead) => {
-                  const name =
-                    [lead.injuredFirstName, lead.injuredLastName]
-                      .filter(Boolean)
-                      .join(" ") || "Unnamed lead";
-                  const isSaving = Boolean(saving[lead.id]);
+              <div className="flex flex-col gap-2 p-2">
+                {cards.length === 0 ? (
+                  <p className="px-2 py-8 text-center text-xs text-muted-foreground">
+                    No leads here.
+                  </p>
+                ) : (
+                  cards.map((lead) => {
+                    const name =
+                      [lead.injuredFirstName, lead.injuredLastName]
+                        .filter(Boolean)
+                        .join(" ") || "Unnamed lead";
+                    const isSaving = Boolean(saving[lead.id]);
 
-                  return (
-                    <article
-                      key={lead.id}
-                      draggable={!isSaving}
-                      onDragStart={(event) => {
-                        const target = event.target as HTMLElement;
-                        // Do not drag when the gesture starts on a control.
-                        if (
-                          target.closest("button, [data-slot=select-trigger]")
-                        ) {
-                          event.preventDefault();
-                          return;
-                        }
-                        event.dataTransfer.setData(
-                          "text/plain",
-                          String(lead.id),
-                        );
-                        event.dataTransfer.effectAllowed = "move";
-                        setDragId(lead.id);
-                      }}
-                      onDragEnd={() => {
-                        setDragId(null);
-                        setHoverStage(null);
-                      }}
-                      className={cn(
-                        "cursor-grab rounded-lg border bg-card p-2.5 shadow-xs transition-opacity active:cursor-grabbing",
-                        dragId === lead.id && "opacity-50",
-                        isSaving && "opacity-80",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{name}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
-                            {lead.caseType ? (
-                              <Badge variant="outline">
-                                {caseTypeLabel(lead.caseType)}
-                              </Badge>
-                            ) : null}
+                    return (
+                      <article
+                        key={lead.id}
+                        draggable={!isSaving}
+                        onDragStart={(event) => {
+                          const target = event.target as HTMLElement;
+                          // Do not drag when the gesture starts on a control.
+                          if (
+                            target.closest("button, [data-slot=select-trigger]")
+                          ) {
+                            event.preventDefault();
+                            return;
+                          }
+                          event.dataTransfer.setData(
+                            "text/plain",
+                            String(lead.id),
+                          );
+                          event.dataTransfer.effectAllowed = "move";
+                          setDragId(lead.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setHoverStage(null);
+                        }}
+                        className={cn(
+                          "cursor-grab rounded-lg border bg-card p-2.5 shadow-xs transition-opacity active:cursor-grabbing",
+                          dragId === lead.id && "opacity-50",
+                          isSaving && "opacity-80",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {name}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              {lead.caseType ? (
+                                <Badge variant="outline">
+                                  {caseTypeLabel(lead.caseType)}
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label={`Open ${name}`}
+                              onClick={() => onOpen(effective(lead))}
+                            >
+                              <Eye />
+                            </Button>
+                            {/* Touch has no native HTML drag, so this handle owns
+                              the pointer gesture and hit-tests the columns. */}
+                            <button
+                              type="button"
+                              data-drag-handle
+                              aria-label={`Drag ${name} to another stage`}
+                              title="Drag to move"
+                              disabled={isSaving}
+                              onPointerDown={(event) =>
+                                startPointerDrag(lead, event)
+                              }
+                              onPointerMove={movePointerDrag}
+                              onPointerUp={(event) =>
+                                endPointerDrag(lead, event, true)
+                              }
+                              onPointerCancel={(event) =>
+                                endPointerDrag(lead, event, false)
+                              }
+                              onLostPointerCapture={() => {
+                                if (!pointerLead.current) return;
+                                pointerLead.current = null;
+                                stopAutoScroll();
+                                setDragId(null);
+                                setHoverStage(null);
+                              }}
+                              className="-my-1 -mr-1 flex size-9 touch-none cursor-grab items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <GripVertical className="size-4" aria-hidden />
+                            </button>
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`Open ${name}`}
-                          onClick={() => onOpen(effective(lead))}
-                        >
-                          <Eye />
-                        </Button>
-                      </div>
 
-                      <div className="mt-2 grid min-w-0 gap-1 text-xs text-muted-foreground">
-                        <p className="flex min-w-0 items-center gap-1.5">
-                          <Mail className="size-3.5 shrink-0" />
-                          <span
-                            className="min-w-0 flex-1 truncate"
-                            title={lead.injuredEmail ?? undefined}
-                          >
-                            {lead.injuredEmail ?? "—"}
-                          </span>
-                        </p>
-                        <p className="flex min-w-0 items-center gap-1.5">
-                          <Phone className="size-3.5 shrink-0" />
-                          <span
-                            className="min-w-0 flex-1 truncate"
-                            title={lead.injuredPhone ?? undefined}
-                          >
-                            {lead.injuredPhone ?? "—"}
-                          </span>
-                        </p>
-                        <p className="flex min-w-0 items-center gap-1.5">
-                          <CalendarDays className="size-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">
-                            Added {formatDate(lead.createdAt)}
-                          </span>
-                        </p>
-                      </div>
+                        <div className="mt-2 grid min-w-0 gap-1 text-xs text-muted-foreground">
+                          <p className="flex min-w-0 items-center gap-1.5">
+                            <Mail className="size-3.5 shrink-0" />
+                            <span
+                              className="min-w-0 flex-1 truncate"
+                              title={lead.injuredEmail ?? undefined}
+                            >
+                              {lead.injuredEmail ?? "—"}
+                            </span>
+                          </p>
+                          <p className="flex min-w-0 items-center gap-1.5">
+                            <Phone className="size-3.5 shrink-0" />
+                            <span
+                              className="min-w-0 flex-1 truncate"
+                              title={lead.injuredPhone ?? undefined}
+                            >
+                              {lead.injuredPhone ?? "—"}
+                            </span>
+                          </p>
+                          <p className="flex min-w-0 items-center gap-1.5">
+                            <CalendarDays className="size-3.5 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">
+                              Added {formatDate(lead.createdAt)}
+                            </span>
+                          </p>
+                        </div>
 
-                      <div className="mt-3 border-t pt-2">
-                        <AssigneeCell lead={lead} compact />
-                      </div>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-          </section>
-        );
-      })}
-    </div>
+                        <div className="mt-3 border-t pt-2">
+                          <AssigneeCell lead={lead} compact />
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      {/* The finger hides the card on touch, so name the stage it will land on. */}
+      {draggedSubject ? (
+        <div
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4"
+        >
+          <p className="rounded-full border bg-background/95 px-4 py-2 text-sm font-medium shadow-lg">
+            {hoverStage && hoverStage !== draggedSubject.stage
+              ? `Move to ${LEAD_STAGE_LABELS[hoverStage]}`
+              : "Drag onto a stage"}
+          </p>
+        </div>
+      ) : null}
+    </>
   );
 }
 

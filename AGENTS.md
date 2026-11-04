@@ -209,7 +209,11 @@ their Lawmatics CRM.
   to show the grid. The server loads the filtered set (up to 1000 rows) for the
   board; cards drag between stage columns through the same `saveLeadFields`
   action, carry an eye button that opens the detail dialog, and reuse the inline
-  assignee control. A Stages menu beside Filters hides and shows columns; hidden
+  assignee control. Touch has no native HTML drag, so every card also carries a
+  grip handle that runs a pointer drag for mouse and touch: it hit-tests
+  `[data-stage]`, auto-scrolls the board near its edges, and names the pending
+  stage in a floating pill. Keep that path intact when changing the card layout.
+  A Stages menu beside Filters hides and shows columns; hidden
   stages free their width, the columns flex to fill the space, and the page
   scrolls rather than each stage getting its own scrollbar. The stage filter is
   dropped in Kanban because the board already groups by stage.
