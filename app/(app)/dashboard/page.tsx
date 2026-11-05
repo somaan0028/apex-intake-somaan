@@ -339,12 +339,12 @@ export default async function OverviewPage() {
         />
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
-          <AssistantInvite firstName={firstName} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AssistantInvite firstName={firstName} className="lg:order-2" />
+        <div className="space-y-4 lg:order-1">
           <Pipeline byStage={metrics.byStage} total={metrics.total} />
+          <LatestIntake leads={latest} />
         </div>
-        <LatestIntake leads={latest} />
       </div>
     </div>
   );

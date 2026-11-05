@@ -338,10 +338,14 @@ their Lawmatics CRM.
   adding a variable there.
 - The Overview's assistant card is a Client Component only because opening the panel is
   an interaction and the mascot is animated. It is **Larry's home on the page**: the
-  first card in the content grid, with the Lottie mascot (~96px), "Hi {first} — I'm
-  Larry.", a one-line invite and a "Chat with Larry" button; the mascot and the button
-  both call `open()`. The mascot is decorative (`aria-hidden`) and the button carries
-  the label. `AiAssistantProvider` (in the app shell) publishes `open(prompt)` through
+  right-hand column of the content grid, stretching to the height of the Pipeline and
+  Latest intake panels stacked on the left, with the Lottie mascot (160px), "Hi {first}
+  — I'm Larry.", a one-line invite and a "Chat with Larry" button, all vertically
+  centred; the mascot and the button both call `open()`. The mascot is decorative
+  (`aria-hidden`) and the button carries the label. The panel's own empty state shows
+  the same mascot at 128px above the starter prompts, and drops it as soon as the
+  thread has a message so it never competes with the conversation.
+  `AiAssistantProvider` (in the app shell) publishes `open(prompt)` through
   `components/ai/assistant-context.tsx`, so any page can still open the panel with a
   question waiting in the composer; `chat-thread.tsx` folds that prompt in during
   render, keyed by a counter, rather than in an effect. The header button and the

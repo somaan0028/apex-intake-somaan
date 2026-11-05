@@ -1,51 +1,62 @@
 "use client";
 
 /**
- * Larry's invitation on the Overview page.
+ * Larry's home on the Overview page.
  *
  * A Client Component because opening the panel is an interaction and the mascot
  * is animated; it holds no state of its own and calls the shell's `open()`
  * handle, the same one the header button uses.
  *
- * It is deliberately the first card in the content grid: the assistant should
- * feel like a colleague waiting on the page, not a footnote at the bottom.
+ * It is a tall, vertically-centred card in the right-hand column, deliberately
+ * larger than a utility tile: the assistant should feel like a colleague
+ * waiting on the page. The card stretches to the height of the two panels beside
+ * it, so the page's right edge is one calm, personal block rather than a list.
  */
 import { Sparkles } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/assistant-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ASSISTANT_NAME } from "@/lib/ai/identity";
+import { cn } from "@/lib/utils";
 import { LarryMascot } from "@/components/ai/larry-mascot";
 
-export function AssistantInvite({ firstName }: { firstName: string }) {
+export function AssistantInvite({
+  firstName,
+  className,
+}: {
+  firstName: string;
+  className?: string;
+}) {
   const { open } = useAiAssistant();
 
   return (
-    <Card className="border-primary/30 bg-primary/5">
-      <CardContent className="flex items-center gap-4">
+    <Card
+      className={cn("h-full border-primary/30 bg-primary/5", className)}
+    >
+      <CardContent className="flex h-full flex-col items-center justify-center gap-5 px-6 py-8 text-center">
         <button
           type="button"
           onClick={() => open()}
           aria-label={`Chat with ${ASSISTANT_NAME}`}
           title={`Chat with ${ASSISTANT_NAME}`}
-          className="group -my-1 shrink-0 rounded-2xl outline-offset-4"
+          className="group rounded-3xl outline-offset-4"
         >
-          <LarryMascot className="size-24 transition-transform duration-300 group-hover:scale-105" />
+          <LarryMascot className="size-40 transition-transform duration-300 group-hover:scale-105" />
         </button>
 
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="space-y-1.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
             Your AI assistant
           </p>
-          <p className="text-base font-semibold tracking-tight">
+          <p className="text-lg font-semibold tracking-tight">
             Hi {firstName} — I&apos;m {ASSISTANT_NAME}.
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="mx-auto max-w-xs text-sm text-muted-foreground">
             Ask me about your leads, your team, or what to work on next.
           </p>
         </div>
 
-        <Button size="sm" className="shrink-0" onClick={() => open()}>
+        <Button onClick={() => open()}>
           <Sparkles />
           Chat with {ASSISTANT_NAME}
         </Button>

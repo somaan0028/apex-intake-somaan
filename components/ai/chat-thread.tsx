@@ -52,6 +52,7 @@ import type {
   StoredMessage,
 } from "@/lib/ai/types";
 import { cn } from "@/lib/utils";
+import { LarryMascot } from "./larry-mascot";
 import { Markdown } from "./markdown";
 
 /** A prompt the empty state offers, to make the first turn obvious. */
@@ -450,14 +451,23 @@ export function ChatThread({
     <div className="flex h-full min-h-0 flex-col">
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {isEmpty ? (
-          <div className="grid gap-3 py-6">
-            <p className="text-sm text-muted-foreground">
-              What would you like to know? To point {ASSISTANT_NAME} at a
-              specific lead or teammate, type{" "}
-              <span className="font-medium">@</span> and pick them from the
-              list.
-            </p>
-            <div className="grid gap-1.5">
+          <div className="grid justify-items-center gap-4 py-6 text-center">
+            {/* The full artwork only greets an empty conversation; once the
+                thread starts it would just take space away from the messages. */}
+            <LarryMascot className="size-32" />
+
+            <div className="space-y-1.5">
+              <p className="text-base font-semibold tracking-tight">
+                Hi, I&apos;m {ASSISTANT_NAME}.
+              </p>
+              <p className="mx-auto max-w-xs text-sm text-muted-foreground">
+                Ask me about your leads or your team. To point me at someone,
+                type <span className="font-medium">@</span> and pick them from
+                the list.
+              </p>
+            </div>
+
+            <div className="grid w-full gap-1.5 text-left">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
