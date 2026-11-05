@@ -259,8 +259,10 @@ their Lawmatics CRM.
   **Notes** section above Attribution holds free-form internal notes; it is
   autosaved like the other text fields, never populated by public intake, and
   never sent to the firm. The **Case type** select is the first field in Case
-  facts; it offers the canonical codes and keeps an imported raw campaign value
-  selectable until the user changes it. The **Firm submission** section is shown
+  facts; it is required (there is no unset option), offers the canonical codes,
+  and keeps an imported raw campaign value selectable until the user changes it.
+  The CSV seeder now preserves an unrecognised campaign verbatim and refuses a
+  missing one. The **Firm submission** section is shown
   only while the lead's case type is MVA. On a
   lead filed for someone else, the filler's name, phone, email and relationship
   are editable under the same `leads.edit.*` permission as the injured person's

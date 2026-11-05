@@ -265,10 +265,21 @@ function seedLeads(db: AppDatabase): number {
         }
       }
 
+      // Case type is required. A recognised campaign becomes its canonical
+      // code; an unrecognised one is kept verbatim, matching public intake,
+      // rather than being lost as null.
+      const caseType =
+        toCaseType(record.campaign) ?? toNullableText(record.campaign);
+      if (!caseType) {
+        throw new Error(
+          `[db] Lead ${matterId}: campaign/case type is required.`,
+        );
+      }
+
       return {
         matterId,
         createdAt: toNullableDate(record.created_at),
-        caseType: toCaseType(record.campaign),
+        caseType,
         stage: toLeadStage(record.stage),
         assignedToId: userIdByEmail.get(assignedEmail) ?? null,
 

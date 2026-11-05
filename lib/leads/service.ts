@@ -98,8 +98,8 @@ export interface LeadUpdate {
   stage?: LeadStage;
   assignedToId?: number | null;
   /**
-   * Canonical case type, or the current raw campaign value (so an imported lead
-   * can be saved without changing it). `null` clears the field.
+   * Required canonical case type, or the current raw campaign value (so an
+   * imported lead can be saved without changing it). It is never cleared.
    */
   caseType?: string | null;
   injuredFirstName?: string | null;
@@ -293,8 +293,8 @@ function validateLeadUpdate(lead: Lead, update: LeadUpdate): NormalizedPatch {
 
   if (next.caseType !== undefined) {
     const value = (next.caseType ?? "").trim();
-    if (value === "") {
-      next.caseType = null;
+    if (!value) {
+      return { ok: false, error: "Choose a case type." };
     } else if (
       !(CASE_TYPES as readonly string[]).includes(value) &&
       value !== lead.caseType
@@ -669,8 +669,8 @@ function normalizeLeadPatch(
 
   if (provided("caseType")) {
     const value = (patch.caseType ?? "").trim();
-    if (value === "") {
-      update.caseType = null;
+    if (!value) {
+      return { ok: false, error: "Choose a case type." };
     } else if (
       !(CASE_TYPES as readonly string[]).includes(value) &&
       value !== lead.caseType

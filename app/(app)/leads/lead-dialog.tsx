@@ -416,7 +416,6 @@ function LeadForm({
     lead.caseType !== null &&
     (CASE_TYPES as readonly string[]).includes(lead.caseType);
   const caseTypeOptions = [
-    { label: "Not set", value: NONE },
     ...CASE_TYPES.map((value) => ({
       label: CASE_TYPE_LABELS[value],
       value,
@@ -509,10 +508,9 @@ function LeadForm({
   }
 
   async function changeCaseType(value: string) {
-    const next = value === NONE ? "" : value;
     const previous = draft.caseType;
-    updateDraft("caseType", next);
-    const ok = await saveNow({ caseType: next });
+    updateDraft("caseType", value);
+    const ok = await saveNow({ caseType: value });
     if (!ok) updateDraft("caseType", previous);
   }
 
@@ -1164,14 +1162,14 @@ function LeadForm({
               <FormField label="Case type" htmlFor="lead-case-type">
                 <Select
                   items={caseTypeOptions}
-                  value={draft.caseType || NONE}
+                  value={draft.caseType || null}
                   onValueChange={(value) => {
                     if (value) void changeCaseType(value);
                   }}
                   disabled={!canEdit}
                 >
                   <SelectTrigger id="lead-case-type" className="w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="Select a case type" />
                   </SelectTrigger>
                   <SelectContent>
                     {caseTypeOptions.map((option) => (
