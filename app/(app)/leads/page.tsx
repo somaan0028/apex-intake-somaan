@@ -98,28 +98,35 @@ export default async function LeadsPage({
             Every lead captured by the intake desk.
           </p>
         </div>
-        {/* Hidden once the duplicate filter is on: the list already is the warning. */}
-        {potentialDuplicates > 0 && !duplicatesViewActive ? (
+        {/* The callout stays as context; once the duplicate filter is on it says
+            how many are being shown and drops the now-pointless button. */}
+        {potentialDuplicates > 0 ? (
           <AlertBar
             tone="warning"
             className="shrink-0"
             action={
-              <Button
-                size="sm"
-                variant="outline"
-                nativeButton={false}
-                render={<Link href="/leads?filter.potentialDuplicate=yes" />}
-              >
-                Show
-                <ArrowRight />
-              </Button>
+              duplicatesViewActive ? null : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href="/leads?filter.potentialDuplicate=yes" />}
+                >
+                  Show
+                  <ArrowRight />
+                </Button>
+              )
             }
           >
             <span className="font-medium">
               {potentialDuplicates} potential duplicate lead
               {potentialDuplicates === 1 ? "" : "s"}
             </span>{" "}
-            {potentialDuplicates === 1 ? "needs" : "need"} review
+            {duplicatesViewActive
+              ? "being shown"
+              : potentialDuplicates === 1
+                ? "needs review"
+                : "need review"}
           </AlertBar>
         ) : null}
       </div>

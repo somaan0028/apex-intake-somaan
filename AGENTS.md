@@ -490,7 +490,8 @@ their Lawmatics CRM.
   views so a dashboard card always lands on the leads it counted. Grouped leads carry an
   amber warning icon in both views. The page header carries the same potential-duplicates
   callout as the Overview (shared `components/alert-bar.tsx`), with a **Show** button
-  that applies `filter.potentialDuplicate=yes`; it steps aside while that filter is on.
+  that applies `filter.potentialDuplicate=yes`; while that filter is on the button
+  hides and the text reads "X potential duplicate leads being shown".
   The **Duplicates** filter
   (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
   `filter.dupGroup=<id>`, which ignores every other filter. A **Bookmarked** filter
