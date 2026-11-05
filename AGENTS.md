@@ -532,9 +532,11 @@ their Lawmatics CRM.
   that uses `filter.addedFrom` (required, default seven days ago) and optional
   `filter.addedTo`; `listLeads` turns those into `created_at` bounds. The custom
   lower date has no clear control; the upper date can be cleared.
-- **Export CSV** (`app/api/leads/export/route.ts`, download icon beside Clear
-  Filters) downloads every lead under the current filters, search and sort — not
-  the visible page or the loaded Kanban cards. `lib/leads/query-params.ts` applies
+- **Export CSV** (`app/api/leads/export/route.ts`) downloads every lead under the
+  current filters, search and sort — not the visible page or the loaded Kanban
+  cards. On desktop it lives in the view-actions (three-dot) menu beside **Save
+  View**; on small screens it sits in the Options sheet's Filters section.
+  `lib/leads/query-params.ts` applies
   the same date normalisation the page uses, and the route reuses
   `listLeadsForExport` (the `listLeads` query with no page window), so visibility,
   attribution, and duplicate-group scoping can never disagree with the grid.
@@ -548,15 +550,16 @@ their Lawmatics CRM.
   a bare `/leads` visit (a shared link, the Overview's Active leads card) starts with
   cleared filters but still restores the view and the UI preferences.
   A URL with filters always keeps those filters and still applies the stored view when
-  it does not name one. The heart opens the save dialog and
-  stays red only while the page still matches that saved view. **Clear Filters**
+  it does not name one. The three-dot **View actions** menu holds **Save View**
+  and **Download CSV**; the trigger turns red while the page still matches the
+  saved view it came from. **Clear Filters**
   resets the filter values and search but never deletes a saved view. Stage
   visibility is browser-local too, so the Kanban board shows a skeleton until the
   mount effect has read it; without that, every stage would flash on refresh.
 - On desktop the leads filters live in a **Filters** popover on the toolbar
   (`DataTable`'s `filtersMenu` + `filtersMenuCount`), so there is no separate filter
-  row: it holds the Added range, every filter control and the Clear Filters / CSV
-  actions. The button carries the active-filter count. Below `xl`, the toolbar
+  row: it holds the Added range, every filter control and the Clear Filters
+  action. The button carries the active-filter count. Below `xl`, the toolbar
   collapses into one **Options** sheet instead: search stays inline, and view, sort,
   saved views, filters, columns, stages, and Clear all move into the sheet.
   `DataTable`'s `mobileControls` prop owns that switch, and the grid card scrolls

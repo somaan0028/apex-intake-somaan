@@ -32,6 +32,7 @@ import {
   CalendarDays,
   Columns3,
   Download,
+  EllipsisVertical,
   Eye,
   FilterX,
   GripVertical,
@@ -1090,25 +1091,27 @@ export function LeadsTable({
     <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
       <Button
         type="button"
-        size="sm"
+        size="icon-sm"
         variant={view === "table" ? "secondary" : "ghost"}
-        className="h-7"
+        className="h-7 w-7"
+        aria-label="Table view"
+        title="Table view"
         aria-pressed={view === "table"}
         onClick={() => changeView("table")}
       >
         <Table2 />
-        <span className="hidden sm:inline">Table</span>
       </Button>
       <Button
         type="button"
-        size="sm"
+        size="icon-sm"
         variant={view === "kanban" ? "secondary" : "ghost"}
-        className="h-7"
+        className="h-7 w-7"
+        aria-label="Kanban view"
+        title="Kanban view"
         aria-pressed={view === "kanban"}
         onClick={() => changeView("kanban")}
       >
         <Columns3 />
-        <span className="hidden sm:inline">Kanban</span>
       </Button>
     </div>
   );
@@ -1174,18 +1177,6 @@ export function LeadsTable({
               <span className="hidden sm:inline">Clear Filters</span>
               {filterCountBadge}
             </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              nativeButton={false}
-              render={
-                <a href={leadsExportHref(query, view)} download />
-              }
-              aria-label="Download filtered leads as CSV"
-              title="Download filtered leads as CSV"
-            >
-              <Download aria-hidden />
-            </Button>
           </div>
         }
         headerLeading={
@@ -1230,24 +1221,49 @@ export function LeadsTable({
               >
                 Saved Views
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Save current view"
-                title="Save current view"
-                onClick={() => {
-                  setViewName("");
-                  setSaveOpen(true);
-                }}
-              >
-                <Heart
-                  className={cn(
-                    "size-4",
-                    viewActive && "fill-red-500 text-red-500",
-                  )}
-                />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="View actions"
+                      title="View actions"
+                    />
+                  }
+                >
+                  <EllipsisVertical
+                    className={cn("size-4", viewActive && "text-red-500")}
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setViewName("");
+                        setSaveOpen(true);
+                      }}
+                    >
+                      <Heart
+                        className={cn(
+                          "size-4",
+                          viewActive && "fill-red-500 text-red-500",
+                        )}
+                      />
+                      Save View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      render={
+                        <a href={leadsExportHref(query, view)} download />
+                      }
+                    >
+                      <Download />
+                      Download CSV
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         }
