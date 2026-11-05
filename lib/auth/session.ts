@@ -40,7 +40,7 @@ function hashToken(token: string): string {
  * can be forced with `AUTH_COOKIE_SECURE` (e.g. `false` when testing a
  * production build over plain HTTP).
  */
-function secureCookiesEnabled(): boolean {
+export function secureCookiesEnabled(): boolean {
   return process.env.AUTH_COOKIE_SECURE
     ? process.env.AUTH_COOKIE_SECURE === "true"
     : process.env.NODE_ENV === "production";

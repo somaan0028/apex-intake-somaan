@@ -6,12 +6,12 @@ import { mcpEndpoint } from "@/lib/mcp/endpoint";
 import { TokensCard } from "./tokens-card";
 
 export const metadata: Metadata = {
-  title: "AI Settings · Apex Intake Desk",
+  title: "Connect Your Agent · Apex Intake Desk",
 };
 
 /**
- * AI settings. Today that means the access tokens for external AI assistants;
- * it is the only place a user can mint one for themselves.
+ * Agent connection settings. Today that means the access tokens for external
+ * AI assistants; it is the only place a user can mint one for themselves.
  */
 export default async function AiSettingsPage() {
   const user = await requireUser();
@@ -26,7 +26,9 @@ export default async function AiSettingsPage() {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">AI Settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Connect Your Agent
+        </h1>
         <p className="text-muted-foreground">
           Manage the assistants connected to your account.
         </p>

@@ -155,6 +155,32 @@ their Lawmatics CRM.
   erases nor blocks history; readers show "Deleted user" / "Deleted lead" when the join
   misses.
 
+## Preferences & appearance
+- `users.preferences` is a JSON object validated by `lib/preferences/schema.ts`. It holds
+  `appearance.theme` and `appearance.mode`, and is deliberately a blob so future personal
+  settings (for example which Overview stats to show) need no migration. Reads merge
+  defaults; writes preserve unknown keys so an older code path cannot drop a newer
+  preference.
+- Theme presets live in `app/themes.css` as `[data-theme="id"]` blocks (light) and
+  `[data-theme="id"].dark` blocks, imported after `globals.css` so they win the cascade.
+  `lib/themes/registry.ts` holds the IDs, names and descriptions. The current set is
+  Apex (Default), Sakura, WhatsApp, Retro, Zen, Claude, Bold Wikipedia and Burgundy.
+  Add a theme by pasting only its variable block and adding one registry entry; do not
+  copy TweakCN's `@theme inline`, base layer, font overrides, or `--spacing`.
+- The `apex-theme=<theme>:<mode>` cookie is a boot cache, not the source of truth. Login and
+  every appearance change set it; logout clears it. `lib/themes/boot-script.ts` runs in the
+  initial HTML via `next/script` `beforeInteractive`, validates the values, and sets
+  `data-theme`, `data-theme-mode`, the `dark` class and `color-scheme` before first paint.
+  `<html>` carries `suppressHydrationWarning` for that pre-hydration change.
+- Modes are `light`, `dark` and `system`; system mode installs a
+  `prefers-color-scheme` listener. `components/ui/sonner.tsx` follows the `dark` class
+  rather than next-themes. Scrollbars are themed too: `app/globals.css` sets
+  `scrollbar-color` from `--border` and a matching `::-webkit-scrollbar` thumb.
+- The Preferences page's **Appearance** section (`app/(app)/settings/preferences/`) applies
+  changes optimistically, then calls `updateAppearance` (`lib/preferences/actions.ts`) to
+  save the JSON and refresh the cookie. The preview cards scope a theme to their own
+  subtree with `data-theme`, so they never duplicate colour values in JavaScript.
+
 ## AI assistant
 - The panel is a **non-modal** slide-over in the app shell (`components/ai/`), opened from
   the header button in `app/(app)/layout.tsx`. It has no backdrop, does not close on an
@@ -210,7 +236,7 @@ their Lawmatics CRM.
 - The copied endpoint comes from `lib/mcp/endpoint.ts`, which follows the request host
   (`x-forwarded-host` first) and `x-forwarded-proto`. When no proxy says otherwise,
   loopback and private/link-local addresses use HTTP and public hostnames use HTTPS.
-- The AI Settings card's **Copy Instructions for AI** button copies a ready-to-use prompt
+- The Connect Your Agent card's **Copy Instructions for AI** button copies a ready-to-use prompt
   with the endpoint, the bearer header, and the JSON config. A token created in the same
   visit is included once; otherwise the prompt carries a placeholder.
 - A token carries **no permissions of its own**. Every call runs through the same services
@@ -236,9 +262,10 @@ their Lawmatics CRM.
   composition of a single total, so a shared bar compares them at a glance, and no label
   has to fit inside a 1%-wide segment. Each segment carries a `title` and an
   `aria-label`, and the legend below states every value and share. Segment colours are
-  `--stage-*` variables in `app/globals.css` — defined per theme there, because the
-  stages must stay distinguishable side by side, which opacity on one colour cannot do.
-  Adding a stage means adding a variable in both theme blocks.
+  `--stage-*` variables in `app/globals.css`, derived from the active theme's chart
+  tokens (with foreground mixes for contrast and a muted mix for Disqualified) rather than
+  hard-coded, so switching themes changes the pipeline as well. Adding a stage means
+  adding a variable there.
 - The Overview's assistant card is a Client Component only because opening the panel is
   an interaction. `AiAssistantProvider` (in the app shell) publishes `open(prompt)`
   through `components/ai/assistant-context.tsx`, so any page can open the panel with a
@@ -329,18 +356,25 @@ their Lawmatics CRM.
   caller may not set instead of trusting the form — a hidden input is not a permission.
   A password change requires the current password for everyone, admins included, and the
   last-admin invariant still blocks a self-demotion.
+  The profile header shows a clickable avatar (the photo is the upload control), the
+  person's name, role and member-since date. The email is intentionally not repeated there;
+  it appears in the details form below.
 - The sidebar (`components/app-sidebar.tsx`) keeps Overview, Leads, and Campaign Analytics
-  flat, then folds **Staff** (Users, Activity) and **Settings** (AI Settings, Preferences)
-  into collapsible groups. Both groups start open; clicking a group header while the sidebar
-  is in its icon rail reopens the sidebar instead of toggling a hidden panel.
-  **AI Settings** (`app/(app)/settings/ai/`) holds the MCP token card, and the old
+  flat, then folds **Staff** (Users, Activity) and **Settings** (Connect Your Agent,
+  Preferences) into collapsible groups. It uses the sidebar's `inset` variant, so the
+  desktop shell shows the sidebar colour behind a main panel that floats with an 8px
+  margin, rounded corners and a shadow. Nav and sub-item icons use
+  `text-sidebar-accent-foreground`, which stays themed and legible in every preset. Both
+  groups start open; clicking a group header while the sidebar is in its icon rail reopens
+  the sidebar instead of toggling a hidden panel.
+  **Connect Your Agent** (`app/(app)/settings/ai/`) holds the MCP token card, and the old
   `/settings` URL redirects there. **Preferences**
-  (`app/(app)/settings/preferences/`) is a placeholder for now.
-  **Profile and Log out live in the account menu**, opened by the bordered profile button
-  at the bottom of the sidebar. The trigger *is* the profile
-  row, so clicking your own name opens the menu rather than navigating on its own; the
-  menu opens upward (`side="top"`) and carries the full email, which no longer fits under
-  the name in the sidebar (that line shows the role instead).
+  (`app/(app)/settings/preferences/`) has the Appearance section: preset themes plus
+  light/dark/system. **Profile and Log out live in the account menu**, opened by the
+  bordered profile button at the bottom of the sidebar. The trigger *is* the profile
+  row, so clicking your own name opens the menu rather than navigating on its own. The
+  menu opens upward (`side="top"`) and contains only those two items — the repeated
+  name/email/avatar header was deliberately removed.
 - A name change revalidates the whole layout (`revalidatePath("/", "layout")`), because
   the shell renders the viewer's name in the sidebar.
 
@@ -358,6 +392,8 @@ their Lawmatics CRM.
   the rendered semantics are wrong. The inverse applies too: `DropdownMenuItem` and
   friends default to `nativeButton={false}`, so an item that renders a real `<button>`
   must pass `nativeButton`.
+- Base UI menu items ship with `cursor-default`. The pointer rule in `app/globals.css` is
+  deliberately **outside `@layer base`**, so it beats those utilities; keep it unlayered.
 - Base UI menu parts must be grouped: a `DropdownMenuLabel` outside a
   `DropdownMenuGroup` throws `MenuGroupContext is missing` at runtime, not at build time,
   so it only shows up when the menu is first opened.

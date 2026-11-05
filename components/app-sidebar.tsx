@@ -110,7 +110,7 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     icon: Settings,
     items: [
       {
-        title: "AI Settings",
+        title: "Connect Your Agent",
         url: "/settings/ai",
         icon: Bot,
         permission: null,
@@ -160,7 +160,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
   const accountItems = visible(ACCOUNT_ITEMS);
 
   return (
-    <Sidebar>
+    <Sidebar variant="inset">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -191,7 +191,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                     tooltip={item.title}
                     render={<Link href={item.url} />}
                   >
-                    <item.icon />
+                    <item.icon className="text-sidebar-accent-foreground" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -230,7 +230,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                       />
                     }
                   >
-                    <group.icon />
+                    <group.icon className="text-sidebar-accent-foreground" />
                     <span>{group.title}</span>
                     <ChevronDown className="ml-auto size-4 shrink-0 transition-transform group-data-[panel-open]/menu-button:rotate-180" />
                   </Collapsible.Trigger>
@@ -243,7 +243,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                             isActive={isCurrent(item.url)}
                             render={<Link href={item.url} />}
                           >
-                            <item.icon />
+                            <item.icon className="text-sidebar-accent-foreground" />
                             <span>{item.title}</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

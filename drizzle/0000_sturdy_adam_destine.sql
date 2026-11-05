@@ -63,8 +63,10 @@ CREATE TABLE `users` (
 	`role` text DEFAULT 'USER' NOT NULL,
 	`password_hash` text NOT NULL,
 	`avatar_path` text,
+	`preferences` text DEFAULT '{}' NOT NULL,
 	`created_at` integer NOT NULL,
-	CONSTRAINT "users_role_check" CHECK("users"."role" in ('ADMIN', 'USER'))
+	CONSTRAINT "users_role_check" CHECK("users"."role" in ('ADMIN', 'USER')),
+	CONSTRAINT "users_preferences_json_check" CHECK(json_valid("users"."preferences"))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint

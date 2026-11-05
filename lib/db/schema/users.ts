@@ -36,11 +36,25 @@ export const users = sqliteTable(
      * served through an authenticated route, not from `public/`.
      */
     avatarPath: text("avatar_path"),
+    /**
+     * Personal preferences as a JSON object. It is a blob rather than a column
+     * per setting so future preferences (Overview stats, notification choices)
+     * can be added without a migration. Readers go through
+     * `normalizePreferences`, which fills defaults and validates the shape.
+     */
+    preferences: text("preferences", { mode: "json" })
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'`),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [
     uniqueIndex("users_email_unique").on(table.email),
     check("users_role_check", sql`${table.role} in ('ADMIN', 'USER')`),
+    check(
+      "users_preferences_json_check",
+      sql`json_valid(${table.preferences})`,
+    ),
   ],
 );
 

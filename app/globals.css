@@ -190,20 +190,34 @@
 
   /*
    * One colour per lead stage, used by the Overview pipeline bar and its legend.
-   * They live here rather than in the component so the two themes can be tuned
-   * independently: the bar is a comparison, so the stages have to stay
-   * distinguishable side by side, which cannot be done by opacity alone.
-   *
-   * The order runs dark → light the further a lead has progressed, with
-   * Disqualified deliberately desaturated so it reads as "closed" (its grey
-   * carries no meaning of success or failure).
+   * These are derived from the active theme's chart palette, so switching themes
+   * changes the pipeline too. The middle stages are mixed toward the foreground
+   * so a dark chart token stays visible in dark mode and a light one stays
+   * visible in light mode. Disqualified is mixed toward the muted surface so it
+   * reads as "closed" without disappearing against the card.
    */
-  --stage-new: rgb(148, 140, 128);
-  --stage-contacted: rgb(193, 168, 117);
-  --stage-qualified: rgb(168, 136, 62);
-  --stage-retained: rgb(106, 128, 92);
-  --stage-sent_to_firm: rgb(61, 65, 71);
-  --stage-disqualified: rgb(216, 212, 199);
+  --stage-new: var(--muted-foreground);
+  --stage-contacted: color-mix(
+    in oklab,
+    var(--chart-4) 70%,
+    var(--foreground) 30%
+  );
+  --stage-qualified: color-mix(
+    in oklab,
+    var(--chart-3) 65%,
+    var(--foreground) 35%
+  );
+  --stage-retained: color-mix(
+    in oklab,
+    var(--chart-2) 85%,
+    var(--foreground) 15%
+  );
+  --stage-sent_to_firm: var(--chart-1);
+  --stage-disqualified: color-mix(
+    in oklab,
+    var(--muted-foreground) 35%,
+    var(--muted)
+  );
 }
 
 .dark {
@@ -262,14 +276,6 @@
   --shadow-xl:
     0px 10px 25px 0px hsl(0 0% 0% / 0.4), 0px 8px 10px -1px hsl(0 0% 0% / 0.4);
   --shadow-2xl: 0px 10px 25px 0px hsl(0 0% 0% / 1);
-
-  /* Stage colours for the dark theme — see the light block for what they mean. */
-  --stage-new: rgb(150, 145, 134);
-  --stage-contacted: rgb(212, 188, 139);
-  --stage-qualified: rgb(196, 166, 101);
-  --stage-retained: rgb(134, 158, 118);
-  --stage-sent_to_firm: rgb(206, 211, 219);
-  --stage-disqualified: rgb(74, 72, 67);
 }
 
 @theme inline {
@@ -332,13 +338,48 @@
   body {
     @apply bg-background text-foreground;
   }
+}
 
-  /* Tailwind v4 leaves native buttons with the default arrow cursor. Give
-     every enabled button and menu item the pointer users expect. */
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]),
-  [role="menuitem"]:not([data-disabled]):not([aria-disabled="true"]),
-  [role="option"]:not([data-disabled]):not([aria-disabled="true"]) {
-    cursor: pointer;
-  }
+/*
+ * Tailwind v4 leaves native buttons with the default arrow cursor. Give every
+ * enabled button and menu item the pointer users expect. Keep this unlayered so
+ * it beats the `cursor-default` utilities built into the menu primitives.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="menuitem"]:not([data-disabled]):not([aria-disabled="true"]),
+[role="option"]:not([data-disabled]):not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/*
+ * Scrollbars are part of the UI too: derive the thumb from the active theme's
+ * border token so every preset, including dark mode, gets a matching scrollbar.
+ * The WebKit rules cover Chromium/Safari; `scrollbar-color` covers Firefox and
+ * newer Chromium, which use the standard property.
+ */
+* {
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
 }
