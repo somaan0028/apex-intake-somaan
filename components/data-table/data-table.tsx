@@ -418,7 +418,7 @@ export function DataTable<TData extends RowData>({
                       </span>
                     ) : null}
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-80 p-3">
+                  <PopoverContent align="end" className="w-96 p-3">
                     <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
                       {toolbarFilters}
                       {filters?.map((filter) => (
