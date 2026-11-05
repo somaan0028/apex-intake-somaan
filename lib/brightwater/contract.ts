@@ -23,6 +23,15 @@ export const BRIGHTWATER_TRACKING = {
   subid: "50",
 } as const;
 
+/**
+ * The `source` Brightwater expects on every submission.
+ *
+ * Brightwater's source identifier is not the attribution value stored on the
+ * lead (`leads.source`, which comes from `utm_source`), so the two must not be
+ * conflated: this is a fixed brand string rather than lead data.
+ */
+export const BRIGHTWATER_SOURCE = "www.apexleadsource.com";
+
 /** Abort a hung request rather than hold the dialog open forever. */
 export const BRIGHTWATER_TIMEOUT_MS = 15_000;
 

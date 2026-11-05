@@ -12,7 +12,7 @@
  */
 import { STATE_NAME_BY_CODE } from "@/lib/us-states";
 import { isValidEmail } from "@/lib/validation";
-import { BRIGHTWATER_TRACKING } from "./contract";
+import { BRIGHTWATER_SOURCE, BRIGHTWATER_TRACKING } from "./contract";
 
 /** The lead facts the payload needs; a full `Lead` row satisfies this. */
 export interface BrightwaterLead {
@@ -90,6 +90,7 @@ export function buildBrightwaterPayload(
     // Always-on tracking
     c1: BRIGHTWATER_TRACKING.c1,
     subid: BRIGHTWATER_TRACKING.subid,
+    source: BRIGHTWATER_SOURCE,
 
     // Injured person
     ...withValue("lastname", lead.injuredLastName),
