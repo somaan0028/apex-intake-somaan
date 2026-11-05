@@ -1160,6 +1160,8 @@ export function LeadsTable({
         emptyFilteredMessage="No leads match your filters."
         mobileControls={mobileControls}
         toolbarFilters={dateFilter}
+        filtersMenu
+        filtersMenuCount={activeFilterCount}
         toolbarActions={
           <div className="flex items-center gap-2">
             <Button

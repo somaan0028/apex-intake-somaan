@@ -553,13 +553,17 @@ their Lawmatics CRM.
   resets the filter values and search but never deletes a saved view. Stage
   visibility is browser-local too, so the Kanban board shows a skeleton until the
   mount effect has read it; without that, every stage would flash on refresh.
-- Below `xl`, the leads toolbar collapses into one **Options** sheet: search stays
-  inline, and view, sort, saved views, filters, columns, stages, and Clear all
-  move into the sheet. `DataTable`'s `mobileControls` prop owns that switch, and
-  the grid card scrolls horizontally so a wide table never widens the page.
-  The **Options** and **Clear Filters** triggers both carry the same badge with the
-  number of active filters (each filter counts once, the Added range included;
-  "All Time" and the sort do not count).
+- On desktop the leads filters live in a **Filters** popover on the toolbar
+  (`DataTable`'s `filtersMenu` + `filtersMenuCount`), so there is no separate filter
+  row: it holds the Added range, every filter control and the Clear Filters / CSV
+  actions. The button carries the active-filter count. Below `xl`, the toolbar
+  collapses into one **Options** sheet instead: search stays inline, and view, sort,
+  saved views, filters, columns, stages, and Clear all move into the sheet.
+  `DataTable`'s `mobileControls` prop owns that switch, and the grid card scrolls
+  horizontally so a wide table never widens the page. The **Filters**, **Options** and
+  **Clear Filters** triggers all carry the same badge with the number of active
+  filters (each filter counts once, the Added range included; "All Time" and the sort
+  do not count).
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the

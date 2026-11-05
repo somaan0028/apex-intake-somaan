@@ -62,6 +62,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -168,6 +173,13 @@ export interface DataTableProps<TData extends RowData> {
   columnMenu?: ReactNode;
   /** Extra filter controls rendered with the select filters (e.g. a date range). */
   toolbarFilters?: ReactNode;
+  /**
+   * Collapse the filter row into a "Filters" popover on desktop. Small screens
+   * already put everything in `mobileControls`, so this only changes `xl` and up.
+   */
+  filtersMenu?: boolean;
+  /** Number shown on the Filters button; 0 hides the badge. */
+  filtersMenuCount?: number;
   /** Controls rendered beside Filters and Columns, e.g. a view switcher. */
   headerActions?: ReactNode;
   /** Controls rendered after the search box, before the right-hand button group. */
@@ -216,6 +228,8 @@ export function DataTable<TData extends RowData>({
   showColumnMenu = true,
   columnMenu,
   toolbarFilters,
+  filtersMenu = false,
+  filtersMenuCount = 0,
   headerActions,
   headerLeading,
   filterVisibility: controlledFilterVisibility,
@@ -390,7 +404,39 @@ export function DataTable<TData extends RowData>({
             )}
           >
             {headerLeading}
-            {filters?.length ? (
+            {filtersMenu ? (
+              filters?.length || toolbarFilters || toolbarActions ? (
+                <Popover>
+                  <PopoverTrigger
+                    render={<Button variant="outline" size="sm" />}
+                  >
+                    <ListFilter aria-hidden />
+                    Filters
+                    {filtersMenuCount > 0 ? (
+                      <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+                        {filtersMenuCount}
+                      </span>
+                    ) : null}
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-80 p-3">
+                    <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                      {toolbarFilters}
+                      {filters?.map((filter) => (
+                        <ColumnFilter
+                          key={filter.columnId}
+                          table={table}
+                          filter={filter}
+                          stacked
+                        />
+                      ))}
+                    </div>
+                    {toolbarActions ? (
+                      <div className="mt-3 border-t pt-3">{toolbarActions}</div>
+                    ) : null}
+                  </PopoverContent>
+                </Popover>
+              ) : null
+            ) : filters?.length ? (
               <FilterVisibilityMenu
                 filters={filters}
                 visibility={filterVisibility}
@@ -412,8 +458,10 @@ export function DataTable<TData extends RowData>({
         </div>
 
         {/* Row 2: the filter controls, with any caller-supplied actions pushed
-            to the right of the same line. */}
-        {visibleFilters.length || toolbarFilters || toolbarActions ? (
+            to the right of the same line. With `filtersMenu` they live in the
+            popover instead, so the whole row disappears on desktop. */}
+        {!filtersMenu &&
+        (visibleFilters.length || toolbarFilters || toolbarActions) ? (
           <div
             className={cn(
               "flex flex-wrap items-center gap-x-4 gap-y-2",
@@ -640,9 +688,12 @@ function SortIcon({ direction }: { direction: false | SortDirection }) {
 function ColumnFilter<TData extends RowData>({
   table,
   filter,
+  stacked = false,
 }: {
   table: ReactTable<DataTableFeatures, TData>;
   filter: DataTableFilter;
+  /** Label above a full-width control, for the Filters popover. */
+  stacked?: boolean;
 }) {
   const column = table.getColumn(filter.columnId);
   if (!column) return null;
@@ -659,14 +710,17 @@ function ColumnFilter<TData extends RowData>({
   // Each control carries a visible label: a select only shows its *value*, so
   // without this several filters (all three booleans, for one) read identically.
   const labelId = `${filter.columnId}-filter-label`;
+  const wrapperClass = stacked
+    ? "flex flex-col items-stretch gap-1.5"
+    : "flex items-center gap-2";
+  const labelClass = stacked
+    ? "text-xs font-medium text-muted-foreground"
+    : "text-sm font-medium whitespace-nowrap text-muted-foreground";
 
   if (filter.multiple) {
     return (
-      <div className="flex items-center gap-2">
-        <span
-          id={labelId}
-          className="text-sm font-medium whitespace-nowrap text-muted-foreground"
-        >
+      <div className={wrapperClass}>
+        <span id={labelId} className={labelClass}>
           {filter.label}
         </span>
         <MultiSelectFilter
@@ -677,17 +731,15 @@ function ColumnFilter<TData extends RowData>({
           onChange={(values) =>
             column.setFilterValue(values.length ? values.join(",") : undefined)
           }
+          className={stacked ? "w-full justify-between" : undefined}
         />
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span
-        id={labelId}
-        className="text-sm font-medium whitespace-nowrap text-muted-foreground"
-      >
+    <div className={wrapperClass}>
+      <span id={labelId} className={labelClass}>
         {filter.label}
       </span>
       <Select
@@ -699,7 +751,11 @@ function ColumnFilter<TData extends RowData>({
           )
         }
       >
-        <SelectTrigger size="sm" className="w-fit" aria-labelledby={labelId}>
+        <SelectTrigger
+          size="sm"
+          className={stacked ? "w-full" : "w-fit"}
+          aria-labelledby={labelId}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
