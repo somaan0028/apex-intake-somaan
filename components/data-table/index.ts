@@ -10,4 +10,5 @@ export {
   type DataTableProps,
 } from "./data-table";
 export { dataTableFeatures, type DataTableFeatures } from "./features";
+export { MultiSelectFilter } from "./multi-select-filter";
 export { useTableQuerySync } from "./use-table-query-sync";

@@ -1,22 +1,31 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
-import { defaultAddedFrom, type LeadsView } from "@/lib/leads/constants";
-import { LEADS_DEFAULT_SORT, listLeads } from "@/lib/leads/queries";
+import type { LeadsView } from "@/lib/leads/constants";
+import { parseKanbanLimits } from "@/lib/leads/kanban";
+import { normalizeLeadsQueryParams } from "@/lib/leads/query-params";
+import {
+  LEADS_DEFAULT_SORT,
+  listKanbanBoard,
+  listLeads,
+  type LeadRow,
+  type LeadsBoard,
+} from "@/lib/leads/queries";
 import {
   LEADS_VIEW_COOKIE,
   isLeadsView,
 } from "@/lib/leads/view-preference";
-import { loadTablePage } from "@/lib/table-query";
+import {
+  loadTablePage,
+  parseTableQuery,
+  type TableQuery,
+} from "@/lib/table-query";
 import { listAssignees } from "@/lib/users/queries";
 import { LeadsTable } from "./leads-table";
 
 export const metadata: Metadata = {
   title: "Leads · Apex Intake Desk",
 };
-
-/** The Kanban board needs the whole filtered set, not one table page. */
-const KANBAN_PAGE_SIZE = 1000;
 
 /**
  * Same shape as the users page: the URL is the query, the server does the
@@ -41,39 +50,34 @@ export default async function LeadsPage({
       ? preferredView
       : "kanban";
   const sortExplicit = params.sort === "createdAt";
-  const queryParams = { ...params };
-  if (view === "kanban") {
-    // The board groups by stage, so an inherited stage filter would silently
-    // hide every other column.
-    delete queryParams["filter.stage"];
-  }
-  // No date window by default: the Added filter starts cleared ("Any time").
-  // A URL that already carries from/to dates is treated as a custom range, and
-  // a custom range without a lower bound still gets the picker's default.
-  if (!queryParams["filter.addedWithin"]) {
-    const hasCustomDates =
-      Boolean(queryParams["filter.addedFrom"]) ||
-      Boolean(queryParams["filter.addedTo"]);
-    if (hasCustomDates) queryParams["filter.addedWithin"] = "custom";
-  }
-  if (
-    queryParams["filter.addedWithin"] === "custom" &&
-    !queryParams["filter.addedFrom"]
-  ) {
-    queryParams["filter.addedFrom"] = defaultAddedFrom();
-  }
-  const { query, rows, total } = await loadTablePage(
-    Promise.resolve(queryParams),
-    { defaultSort: LEADS_DEFAULT_SORT },
-    (parsed) =>
-      listLeads(
-        view === "kanban"
-          ? { ...parsed, page: 1, pageSize: KANBAN_PAGE_SIZE }
-          : parsed,
-        user,
-      ),
-  );
+  const queryParams = normalizeLeadsQueryParams(params, view);
   const assignees = listAssignees(user);
+  const limits = parseKanbanLimits(params);
+
+  let query: TableQuery;
+  let rows: LeadRow[] = [];
+  let total: number;
+  let board: LeadsBoard | undefined;
+
+  if (view === "kanban") {
+    // The board is six independent windows over the same filtered set. The
+    // server never pages it as a whole; each lane asks for its own slice.
+    const parsed = parseTableQuery(queryParams, {
+      defaultSort: LEADS_DEFAULT_SORT,
+    });
+    board = listKanbanBoard({ ...parsed, page: 1 }, user, limits);
+    query = { ...parsed, page: 1, sort: board.sort };
+    total = board.total;
+  } else {
+    const page = await loadTablePage(
+      Promise.resolve(queryParams),
+      { defaultSort: LEADS_DEFAULT_SORT },
+      (parsed) => listLeads(parsed, user),
+    );
+    query = page.query;
+    rows = page.rows;
+    total = page.total;
+  }
 
   return (
     <div className="space-y-4">
@@ -86,6 +90,8 @@ export default async function LeadsPage({
       <LeadsTable
         leads={rows}
         total={total}
+        board={board}
+        laneLimits={limits}
         query={query}
         assignees={assignees}
         viewer={user}

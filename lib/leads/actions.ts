@@ -18,6 +18,7 @@ import {
   markLeadNotDuplicateForActor,
   saveLeadFieldsForActor,
   sendLeadForActor,
+  setLeadBookmarkForActor,
   type DuplicateCheckResult,
   type LeadMutationResult,
   type SendLeadResult,
@@ -50,7 +51,25 @@ export async function saveLeadFields(
   return result;
 }
 
-/** Permanently delete a lead (admin only). */
+/** Add or remove the signed-in user's bookmark for a lead. */
+export async function setLeadBookmark(
+  id: number,
+  bookmarked: boolean,
+): Promise<LeadMutationResult> {
+  const actor = await requireUser();
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, error: "Unknown lead." };
+  }
+
+  const result = setLeadBookmarkForActor(actor, id, bookmarked);
+  if (result.ok) revalidatePath("/leads");
+  return result;
+}
+
+/**
+ * Permanently delete a lead (admin only).
+ */
 export async function deleteLead(
   formData: FormData,
 ): Promise<LeadMutationResult> {

@@ -158,6 +158,10 @@ their Lawmatics CRM.
 - `api_tokens` (one row per personal access token for external agents) stores only the
   SHA-256 hash of the token plus a display `prefix`, its owner and `last_used_at`; the raw
   token is shown once and never persisted.
+- `lead_bookmarks` is the personal many-to-many bookmark table: `(user_id, lead_id)` is the
+  primary key, both foreign keys cascade on delete, and `created_at` records when the
+  bookmark was made. It is never shared: the grid's `filter.bookmarked=yes|no` always
+  resolves against the signed-in actor, and bookmarking records no activity.
 - `activities` is the append-only audit log. `type` is one of the canonical codes in
   `lib/db/schema/activities.ts` (`lead:stage_update`, `lead:claimed`, `lead:released`,
   `lead:assigned`, `lead:unassigned`, `lead:send_to_firm`,
@@ -400,7 +404,9 @@ their Lawmatics CRM.
   and keeps a stored raw campaign value selectable until the user changes it.
   The CSV seeder now preserves an unrecognised campaign verbatim and refuses a
   missing one. The **Firm submission** section is shown only while the lead's case
-  type is MVA. A potential-duplicate banner offers **View similar** and **Mark as Not
+  type is MVA. The dialog header carries a **bookmark** toggle (filled when the
+  signed-in user has bookmarked the lead); it updates optimistically through
+  `setLeadBookmark` and never records an activity. A potential-duplicate banner offers **View similar** and **Mark as Not
   Duplicate**, and **Check for Duplicates** sits beside Delete for an on-demand re-run;
   only admins can dismiss a grouping. On a
   lead filed for someone else, the filler's name, phone, email and relationship
@@ -435,8 +441,14 @@ their Lawmatics CRM.
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
   card therefore keeps the last chosen view, while filters and search still come from
-  the URL. The server loads the filtered set (up to 1000 rows) for the
-  board; cards drag between stage columns through the same `saveLeadFields`
+  the URL. The board is windowed **per stage**, not paged as a whole: the server
+  returns the newest 10 cards of each column (expandable with "Show more", which
+  writes `board.<STAGE>=<limit>`, 10 cards at a time up to a 200-card ceiling)
+  plus a true grouped count per stage, so a column badge always describes the
+  whole filtered backlog rather than the loaded slice. A card moved into a lane
+  whose window does not contain it stays pinned in that lane until the board's
+  filters, search or sort change. Cards drag between stage columns through the
+  same `saveLeadFields`
   action, carry an eye button that opens the detail dialog, and reuse the inline
   assignee control. Touch has no native HTML drag, so every card also carries a
   grip handle that runs a pointer drag for mouse and touch: it hit-tests
@@ -448,12 +460,30 @@ their Lawmatics CRM.
   dropped in Kanban because the board already groups by stage. Grouped leads carry an
   amber warning icon in both views. The **Duplicates** filter
   (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
-  `filter.dupGroup=<id>`, which ignores every other filter.
+  `filter.dupGroup=<id>`, which ignores every other filter. A **Bookmarked** filter
+  (`filter.bookmarked=yes|no`) is visible by default and is always personal: "yes"
+  means bookmarked by the signed-in user, never by anyone else. The filter is hosted
+  by a hidden, non-hideable table column so it uses the same URL/saved-view plumbing
+  as every other filter, and it works unchanged in Table, Kanban, and CSV export.
+  **Case type**, **Stage**, and **Assigned to** are multi-select: their URL value is a
+  comma-separated list (`filter.stage=NEW,CONTACTED`), parsed through
+  `parseFilterValues` / `readFilterList`, so one filter can match several values.
+  A `DataTableFilter` opts into this with `multiple: true`; the shared
+  `MultiSelectFilter` renders a checkbox popover with **Select all** / **Clear**
+  and keeps a local draft while the URL round-trip is in flight.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("All Time"). It offers `24h`, `3d`, `7d`, `30d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional
   `filter.addedTo`; `listLeads` turns those into `created_at` bounds. The custom
   lower date has no clear control; the upper date can be cleared.
+- **Export CSV** (`app/api/leads/export/route.ts`, download icon beside Clear
+  Filters) downloads every lead under the current filters, search and sort — not
+  the visible page or the loaded Kanban cards. `lib/leads/query-params.ts` applies
+  the same view/date normalisation the page uses, and the route reuses
+  `listLeadsForExport` (the `listLeads` query with no page window), so visibility,
+  attribution, and duplicate-group scoping can never disagree with the grid.
+  Attribution columns are included only for viewers with `leads.view.attribution`;
+  `lib/leads/csv.ts` writes labels, ISO dates, and formula-injection safe cells.
 - **Saved Views** (`lib/leads/saved-views.ts`) are browser-local, never sent to
   the server: `localStorage` holds the named views plus the last place the person
   left off (view, filter values, search, sort, filter/column visibility, hidden

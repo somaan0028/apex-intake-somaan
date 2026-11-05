@@ -9,7 +9,12 @@
 import { and, asc, count, desc, eq, isNull, like, or, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn, AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import type { AppDatabase } from "@/lib/db";
-import type { ListPageResult, TableQuery, TableSort } from "@/lib/table-query";
+import {
+  parseFilterValues,
+  type ListPageResult,
+  type TableQuery,
+  type TableSort,
+} from "@/lib/table-query";
 
 /** `col LIKE %term%`, OR'd across `columns`; `undefined` when there is no term. */
 export function searchCondition(
@@ -42,6 +47,20 @@ export function readFilter<T extends string>(
 ): T | null {
   const value = query.filters[id];
   return value !== undefined && isAllowed(value) ? value : null;
+}
+
+/**
+ * Reads every allowed choice from a multi-value filter.
+ *
+ * The URL carries multi-select values as a comma-separated list; anything that
+ * is not on the caller's allow-list is discarded rather than reaching the SQL.
+ */
+export function readFilterList<T extends string>(
+  query: TableQuery,
+  id: string,
+  isAllowed: (value: string) => value is T,
+): T[] {
+  return parseFilterValues(query.filters[id]).filter(isAllowed);
 }
 
 /** Combines conditions with AND, dropping the empty ones. */

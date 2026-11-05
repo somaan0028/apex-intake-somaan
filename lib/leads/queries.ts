@@ -7,7 +7,9 @@
  */
 import {
   and,
+  asc,
   count,
+  desc,
   eq,
   getTableColumns,
   gte,
@@ -15,6 +17,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  not,
   notInArray,
   or,
   sql,
@@ -28,20 +31,24 @@ import {
   booleanFilter,
   planListPage,
   readFilter,
+  readFilterList,
   searchCondition,
   type ListPageResult,
 } from "@/lib/db/list-query";
 import {
   CASE_TYPES,
   LEAD_STAGES,
+  leadBookmarks,
   leads,
   users,
   type CaseType,
   type Lead,
   type LeadStage,
 } from "@/lib/db/schema";
-import type { TableQuery } from "@/lib/table-query";
+import type { TableQuery, TableSort } from "@/lib/table-query";
+import { parseFilterValues } from "@/lib/table-query";
 import { LEAD_SOURCES, UNASSIGNED, type LeadSource } from "./constants";
+import { KANBAN_DEFAULT_LANE_SIZE } from "./kanban";
 
 /**
  * Attribution/tracking fields, visible only to viewers holding
@@ -61,6 +68,8 @@ type AttributionKey = (typeof ATTRIBUTION_KEYS)[number];
 /** A row as it comes out of SQL, before the duplicate group counts are added. */
 type LeadBaseRow = Omit<Lead, "dupMatchString"> & {
   assignedToName: string | null;
+  /** True when the current actor has bookmarked this lead. */
+  bookmarked: boolean;
 };
 
 /**
@@ -75,6 +84,8 @@ type LeadBaseRow = Omit<Lead, "dupMatchString"> & {
  */
 export type LeadRow = Omit<Lead, AttributionKey | "dupMatchString"> & {
   assignedToName: string | null;
+  /** True when the signed-in viewer has bookmarked this lead. */
+  bookmarked: boolean;
   /** Every lead in this lead's duplicate group, including itself. */
   dupGroupCount: number;
   /** Group members this viewer is allowed to see, including itself. */
@@ -241,12 +252,34 @@ export function leadsVisibilityCondition(actor: Actor): SQL | undefined {
   return conditions.length ? or(...conditions) : sql`0`;
 }
 
-/** One page of leads for `query` that `actor` is allowed to see, plus the total. */
-export function listLeads(
-  query: TableQuery,
-  actor: Actor,
-): ListPageResult<LeadRow> {
-  const db = getDb();
+/**
+ * SQL predicate: the signed-in actor has bookmarked this lead.
+ *
+ * The same expression is used to select each row's `bookmarked` flag and to
+ * apply the grid's Bookmarked filter, so the filter and the dialog icon can
+ * never disagree. It is always scoped to the actor — bookmarks are personal.
+ */
+function bookmarkedBy(actor: Actor): SQL<boolean> {
+  return sql<boolean>`exists (
+    select 1 from ${leadBookmarks}
+    where ${leadBookmarks.leadId} = ${leads.id}
+      and ${leadBookmarks.userId} = ${actor.id}
+  )`.mapWith(Boolean);
+}
+
+/**
+ * Visibility plus every active filter, shared by the table and the board.
+ *
+ * Keeping this in one place is what makes the board's column counts and its
+ * cards agree with the grid: both run the same predicate, so a count can never
+ * include a lead the viewer is not allowed to open.
+ */
+interface LeadScope {
+  where: SQL | undefined;
+  showAttribution: boolean;
+}
+
+function leadScope(query: TableQuery, actor: Actor): LeadScope {
   const showAttribution = can(actor.role, "leads.view.attribution");
 
   // "View similar" is an explicit request for one duplicate group. It ignores
@@ -273,23 +306,32 @@ export function listLeads(
       ]),
     ];
 
-    const caseType = readFilter(query, "caseType", isCaseType);
-    if (caseType === "OTHER") {
-      // "Other" is a bucket, not just the literal code: it covers every stored
-      // case type that is not one of the ad campaigns, including a raw campaign
-      // value we did not recognise (e.g. `workers_comp`).
-      conditions.push(
-        and(
+    // Case type accepts more than one choice. "OTHER" is a bucket, not just the
+    // literal code: it covers every stored case type that is not one of the ad
+    // campaigns, including a raw campaign value we did not recognise.
+    const caseTypes = readFilterList(query, "caseType", isCaseType);
+    if (caseTypes.length) {
+      const parts: SQL[] = [];
+      const canonical = caseTypes.filter((value) => value !== "OTHER");
+      if (canonical.length) {
+        parts.push(inArray(leads.caseType, canonical));
+      }
+      if (caseTypes.includes("OTHER")) {
+        const other = and(
           isNotNull(leads.caseType),
           notInArray(leads.caseType, ["MVA", "MASS_TORT"]),
-        ),
-      );
-    } else if (caseType) {
-      conditions.push(eq(leads.caseType, caseType));
+        );
+        if (other) parts.push(other);
+      }
+      if (parts.length) {
+        conditions.push(parts.length === 1 ? parts[0] : or(...parts));
+      }
     }
 
-    const stage = readFilter(query, "stage", isLeadStage);
-    if (stage) conditions.push(eq(leads.stage, stage));
+    // Stage accepts more than one choice (the table view uses this; the board
+    // drops the filter entirely because it already groups by stage).
+    const stages = readFilterList(query, "stage", isLeadStage);
+    if (stages.length) conditions.push(inArray(leads.stage, stages));
 
     // Source is attribution data: filtering by it would leak which leads came
     // from where, so the condition is only applied for viewers allowed to see it.
@@ -298,14 +340,19 @@ export function listLeads(
       : null;
     if (source) conditions.push(eq(leads.source, source));
 
-    // The assignee filter carries either a user id or the "unassigned" sentinel.
-    const assignee = query.filters.assignedTo;
-    if (assignee === UNASSIGNED) {
-      conditions.push(isNull(leads.assignedToId));
-    } else if (assignee) {
-      const id = Number(assignee);
-      if (Number.isInteger(id) && id > 0) {
-        conditions.push(eq(leads.assignedToId, id));
+    // The assignee filter accepts several ids plus the "unassigned" sentinel.
+    const assigneeValues = parseFilterValues(query.filters.assignedTo);
+    if (assigneeValues.length) {
+      const parts: SQL[] = [];
+      if (assigneeValues.includes(UNASSIGNED)) {
+        parts.push(isNull(leads.assignedToId));
+      }
+      const ids = assigneeValues
+        .map(Number)
+        .filter((id) => Number.isInteger(id) && id > 0);
+      if (ids.length) parts.push(inArray(leads.assignedToId, ids));
+      if (parts.length) {
+        conditions.push(parts.length === 1 ? parts[0] : or(...parts));
       }
     }
 
@@ -316,6 +363,15 @@ export function listLeads(
       conditions.push(isNotNull(leads.dupGroupId));
     } else if (potentialDuplicate === "no") {
       conditions.push(isNull(leads.dupGroupId));
+    }
+
+    // Personal bookmark filter. "Yes" means bookmarked by this actor, never by
+    // anyone else; "No" is the complement.
+    const bookmarked = query.filters.bookmarked;
+    if (bookmarked === "yes") {
+      conditions.push(bookmarkedBy(actor));
+    } else if (bookmarked === "no") {
+      conditions.push(not(bookmarkedBy(actor)));
     }
 
     // Tri-state qualifying answers (yes / no / unknown).
@@ -359,6 +415,17 @@ export function listLeads(
     }
   }
 
+  return { where: allOf(conditions), showAttribution };
+}
+
+/** One page of leads for `query` that `actor` is allowed to see, plus the total. */
+export function listLeads(
+  query: TableQuery,
+  actor: Actor,
+): ListPageResult<LeadRow> {
+  const db = getDb();
+  const { where, showAttribution } = leadScope(query, actor);
+
   // Sorting by source is the same side-channel as filtering by it; fall back to
   // the default order rather than order by a column the viewer can't see.
   const pageQuery =
@@ -369,14 +436,18 @@ export function listLeads(
   const plan = planListPage({
     db,
     table: leads,
-    where: allOf(conditions),
+    where,
     query: pageQuery,
     sortColumns: SORT_COLUMNS,
     defaultSort: LEADS_DEFAULT_SORT,
   });
 
   const selected = db
-    .select({ ...getTableColumns(leads), assignedToName: users.name })
+    .select({
+      ...getTableColumns(leads),
+      assignedToName: users.name,
+      bookmarked: bookmarkedBy(actor),
+    })
     .from(leads)
     .leftJoin(users, eq(leads.assignedToId, users.id))
     .where(plan.where)
@@ -403,3 +474,132 @@ export function listLeads(
     sort: plan.sort,
   };
 }
+
+/**
+ * Every lead matching `query`, not one page.
+ *
+ * The CSV export deliberately ignores the grid's page window. Rather than
+ * re-implement the filters, it reuses `listLeads` with a page large enough to
+ * hold the whole filtered set, so an export can never disagree with the grid
+ * about visibility, attribution, search or filters.
+ */
+export function listLeadsForExport(
+  query: TableQuery,
+  actor: Actor,
+): LeadRow[] {
+  return listLeads(
+    { ...query, page: 1, pageSize: Number.MAX_SAFE_INTEGER },
+    actor,
+  ).rows;
+}
+
+/**
+ * A board is not a page: it is one bounded window per stage. Each lane gets its
+ * own newest-first slice, while `counts` describes the whole filtered set, so a
+ * header badge never lies about how much work a column holds.
+ */
+export interface LeadsBoard {
+  lanes: Record<LeadStage, LeadRow[]>;
+  /** Every matching lead per stage, ignoring the lane window. */
+  counts: Record<LeadStage, number>;
+  total: number;
+  /** The order actually applied to every lane. */
+  sort: TableSort;
+}
+
+/**
+ * Resolve the board's ORDER BY once, applying the same attribution guard the
+ * grid uses: a viewer who cannot see `source` is not ordered by it either.
+ */
+function resolveBoardOrder(
+  query: TableQuery,
+  showAttribution: boolean,
+): { orderBy: SQL; sort: TableSort } {
+  const requested =
+    query.sort && query.sort.id in SORT_COLUMNS ? query.sort : null;
+  const usable =
+    requested && (showAttribution || requested.id !== "source")
+      ? requested
+      : null;
+  const sortId = (usable?.id ?? LEADS_DEFAULT_SORT.id) as LeadSortKey;
+  const sortDesc = usable ? usable.desc : LEADS_DEFAULT_SORT.desc;
+  const column = SORT_COLUMNS[sortId];
+  return {
+    orderBy: sortDesc ? desc(column) : asc(column),
+    sort: { id: sortId, desc: sortDesc },
+  };
+}
+
+/**
+ * The Kanban board's data: the first `limits[stage]` cards of every stage plus
+ * the true count of each stage under the same visibility and filters.
+ *
+ * Six small indexed queries are easier to reason about than one window-function
+ * query, and at this scale the difference is noise. Duplicate-group counts are
+ * attached once over the combined result rather than per lane.
+ */
+export function listKanbanBoard(
+  query: TableQuery,
+  actor: Actor,
+  limits: Record<LeadStage, number>,
+): LeadsBoard {
+  const db = getDb();
+  const { where, showAttribution } = leadScope(query, actor);
+  const { orderBy, sort } = resolveBoardOrder(query, showAttribution);
+
+  // Counts ignore the lane window, so each header reflects the full backlog.
+  const counts = Object.fromEntries(
+    LEAD_STAGES.map((stage) => [stage, 0]),
+  ) as Record<LeadStage, number>;
+  let total = 0;
+  const countRows = db
+    .select({ stage: leads.stage, value: count() })
+    .from(leads)
+    .where(where)
+    .groupBy(leads.stage)
+    .all();
+  for (const row of countRows) {
+    counts[row.stage] = row.value;
+    total += row.value;
+  }
+
+  // Fetch each lane in the board's order. Visibility and filters apply to every
+  // query, so a lane can never surface a lead the viewer could not open.
+  const combined: LeadBaseRow[] = [];
+  for (const stage of LEAD_STAGES) {
+    const limit = Math.max(0, limits[stage] ?? KANBAN_DEFAULT_LANE_SIZE);
+    if (limit === 0) continue;
+
+    const stageRows = db
+      .select({
+        ...getTableColumns(leads),
+        assignedToName: users.name,
+        bookmarked: bookmarkedBy(actor),
+      })
+      .from(leads)
+      .leftJoin(users, eq(leads.assignedToId, users.id))
+      .where(allOf([where, eq(leads.stage, stage)]))
+      .orderBy(orderBy)
+      .limit(limit)
+      .all();
+
+    for (const { dupMatchString, ...row } of stageRows) {
+      // The matcher's comparison string never leaves the server.
+      void dupMatchString;
+      combined.push(row);
+    }
+  }
+
+  const visibleRows = showAttribution
+    ? combined
+    : combined.map(withoutAttribution);
+  const hydrated = attachDupCounts(visibleRows, actor);
+
+  const lanes = Object.fromEntries(
+    LEAD_STAGES.map((stage) => [stage, [] as LeadRow[]]),
+  ) as Record<LeadStage, LeadRow[]>;
+  for (const row of hydrated) lanes[row.stage].push(row);
+
+  return { lanes, counts, total, sort };
+}
+

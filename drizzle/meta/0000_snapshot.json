@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "96e34e72-469e-4a68-82ef-d5121161e2b9",
+  "id": "d1fa91a4-da27-4831-ae6b-71d5394b5448",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activities": {
@@ -862,6 +862,80 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "lead_bookmarks": {
+      "name": "lead_bookmarks",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lead_id": {
+          "name": "lead_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "lead_bookmarks_lead_id_idx": {
+          "name": "lead_bookmarks_lead_id_idx",
+          "columns": [
+            "lead_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "lead_bookmarks_user_id_users_id_fk": {
+          "name": "lead_bookmarks_user_id_users_id_fk",
+          "tableFrom": "lead_bookmarks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "lead_bookmarks_lead_id_leads_id_fk": {
+          "name": "lead_bookmarks_lead_id_leads_id_fk",
+          "tableFrom": "lead_bookmarks",
+          "tableTo": "leads",
+          "columnsFrom": [
+            "lead_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "lead_bookmarks_user_id_lead_id_pk": {
+          "columns": [
+            "user_id",
+            "lead_id"
+          ],
+          "name": "lead_bookmarks_user_id_lead_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     }

@@ -133,6 +133,25 @@ export function parseTableQuery(
   return { page, pageSize, sort, search: read(SEARCH_PARAM) ?? "", filters };
 }
 
+/**
+ * Split a filter value into its comma-separated choices.
+ *
+ * Multi-select filters serialize as `filter.stage=NEW,CONTACTED`. A normal
+ * single-value filter is simply a one-element list, so callers can use the same
+ * parser. Empty entries, surrounding spaces, and duplicates are dropped.
+ */
+export function parseFilterValues(
+  value: string | undefined | null,
+): string[] {
+  if (!value) return [];
+  const seen = new Set<string>();
+  for (const part of value.split(",")) {
+    const trimmed = part.trim();
+    if (trimmed) seen.add(trimmed);
+  }
+  return [...seen];
+}
+
 /** Serialize a query back to URL params, omitting values equal to the defaults. */
 export function tableQueryToParams(query: TableQuery): URLSearchParams {
   const params = new URLSearchParams();
