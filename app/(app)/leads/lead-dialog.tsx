@@ -748,8 +748,8 @@ function LeadForm({
 
   return (
     <>
-      <DialogHeader className="flex-row items-start justify-between gap-3 pr-9">
-        <DialogTitle className="min-w-0">
+      <DialogHeader className="flex-row items-center gap-2 pr-8">
+        <DialogTitle className="min-w-0 truncate">
           {[lead.injuredFirstName, lead.injuredLastName]
             .filter(Boolean)
             .join(" ") || "Lead details"}
