@@ -24,7 +24,7 @@ export interface UserPreferences {
 export const DEFAULT_PREFERENCES: UserPreferences = {
   appearance: {
     theme: DEFAULT_THEME_ID,
-    mode: "system",
+    mode: "light",
   },
 };
 

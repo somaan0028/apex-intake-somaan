@@ -15,7 +15,7 @@ import {
 
 const appearanceSchema = z.object({
   theme: z.enum(THEME_IDS).catch(DEFAULT_THEME_ID),
-  mode: z.enum(THEME_MODES).catch("system"),
+  mode: z.enum(THEME_MODES).catch("light"),
 });
 
 const preferencesSchema = z.object({
@@ -30,7 +30,7 @@ export function normalizePreferences(value: unknown): UserPreferences {
   return {
     appearance: {
       theme: parsed.data.appearance?.theme ?? DEFAULT_THEME_ID,
-      mode: parsed.data.appearance?.mode ?? "system",
+      mode: parsed.data.appearance?.mode ?? "light",
     },
   };
 }

@@ -183,18 +183,23 @@ their Lawmatics CRM.
   Apex (Default), Sakura, WhatsApp, Retro, Zen, Claude, Bold Wikipedia and Burgundy.
   Add a theme by pasting only its variable block and adding one registry entry; do not
   copy TweakCN's `@theme inline`, base layer, font overrides, or `--spacing`.
-- The `apex-theme=<theme>:<mode>` cookie is a boot cache, not the source of truth. Login and
-  every appearance change set it; logout clears it. `lib/themes/boot-script.ts` runs in the
-  initial HTML via `next/script` `beforeInteractive`, validates the values, and sets
-  `data-theme`, `data-theme-mode`, the `dark` class and `color-scheme` before first paint.
-  `<html>` carries `suppressHydrationWarning` for that pre-hydration change.
-- Modes are `light`, `dark` and `system`; system mode installs a
-  `prefers-color-scheme` listener. `components/ui/sonner.tsx` follows the `dark` class
-  rather than next-themes. Scrollbars are themed too: `app/globals.css` sets
-  `scrollbar-color` from `--border` and a matching `::-webkit-scrollbar` thumb.
+- Appearance is **scoped to the authenticated shell**. `app/(app)/layout.tsx` reads the
+  signed-in user's preferences from the database, then renders an inline boot script
+  (`buildThemeBootScript`) and `components/theme-scope.tsx`. Those set `data-theme`,
+  `data-theme-mode`, the `dark` class and `color-scheme` on `<html>`. Public pages (the
+  intake form and login) render neither, so they always keep the default light palette.
+  The scope also reapplies the theme on a soft navigation into the shell (login →
+  dashboard) and removes the attributes when the shell unmounts (logout), because the
+  root `<html>` element survives client-side navigation. There is no theme cookie.
+  `<html>` carries `suppressHydrationWarning` for the pre-hydration change.
+- The defaults are theme `default` and mode **`light`**; `system` is opt-in. Modes are
+  `light`, `dark` and `system`, and system mode installs a `prefers-color-scheme`
+  listener. `components/ui/sonner.tsx` follows the `dark` class rather than next-themes.
+  Scrollbars are themed too: `app/globals.css` sets `scrollbar-color` from `--border` and
+  a matching `::-webkit-scrollbar` thumb.
 - The Preferences page's **Appearance** section (`app/(app)/settings/preferences/`) applies
   changes optimistically, then calls `updateAppearance` (`lib/preferences/actions.ts`) to
-  save the JSON and refresh the cookie. The preview cards scope a theme to their own
+  save the JSON. The preview cards scope a theme to their own
   subtree with `data-theme`, so they never duplicate colour values in JavaScript.
 
 ## AI assistant

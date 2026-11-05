@@ -1,26 +1,29 @@
 /**
- * The inline script that runs before React and before first paint.
+ * The inline script that runs before React and before first paint inside the
+ * authenticated app shell.
  *
- * It reads the theme cookie, validates it against the IDs this build knows, and
- * applies `data-theme` plus the `dark` class to `<html>`. A `system` mode also
- * installs a media-query listener so the app follows the OS while it is open.
+ * It is rendered by `app/(app)/layout.tsx`, not the root layout, so public
+ * pages (intake form, login) always keep the default light palette. The theme
+ * and mode are known on the server from the signed-in user's preferences, so
+ * they are embedded directly instead of being read from a cookie.
+ *
+ * A `system` mode also installs a media-query listener so the app follows the
+ * OS while it is open.
  */
-import { THEME_IDS, DEFAULT_THEME_ID } from "./registry";
-import { THEME_MODES } from "@/lib/preferences/types";
+import { THEME_MODES, type ThemeMode } from "@/lib/preferences/types";
+import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from "./registry";
 
 const allowedThemes = JSON.stringify(THEME_IDS);
 const allowedModes = JSON.stringify(THEME_MODES);
-const defaultTheme = JSON.stringify(DEFAULT_THEME_ID);
 
-export const THEME_BOOT_SCRIPT = `(function () {
+/** Build the boot script for the signed-in user's saved appearance. */
+export function buildThemeBootScript(theme: ThemeId, mode: ThemeMode): string {
+  return `(function () {
   try {
     var allowedThemes = ${allowedThemes};
     var allowedModes = ${allowedModes};
-    var match = document.cookie.match(/(?:^|; )apex-theme=([^;]+)/);
-    var raw = match ? decodeURIComponent(match[1]) : "";
-    var parts = raw.split(":");
-    var theme = allowedThemes.indexOf(parts[0]) >= 0 ? parts[0] : ${defaultTheme};
-    var mode = allowedModes.indexOf(parts[1]) >= 0 ? parts[1] : "system";
+    var theme = allowedThemes.indexOf(${JSON.stringify(theme)}) >= 0 ? ${JSON.stringify(theme)} : ${JSON.stringify(DEFAULT_THEME_ID)};
+    var mode = allowedModes.indexOf(${JSON.stringify(mode)}) >= 0 ? ${JSON.stringify(mode)} : "light";
     var root = document.documentElement;
     var media = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -42,3 +45,4 @@ export const THEME_BOOT_SCRIPT = `(function () {
     // The CSS fallback in globals.css keeps the page usable if this fails.
   }
 })();`;
+}

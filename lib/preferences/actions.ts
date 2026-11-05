@@ -12,7 +12,6 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { setThemeCookie } from "@/lib/themes/cookie";
 import { isThemeId, type ThemeId } from "@/lib/themes/registry";
 import { isThemeMode, type ThemeMode } from "./types";
 
@@ -21,7 +20,7 @@ export interface AppearanceResult {
   error?: string;
 }
 
-/** Persist the selected theme and colour mode, then refresh the boot cookie. */
+/** Persist the selected theme and colour mode for the signed-in user. */
 export async function updateAppearance(input: {
   theme: string;
   mode: string;
@@ -66,7 +65,6 @@ export async function updateAppearance(input: {
     .where(eq(users.id, actor.id))
     .run();
 
-  await setThemeCookie(theme, mode);
   revalidatePath("/settings/preferences");
   return { ok: true };
 }

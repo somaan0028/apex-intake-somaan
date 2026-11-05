@@ -20,10 +20,3 @@ export function getUserPreferences(userId: number): UserPreferences {
 
   return normalizePreferences(row?.preferences);
 }
-
-/** Same reader for a row that was already loaded (for example during login). */
-export function preferencesFromUserRow(row: {
-  preferences: unknown;
-}): UserPreferences {
-  return normalizePreferences(row.preferences);
-}
