@@ -301,13 +301,14 @@ export default async function OverviewPage() {
       </div>
 
       {/* Time-sensitive queues come first, but they are notices, not content.
-          They share one line while both fit and wrap onto their own line when
-          the header runs out of room. */}
+          Each bar grows to share the row; a 20rem basis makes the second wrap
+          onto its own full-width line when the header runs out of room. */}
       {hasAlerts ? (
         <div className="flex flex-wrap items-center gap-2">
           {showSendQueue && metrics.readyToSend > 0 ? (
             <AlertBar
               tone="positive"
+              className="grow basis-80"
               action={
                 <Button
                   size="sm"
@@ -336,6 +337,7 @@ export default async function OverviewPage() {
           {metrics.potentialDuplicates > 0 ? (
             <AlertBar
               tone="warning"
+              className="grow basis-80"
               action={
                 <Button
                   size="sm"
