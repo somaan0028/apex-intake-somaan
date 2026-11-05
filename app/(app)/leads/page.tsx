@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
-import { defaultAddedFrom, type LeadsView } from "@/lib/leads/constants";
+import type { LeadsView } from "@/lib/leads/constants";
 import { parseKanbanLimits } from "@/lib/leads/kanban";
+import { normalizeLeadsQueryParams } from "@/lib/leads/query-params";
 import {
   LEADS_DEFAULT_SORT,
   listKanbanBoard,
@@ -49,27 +50,7 @@ export default async function LeadsPage({
       ? preferredView
       : "kanban";
   const sortExplicit = params.sort === "createdAt";
-  const queryParams = { ...params };
-  if (view === "kanban") {
-    // The board groups by stage, so an inherited stage filter would silently
-    // hide every other column.
-    delete queryParams["filter.stage"];
-  }
-  // No date window by default: the Added filter starts cleared ("Any time").
-  // A URL that already carries from/to dates is treated as a custom range, and
-  // a custom range without a lower bound still gets the picker's default.
-  if (!queryParams["filter.addedWithin"]) {
-    const hasCustomDates =
-      Boolean(queryParams["filter.addedFrom"]) ||
-      Boolean(queryParams["filter.addedTo"]);
-    if (hasCustomDates) queryParams["filter.addedWithin"] = "custom";
-  }
-  if (
-    queryParams["filter.addedWithin"] === "custom" &&
-    !queryParams["filter.addedFrom"]
-  ) {
-    queryParams["filter.addedFrom"] = defaultAddedFrom();
-  }
+  const queryParams = normalizeLeadsQueryParams(params, view);
   const assignees = listAssignees(user);
   const limits = parseKanbanLimits(params);
 

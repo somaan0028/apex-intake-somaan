@@ -31,6 +31,7 @@ import {
 import {
   CalendarDays,
   Columns3,
+  Download,
   Eye,
   FilterX,
   GripVertical,
@@ -144,6 +145,7 @@ import {
   BOOLEAN_FILTER_OPTIONS,
   filtersFromKey,
   filtersKey,
+  tableQueryToParams,
   type TableQuery,
 } from "@/lib/table-query";
 import { cn } from "@/lib/utils";
@@ -230,6 +232,22 @@ function applyOverride(
 
 function stopRow(event: SyntheticEvent) {
   event.stopPropagation();
+}
+
+/**
+ * The CSV download URL for the grid's current state.
+ *
+ * Page and page size are deliberately dropped: the export always covers every
+ * lead under the filters, not the visible slice. `view` is carried explicitly so
+ * the server makes the same stage-filter decision the page did.
+ */
+function leadsExportHref(query: TableQuery, view: LeadsView): string {
+  const params = tableQueryToParams(query);
+  params.delete("page");
+  params.delete("pageSize");
+  params.set("view", view);
+  const search = params.toString();
+  return `/api/leads/export${search ? `?${search}` : ""}`;
 }
 
 function leadName(lead: LeadRow): string {
@@ -1062,15 +1080,29 @@ export function LeadsTable({
         mobileControls={mobileControls}
         toolbarFilters={dateFilter}
         toolbarActions={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={clearFilters}
-          >
-            <FilterX aria-hidden />
-            <span className="hidden sm:inline">Clear Filters</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+            >
+              <FilterX aria-hidden />
+              <span className="hidden sm:inline">Clear Filters</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              nativeButton={false}
+              render={
+                <a href={leadsExportHref(query, view)} download />
+              }
+              aria-label="Download filtered leads as CSV"
+              title="Download filtered leads as CSV"
+            >
+              <Download aria-hidden />
+            </Button>
+          </div>
         }
         headerLeading={
           view === "kanban" ? (
@@ -1278,16 +1310,30 @@ export function LeadsTable({
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">Filters</p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={clearFilters}
-                >
-                  <FilterX aria-hidden />
-                  Clear
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={clearFilters}
+                  >
+                    <FilterX aria-hidden />
+                    Clear
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    nativeButton={false}
+                    render={
+                      <a href={leadsExportHref(query, view)} download />
+                    }
+                    aria-label="Download filtered leads as CSV"
+                    title="Download filtered leads as CSV"
+                  >
+                    <Download aria-hidden />
+                  </Button>
+                </div>
               </div>
 
               {dateFilter}

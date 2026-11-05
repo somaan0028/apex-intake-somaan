@@ -424,6 +424,24 @@ export function listLeads(
 }
 
 /**
+ * Every lead matching `query`, not one page.
+ *
+ * The CSV export deliberately ignores the grid's page window. Rather than
+ * re-implement the filters, it reuses `listLeads` with a page large enough to
+ * hold the whole filtered set, so an export can never disagree with the grid
+ * about visibility, attribution, search or filters.
+ */
+export function listLeadsForExport(
+  query: TableQuery,
+  actor: Actor,
+): LeadRow[] {
+  return listLeads(
+    { ...query, page: 1, pageSize: Number.MAX_SAFE_INTEGER },
+    actor,
+  ).rows;
+}
+
+/**
  * A board is not a page: it is one bounded window per stage. Each lane gets its
  * own newest-first slice, while `counts` describes the whole filtered set, so a
  * header badge never lies about how much work a column holds.

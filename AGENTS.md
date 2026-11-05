@@ -416,6 +416,14 @@ their Lawmatics CRM.
   that uses `filter.addedFrom` (required, default seven days ago) and optional
   `filter.addedTo`; `listLeads` turns those into `created_at` bounds. The custom
   lower date has no clear control; the upper date can be cleared.
+- **Export CSV** (`app/api/leads/export/route.ts`, download icon beside Clear
+  Filters) downloads every lead under the current filters, search and sort — not
+  the visible page or the loaded Kanban cards. `lib/leads/query-params.ts` applies
+  the same view/date normalisation the page uses, and the route reuses
+  `listLeadsForExport` (the `listLeads` query with no page window), so visibility,
+  attribution, and duplicate-group scoping can never disagree with the grid.
+  Attribution columns are included only for viewers with `leads.view.attribution`;
+  `lib/leads/csv.ts` writes labels, ISO dates, and formula-injection safe cells.
 - **Saved Views** (`lib/leads/saved-views.ts`) are browser-local, never sent to
   the server: `localStorage` holds the named views plus the last place the person
   left off (view, filter values, search, sort, filter/column visibility, hidden
