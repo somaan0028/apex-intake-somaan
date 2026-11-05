@@ -7,6 +7,7 @@ import {
   listActivityPerformers,
 } from "@/lib/activities/queries";
 import { loadTablePage } from "@/lib/table-query";
+import { can } from "@/lib/rbac";
 import { ActivityTable } from "./activity-table";
 
 export const metadata: Metadata = {
@@ -31,6 +32,8 @@ export default async function ActivityPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
+  // Only a role that can see every row has anything to narrow by doer.
+  const seesAllActivity = can(user.role, "activities.view.all");
 
   const { query, rows, total } = await loadTablePage(
     searchParams,
@@ -43,9 +46,13 @@ export default async function ActivityPage({
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {seesAllActivity ? "Activity" : "My Activity"}
+        </h1>
         <p className="text-muted-foreground">
-          Changes made to leads and users, newest first.
+          {seesAllActivity
+            ? "Important actions that took place in the application"
+            : "Important actions that you took in the application"}
         </p>
       </div>
 
@@ -53,7 +60,8 @@ export default async function ActivityPage({
         activities={rows}
         total={total}
         query={query}
-        performers={listActivityPerformers(user)}
+        performers={seesAllActivity ? listActivityPerformers(user) : []}
+        showPerformerFilter={seesAllActivity}
         selectedLeadLabel={activityLeadFilterLabel(user, selectedLeadId)}
       />
     </div>

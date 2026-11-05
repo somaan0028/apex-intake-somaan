@@ -163,20 +163,36 @@ export function AppSidebar({ user }: { user: AuthUser }) {
       (item) => item.permission === null || can(user.role, item.permission),
     );
 
-  const navItems = visible(NAV_ITEMS);
+  const seesAllActivity = can(user.role, "activities.view.all");
+
+  // A User only ever sees their own rows, so Activity is a personal destination
+  // beside Overview and Leads instead of a one-item Staff submenu. An admin's
+  // Activity is the desk-wide audit trail, so it stays with Users under Staff.
+  const personalActivity: NavItem = {
+    title: "My Activity",
+    url: "/activity",
+    icon: Activity,
+    permission: null,
+  };
+
+  const navItems = seesAllActivity
+    ? visible(NAV_ITEMS)
+    : [...visible(NAV_ITEMS), personalActivity];
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: visible(group.items),
+    items: visible(group.items).filter(
+      (item) => seesAllActivity || item.url !== "/activity",
+    ),
   })).filter((group) => group.items.length > 0);
   const accountItems = visible(ACCOUNT_ITEMS);
 
   return (
-    <Sidebar variant="inset">
+    <Sidebar variant="inset" collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
-              <div className="flex size-8 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
                 <ApexMark className="size-6" />
               </div>
               <div className="grid flex-1 text-left leading-tight">
@@ -287,8 +303,9 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   userId={user.id}
                   name={user.name}
                   avatarPath={user.avatarPath}
-                  className="size-8 rounded-lg"
-                  fallbackClassName="rounded-lg"
+                  // The sidebar profile is just a circle: keep the default
+                  // rounded-full shape and drop the avatar's inset border ring.
+                  className="after:hidden"
                 />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-medium">{user.name}</span>

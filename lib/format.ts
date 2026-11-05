@@ -40,8 +40,7 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
 
 /**
  * A date and time as "Mar 4, 2026, 2:05 PM"; an em dash for missing/invalid
- * input. Used in client-rendered UI (the lead dialog) and in the Overview's
- * latest-intake list, which is a server snapshot of the request.
+ * input. Used where an exact timestamp matters (the lead dialog and history).
  */
 export function formatDateTime(
   value: Date | string | number | null | undefined,
@@ -72,7 +71,7 @@ const RELATIVE_TIME_FORMAT = new Intl.RelativeTimeFormat("en-US", {
 
 /**
  * How long ago something happened: "just now", "10 minutes ago", "2 hours
- * ago", "yesterday". Anything older than a week falls back to a calendar date.
+ * ago", "9 days ago", "3 months ago".
  *
  * Rendered on the server as a snapshot of the request, so it does not tick; the
  * Activity page shows exact timestamps for anything that matters.
@@ -94,8 +93,17 @@ export function formatRelativeTime(
   if (distance < 24 * 60 * 60) {
     return RELATIVE_TIME_FORMAT.format(Math.round(seconds / 3600), "hour");
   }
-  if (distance < 7 * 24 * 60 * 60) {
+  if (distance < 30 * 24 * 60 * 60) {
     return RELATIVE_TIME_FORMAT.format(Math.round(seconds / 86400), "day");
   }
-  return formatDate(date);
+  if (distance < 365 * 24 * 60 * 60) {
+    return RELATIVE_TIME_FORMAT.format(
+      Math.round(seconds / (30 * 86400)),
+      "month",
+    );
+  }
+  return RELATIVE_TIME_FORMAT.format(
+    Math.round(seconds / (365 * 86400)),
+    "year",
+  );
 }

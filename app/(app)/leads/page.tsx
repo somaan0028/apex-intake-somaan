@@ -94,7 +94,7 @@ export default async function LeadsPage({
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
           <p className="text-muted-foreground">
-            Every lead captured by the intake desk.
+            All leads available to you
           </p>
         </div>
         {/* The callout stays as context; once the duplicate filter is on it says

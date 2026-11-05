@@ -15,7 +15,7 @@ import {
 import { requireUser } from "@/lib/auth/session";
 import { recentActivities } from "@/lib/activities/queries";
 import { LEAD_STAGES } from "@/lib/db/schema";
-import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { formatRelativeTime } from "@/lib/format";
 import { LEAD_STAGE_LABELS, caseTypeLabel } from "@/lib/labels";
 import { leadMetrics, recentLeads } from "@/lib/leads/metrics";
 import { can } from "@/lib/rbac";
@@ -72,7 +72,7 @@ function Pipeline({ byStage }: { byStage: Record<string, number> }) {
       <CardHeader>
         <CardTitle className="text-base">Pipeline</CardTitle>
         <CardDescription>
-          {total} lead{total === 1 ? "" : "s"} across the stages you can see.
+          {total} lead{total === 1 ? "" : "s"} across different stages.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -156,7 +156,7 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
       <CardHeader>
         <CardTitle className="text-base">Latest intake</CardTitle>
         <CardDescription>
-          The most recent leads you have access to.
+          Leads that have recently been added to the system
         </CardDescription>
         <CardAction>
           <Button
@@ -186,17 +186,20 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
                     href={`/leads?search=${encodeURIComponent(name)}`}
                     className="flex items-center gap-3 py-2.5"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {name}
+                    </p>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <time
+                        dateTime={lead.createdAt?.toISOString()}
+                        className="whitespace-nowrap text-xs text-muted-foreground"
+                      >
+                        {formatRelativeTime(lead.createdAt)}
+                      </time>
+                      <Badge variant="secondary" className="shrink-0">
                         {lead.caseType ? caseTypeLabel(lead.caseType) : "—"}
-                        {" · "}
-                        {formatDateTime(lead.createdAt)}
-                      </p>
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="shrink-0">
-                      {LEAD_STAGE_LABELS[lead.stage]}
-                    </Badge>
                   </Link>
                 </li>
               );
@@ -222,7 +225,7 @@ function RecentActivity({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Recent activity</CardTitle>
-        <CardDescription>The newest actions you can see.</CardDescription>
+        <CardDescription>Latest actions that have taken place.</CardDescription>
         <CardAction>
           <Button
             variant="outline"
@@ -238,7 +241,7 @@ function RecentActivity({
       <CardContent>
         {activities.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No activity yet. Changes to leads will appear here.
+            No activity yet.
           </p>
         ) : (
           <ul className="divide-y">
@@ -248,7 +251,9 @@ function RecentActivity({
                 className="flex items-start gap-3 py-2.5"
               >
                 <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
-                  <span className="font-medium">{activity.doerName}</span>{" "}
+                  <span className="mr-2 font-medium">
+                    {activity.doerName}:
+                  </span>
                   <span className="text-muted-foreground">
                     {activity.description}
                   </span>

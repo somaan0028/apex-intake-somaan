@@ -3,9 +3,9 @@
  *
  * Admin sees the whole log; every other role sees only rows they performed.
  * Search is limited to the description (the sentence the recorder generated),
- * and the two structured filters narrow by doer and affected lead. Names are
- * resolved with a left join so a deleted user or lead still leaves the event in
- * place, labelled "Deleted user" / "Deleted lead".
+ * and the two structured filters narrow by doer (admin only) and affected lead.
+ * Names are resolved with a left join so a deleted user or lead still leaves the
+ * event in place, labelled "Deleted user" / "Deleted lead".
  */
 import { asc, desc, eq, gte, lte, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
@@ -174,8 +174,12 @@ export function listActivities(
     searchCondition(query.search, [activities.description]),
   ];
 
+  // The doer filter is only offered to a viewer who can see other people's
+  // rows; ignore it otherwise so a stray URL value cannot hide their own rows.
   const performedBy = positiveId(query.filters.performedBy);
-  if (performedBy) conditions.push(eq(activities.doerId, performedBy));
+  if (performedBy && can(actor.role, "activities.view.all")) {
+    conditions.push(eq(activities.doerId, performedBy));
+  }
 
   const leadId = positiveId(query.filters.leadId);
   if (leadId) conditions.push(eq(activities.leadId, leadId));

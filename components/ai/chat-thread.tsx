@@ -461,9 +461,7 @@ export function ChatThread({
                 Hi, I&apos;m {ASSISTANT_NAME}.
               </p>
               <p className="mx-auto max-w-xs text-sm text-muted-foreground">
-                Ask me about your leads or your team. To point me at someone,
-                type <span className="font-medium">@</span> and pick them from
-                the list.
+                I'm here to help you manage leads and answer your questions!
               </p>
             </div>
 
@@ -604,7 +602,7 @@ export function ChatThread({
             ref={textareaRef}
             value={input}
             rows={1}
-            placeholder="Ask the assistant…  (@ or lead: to reference a record)"
+            placeholder="Ask the assistant…  (Use @ to reference a record)"
             className={cn(
               INPUT_BOX,
               "field-sizing-content relative block max-h-40 min-h-9 w-full resize-none rounded-lg border-input bg-transparent text-transparent caret-foreground outline-none selection:bg-primary/25 selection:text-foreground placeholder:text-muted-foreground",
