@@ -189,7 +189,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
       <div className="flex items-center gap-2">
         <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           {title}
@@ -831,7 +831,7 @@ function LeadForm({
 
         <div className="grid max-h-[60vh] gap-5 overflow-y-auto px-1.5">
           {/* Stage + assignment. */}
-          <section className="grid gap-3">
+          <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Case
             </h3>
@@ -939,108 +939,7 @@ function LeadForm({
             </div>
           </section>
 
-          {lead.isFillingForSomeoneElse ? (
-            <section className="grid gap-3">
-              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                Submitted by someone else
-              </h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="First name" htmlFor="fillerFirstName">
-                  <Input
-                    id="fillerFirstName"
-                    value={draft.fillerFirstName}
-                    disabled={!canEdit}
-                    onChange={(event) =>
-                      changeText("fillerFirstName", event.target.value)
-                    }
-                    onBlur={() => flush("fillerFirstName")}
-                  />
-                </FormField>
-                <FormField label="Last name" htmlFor="fillerLastName">
-                  <Input
-                    id="fillerLastName"
-                    value={draft.fillerLastName}
-                    disabled={!canEdit}
-                    onChange={(event) =>
-                      changeText("fillerLastName", event.target.value)
-                    }
-                    onBlur={() => flush("fillerLastName")}
-                  />
-                </FormField>
-                <FormField label="Phone" htmlFor="fillerPhone">
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      id="fillerPhone"
-                      type="tel"
-                      value={draft.fillerPhone}
-                      disabled={!canEdit}
-                      placeholder="(555) 555-5555"
-                      className="min-w-0 flex-1"
-                      onChange={(event) =>
-                        changeText(
-                          "fillerPhone",
-                          formatPhone(event.target.value),
-                        )
-                      }
-                      onKeyDown={(event) =>
-                        phoneKeyDown(event, "fillerPhone")
-                      }
-                      onBlur={() => flush("fillerPhone")}
-                    />
-                    <CopyButton
-                      value={draft.fillerPhone}
-                      label="Phone"
-                      size="icon-sm"
-                    />
-                  </div>
-                </FormField>
-                <FormField label="Email" htmlFor="fillerEmail">
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      id="fillerEmail"
-                      type="email"
-                      value={draft.fillerEmail}
-                      disabled={!canEdit}
-                      placeholder="name@example.com"
-                      className="min-w-0 flex-1"
-                      onChange={(event) =>
-                        changeText("fillerEmail", event.target.value)
-                      }
-                      onBlur={() => flush("fillerEmail")}
-                    />
-                    <CopyButton
-                      value={draft.fillerEmail}
-                      label="Email"
-                      size="icon-sm"
-                    />
-                  </div>
-                </FormField>
-                <FormField label="Relationship" htmlFor="fillerRelationship">
-                  <Select
-                    items={RELATIONSHIP_OPTIONS}
-                    value={draft.relationshipToInjured || NONE}
-                    onValueChange={(value) => {
-                      if (value) changeRelationship(value);
-                    }}
-                    disabled={!canEdit}
-                  >
-                    <SelectTrigger id="fillerRelationship" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RELATIONSHIP_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-              </div>
-            </section>
-          ) : null}
-
-          <section className="grid gap-3">
+          <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Injured person
             </h3>
@@ -1153,7 +1052,108 @@ function LeadForm({
             </div>
           </section>
 
-          <section className="grid gap-3">
+          {lead.isFillingForSomeoneElse ? (
+            <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
+              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Submitted by someone else
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="First name" htmlFor="fillerFirstName">
+                  <Input
+                    id="fillerFirstName"
+                    value={draft.fillerFirstName}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      changeText("fillerFirstName", event.target.value)
+                    }
+                    onBlur={() => flush("fillerFirstName")}
+                  />
+                </FormField>
+                <FormField label="Last name" htmlFor="fillerLastName">
+                  <Input
+                    id="fillerLastName"
+                    value={draft.fillerLastName}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      changeText("fillerLastName", event.target.value)
+                    }
+                    onBlur={() => flush("fillerLastName")}
+                  />
+                </FormField>
+                <FormField label="Phone" htmlFor="fillerPhone">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      id="fillerPhone"
+                      type="tel"
+                      value={draft.fillerPhone}
+                      disabled={!canEdit}
+                      placeholder="(555) 555-5555"
+                      className="min-w-0 flex-1"
+                      onChange={(event) =>
+                        changeText(
+                          "fillerPhone",
+                          formatPhone(event.target.value),
+                        )
+                      }
+                      onKeyDown={(event) =>
+                        phoneKeyDown(event, "fillerPhone")
+                      }
+                      onBlur={() => flush("fillerPhone")}
+                    />
+                    <CopyButton
+                      value={draft.fillerPhone}
+                      label="Phone"
+                      size="icon-sm"
+                    />
+                  </div>
+                </FormField>
+                <FormField label="Email" htmlFor="fillerEmail">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      id="fillerEmail"
+                      type="email"
+                      value={draft.fillerEmail}
+                      disabled={!canEdit}
+                      placeholder="name@example.com"
+                      className="min-w-0 flex-1"
+                      onChange={(event) =>
+                        changeText("fillerEmail", event.target.value)
+                      }
+                      onBlur={() => flush("fillerEmail")}
+                    />
+                    <CopyButton
+                      value={draft.fillerEmail}
+                      label="Email"
+                      size="icon-sm"
+                    />
+                  </div>
+                </FormField>
+                <FormField label="Relationship" htmlFor="fillerRelationship">
+                  <Select
+                    items={RELATIONSHIP_OPTIONS}
+                    value={draft.relationshipToInjured || NONE}
+                    onValueChange={(value) => {
+                      if (value) changeRelationship(value);
+                    }}
+                    disabled={!canEdit}
+                  >
+                    <SelectTrigger id="fillerRelationship" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATIONSHIP_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Location
             </h3>
@@ -1227,7 +1227,7 @@ function LeadForm({
             </div>
           </section>
 
-          <section className="grid gap-3">
+          <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Case facts
             </h3>
@@ -1364,7 +1364,7 @@ function LeadForm({
             </div>
           </section>
 
-          <section className="grid gap-3">
+          <section className="grid gap-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Notes
             </h3>
