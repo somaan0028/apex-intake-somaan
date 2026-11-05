@@ -115,7 +115,14 @@ import {
   type LeadsView,
 } from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
-import type { LeadRow } from "@/lib/leads/queries";
+import {
+  KANBAN_DEFAULT_LANE_SIZE,
+  KANBAN_LANE_STEP,
+  KANBAN_MAX_LANE_SIZE,
+  isKanbanLaneParam,
+  kanbanLaneParam,
+} from "@/lib/leads/kanban";
+import type { LeadRow, LeadsBoard } from "@/lib/leads/queries";
 import {
   readPersistedState,
   readSavedViews,
@@ -486,6 +493,8 @@ function buildFilters(
 export function LeadsTable({
   leads,
   total,
+  board,
+  laneLimits,
   query,
   assignees,
   viewer,
@@ -494,11 +503,15 @@ export function LeadsTable({
 }: {
   leads: LeadRow[];
   total: number;
+  /** Per-stage windows for the Kanban board; absent in the table view. */
+  board?: LeadsBoard;
+  /** How many cards each lane has loaded, read from the URL by the page. */
+  laneLimits: Record<LeadStage, number>;
   query: TableQuery;
   assignees: Array<{ id: number; name: string }>;
   /** The signed-in user, so the detail dialog can run the RBAC policies. */
   viewer: AuthUser;
-  /** Table or Kanban; the server loads a larger set for the board. */
+  /** Table or Kanban; the server loads six lane windows for the board. */
   view: LeadsView;
   /** True when the URL explicitly asked for a date-added sort. */
   sortExplicit: boolean;
@@ -510,6 +523,12 @@ export function LeadsTable({
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [overrides, setOverrides] = useState<Record<number, RowOverride>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
+  // A stage move can push a card outside its target lane's loaded window. Keep
+  // the card visible until the filters change, so dragging never silently makes
+  // it disappear.
+  const [pinned, setPinned] = useState<
+    Array<{ scope: string; row: LeadRow }>
+  >([]);
   const [hiddenStages, setHiddenStages] = useState<LeadStage[]>([]);
   const [filterVisibility, setFilterVisibility] = useState<
     Record<string, boolean>
@@ -542,6 +561,15 @@ export function LeadsTable({
 
   const filterKey = filtersKey(query.filters);
   const currentFilters = useMemo(() => filtersFromKey(filterKey), [filterKey]);
+  // A pin only belongs to the board state that produced it. Filters, search,
+  // sort or a view switch start a new scope and drop stale cards automatically.
+  const pinScope = [
+    view,
+    filterKey,
+    query.search,
+    query.sort?.id ?? "",
+    query.sort?.desc ? "desc" : "asc",
+  ].join("|");
 
   // Restore the last visit once, then keep writing it back as the person works.
   // Everything here is browser-local; nothing is sent to the server.
@@ -733,11 +761,23 @@ export function LeadsTable({
     patch: Pick<LeadFieldPatch, "stage" | "assignedToId">,
   ): Promise<boolean> {
     const id = lead.id;
+    const previousRow = applyOverride(lead, overrides[id]);
     setOverrides((previous) => ({
       ...previous,
       [id]: { ...previous[id], ...patch },
     }));
     setSaving((previous) => ({ ...previous, [id]: true }));
+
+    // A moved card may rank outside the target lane's window, so pin it to this
+    // board state. It is dropped automatically once the server sends it back in
+    // a lane, or when the filters/search/sort change.
+    if (view === "kanban" && patch.stage !== undefined) {
+      const nextStage = patch.stage;
+      setPinned((previous) => [
+        ...previous.filter((item) => item.row.id !== id),
+        { scope: pinScope, row: { ...previousRow, stage: nextStage } },
+      ]);
+    }
 
     const result = await saveLeadFields(id, patch);
 
@@ -748,6 +788,7 @@ export function LeadsTable({
     });
 
     if (!result.ok) {
+      setPinned((previous) => previous.filter((item) => item.row.id !== id));
       setOverrides((previous) => {
         const next = { ...previous };
         const current = { ...next[id] };
@@ -834,13 +875,36 @@ export function LeadsTable({
     // must win over the stored preference for this page.
     params.set("view", next);
     if (next === "kanban") {
-      // The board has no pages; start at the top if the user returns.
+      // The board has no global pages; start at the top if the user returns.
       params.delete("page");
       // The board groups by stage, so the stage filter makes no sense there.
       params.delete("filter.stage");
+    } else {
+      // Lane windows are transient board state, not part of the grid query.
+      for (const key of [...params.keys()]) {
+        if (isKanbanLaneParam(key)) params.delete(key);
+      }
     }
     // Record the preference immediately, before the next navigation can read it.
     document.cookie = viewPreferenceCookie(next);
+    const search = params.toString();
+    startViewTransition(() => {
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
+    });
+  }
+
+  /**
+   * Expand one stage lane by a page of cards. The limit lives in the URL so the
+   * back button collapses it again and a reload keeps the lane open.
+   */
+  function showMoreCards(stage: LeadStage) {
+    const current = laneLimits[stage] ?? KANBAN_DEFAULT_LANE_SIZE;
+    const next = Math.min(current + KANBAN_LANE_STEP, KANBAN_MAX_LANE_SIZE);
+    if (next === current) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set(kanbanLaneParam(stage), String(next));
     const search = params.toString();
     startViewTransition(() => {
       router.replace(search ? `${pathname}?${search}` : pathname, {
@@ -1077,11 +1141,17 @@ export function LeadsTable({
         showColumnMenu={view === "table"}
         renderContent={
           view === "kanban" ? (
-            viewsReady ? (
+            viewsReady && board ? (
               <LeadsKanban
-                leads={leads}
+                lanes={board.lanes}
+                counts={board.counts}
+                laneLimits={laneLimits}
+                pinned={pinned
+                  .filter((item) => item.scope === pinScope)
+                  .map((item) => item.row)}
                 hiddenStages={hiddenStages}
                 onOpen={(lead) => setSelected(lead)}
+                onShowMore={showMoreCards}
               />
             ) : (
               // The saved stages live in localStorage, so the server cannot know
@@ -1666,19 +1736,29 @@ function KanbanSkeleton() {
 /**
  * The Kanban board.
  *
- * The server hands us the whole filtered set, so each stage column can show its
- * own count. Cards are drag targets: dropping one on another column calls the
- * same `save` used by the table and dialog, which applies the stage change
- * optimistically and quietly reverts it if the server refuses.
+ * The server hands us a bounded window per stage plus the true count of every
+ * stage, so a column can say "165" while painting the newest 25. Cards are drag
+ * targets: dropping one on another column calls the same `save` used by the
+ * table and dialog, which applies the stage change optimistically and quietly
+ * reverts it if the server refuses.
  */
 function LeadsKanban({
-  leads,
+  lanes,
+  counts,
+  laneLimits,
+  pinned,
   hiddenStages,
   onOpen,
+  onShowMore,
 }: {
-  leads: LeadRow[];
+  lanes: Record<LeadStage, LeadRow[]>;
+  counts: Record<LeadStage, number>;
+  laneLimits: Record<LeadStage, number>;
+  /** Cards moved this session that the target lane's window does not contain. */
+  pinned: LeadRow[];
   hiddenStages: LeadStage[];
   onOpen: (lead: LeadRow) => void;
+  onShowMore: (stage: LeadStage) => void;
 }) {
   const { viewer, overrides, saving, save } = useLeadTable();
   const [dragId, setDragId] = useState<number | null>(null);
@@ -1694,6 +1774,14 @@ function LeadsKanban({
 
   const effective = (lead: LeadRow): LeadRow =>
     applyOverride(lead, overrides[lead.id]);
+
+  // Only the loaded cards can be dragged; the lane windows bound this list.
+  const loaded = LEAD_STAGES.flatMap((stage) => lanes[stage] ?? []);
+  const loadedIds = new Set(loaded.map((lead) => lead.id));
+  // A moved card the server did not return in a lane stays visible until the
+  // board scope changes, so it never appears to vanish mid-drag.
+  const pinnedCards = pinned.filter((lead) => !loadedIds.has(lead.id));
+  const tracked = [...loaded, ...pinnedCards];
 
   /**
    * The stage column under a screen point. Native HTML drag events carry no
@@ -1817,15 +1905,28 @@ function LeadsKanban({
     (stage) => !hiddenStages.includes(stage),
   );
 
+  // Apply optimistic stage overrides before grouping, so a card that has just
+  // been dropped in another lane moves there (and updates both counters)
+  // immediately, while the server round-trip is still in flight.
   const byStage = new Map<LeadStage, LeadRow[]>();
   for (const stage of LEAD_STAGES) byStage.set(stage, []);
-  for (const lead of leads) {
-    const row = effective(lead);
-    byStage.get(row.stage)?.push(row);
+  const displayedCounts = { ...counts };
+  for (const stage of LEAD_STAGES) {
+    for (const lead of lanes[stage] ?? []) {
+      const row = effective(lead);
+      byStage.get(row.stage)?.push(row);
+      if (row.stage !== stage) {
+        displayedCounts[stage] = Math.max(0, displayedCounts[stage] - 1);
+        displayedCounts[row.stage] += 1;
+      }
+    }
   }
+  // Pinned cards are already staged when the move was made; the server counts
+  // include them once the action revalidates, so they only need a place to sit.
+  for (const row of pinnedCards) byStage.get(row.stage)?.push(row);
 
   const dragged =
-    dragId === null ? null : leads.find((lead) => lead.id === dragId);
+    dragId === null ? null : tracked.find((lead) => lead.id === dragId);
   const draggedSubject = dragged ? effective(dragged) : null;
 
   if (visibleStages.length === 0) {
@@ -1844,6 +1945,11 @@ function LeadsKanban({
       >
         {visibleStages.map((stage) => {
           const cards = byStage.get(stage) ?? [];
+          const laneTotal = displayedCounts[stage] ?? 0;
+          const remaining = Math.max(0, laneTotal - cards.length);
+          const laneLimit =
+            laneLimits[stage] ?? KANBAN_DEFAULT_LANE_SIZE;
+          const atCeiling = laneLimit >= KANBAN_MAX_LANE_SIZE;
           const canDrop = Boolean(
             draggedSubject &&
             draggedSubject.stage !== stage &&
@@ -1885,7 +1991,7 @@ function LeadsKanban({
                 setDragId(null);
 
                 const id = Number(event.dataTransfer.getData("text/plain"));
-                const lead = leads.find((row) => row.id === id);
+                const lead = tracked.find((row) => row.id === id);
                 if (!lead) return;
 
                 moveLead(lead, stage);
@@ -1903,7 +2009,7 @@ function LeadsKanban({
                   </span>
                 </div>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  {cards.length}
+                  {laneTotal}
                 </span>
               </div>
 
@@ -2053,6 +2159,30 @@ function LeadsKanban({
                   })
                 )}
               </div>
+
+              {remaining > 0 ? (
+                <div className="border-t p-2">
+                  {atCeiling ? (
+                    <p className="px-1 py-1 text-center text-xs text-muted-foreground">
+                      Showing the first {cards.length} of {laneTotal}. Narrow the
+                      board with search or filters to see the rest.
+                    </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => onShowMore(stage)}
+                    >
+                      Show {Math.min(KANBAN_LANE_STEP, remaining)} more
+                      <span className="text-muted-foreground">
+                        ({remaining} remaining)
+                      </span>
+                    </Button>
+                  )}
+                </div>
+              ) : null}
             </section>
           );
         })}

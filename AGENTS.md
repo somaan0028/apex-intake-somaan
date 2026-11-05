@@ -391,8 +391,13 @@ their Lawmatics CRM.
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
   card therefore keeps the last chosen view, while filters and search still come from
-  the URL. The server loads the filtered set (up to 1000 rows) for the
-  board; cards drag between stage columns through the same `saveLeadFields`
+  the URL. The board is windowed **per stage**, not paged as a whole: the server
+  returns the newest 25 cards of each column (expandable with "Show more", which
+  writes `board.<STAGE>=<limit>`, up to a 200-card ceiling) plus a true grouped
+  count per stage, so a column badge always describes the whole filtered backlog
+  rather than the loaded slice. A card moved into a lane whose window does not
+  contain it stays pinned in that lane until the board's filters, search or sort
+  change. Cards drag between stage columns through the same `saveLeadFields`
   action, carry an eye button that opens the detail dialog, and reuse the inline
   assignee control. Touch has no native HTML drag, so every card also carries a
   grip handle that runs a pointer drag for mouse and touch: it hit-tests

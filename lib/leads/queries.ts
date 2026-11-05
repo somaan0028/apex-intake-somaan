@@ -7,7 +7,9 @@
  */
 import {
   and,
+  asc,
   count,
+  desc,
   eq,
   getTableColumns,
   gte,
@@ -40,8 +42,9 @@ import {
   type Lead,
   type LeadStage,
 } from "@/lib/db/schema";
-import type { TableQuery } from "@/lib/table-query";
+import type { TableQuery, TableSort } from "@/lib/table-query";
 import { LEAD_SOURCES, UNASSIGNED, type LeadSource } from "./constants";
+import { KANBAN_DEFAULT_LANE_SIZE } from "./kanban";
 
 /**
  * Attribution/tracking fields, visible only to viewers holding
@@ -241,12 +244,19 @@ export function leadsVisibilityCondition(actor: Actor): SQL | undefined {
   return conditions.length ? or(...conditions) : sql`0`;
 }
 
-/** One page of leads for `query` that `actor` is allowed to see, plus the total. */
-export function listLeads(
-  query: TableQuery,
-  actor: Actor,
-): ListPageResult<LeadRow> {
-  const db = getDb();
+/**
+ * Visibility plus every active filter, shared by the table and the board.
+ *
+ * Keeping this in one place is what makes the board's column counts and its
+ * cards agree with the grid: both run the same predicate, so a count can never
+ * include a lead the viewer is not allowed to open.
+ */
+interface LeadScope {
+  where: SQL | undefined;
+  showAttribution: boolean;
+}
+
+function leadScope(query: TableQuery, actor: Actor): LeadScope {
   const showAttribution = can(actor.role, "leads.view.attribution");
 
   // "View similar" is an explicit request for one duplicate group. It ignores
@@ -357,6 +367,17 @@ export function listLeads(
     }
   }
 
+  return { where: allOf(conditions), showAttribution };
+}
+
+/** One page of leads for `query` that `actor` is allowed to see, plus the total. */
+export function listLeads(
+  query: TableQuery,
+  actor: Actor,
+): ListPageResult<LeadRow> {
+  const db = getDb();
+  const { where, showAttribution } = leadScope(query, actor);
+
   // Sorting by source is the same side-channel as filtering by it; fall back to
   // the default order rather than order by a column the viewer can't see.
   const pageQuery =
@@ -367,7 +388,7 @@ export function listLeads(
   const plan = planListPage({
     db,
     table: leads,
-    where: allOf(conditions),
+    where,
     query: pageQuery,
     sortColumns: SORT_COLUMNS,
     defaultSort: LEADS_DEFAULT_SORT,
@@ -401,3 +422,110 @@ export function listLeads(
     sort: plan.sort,
   };
 }
+
+/**
+ * A board is not a page: it is one bounded window per stage. Each lane gets its
+ * own newest-first slice, while `counts` describes the whole filtered set, so a
+ * header badge never lies about how much work a column holds.
+ */
+export interface LeadsBoard {
+  lanes: Record<LeadStage, LeadRow[]>;
+  /** Every matching lead per stage, ignoring the lane window. */
+  counts: Record<LeadStage, number>;
+  total: number;
+  /** The order actually applied to every lane. */
+  sort: TableSort;
+}
+
+/**
+ * Resolve the board's ORDER BY once, applying the same attribution guard the
+ * grid uses: a viewer who cannot see `source` is not ordered by it either.
+ */
+function resolveBoardOrder(
+  query: TableQuery,
+  showAttribution: boolean,
+): { orderBy: SQL; sort: TableSort } {
+  const requested =
+    query.sort && query.sort.id in SORT_COLUMNS ? query.sort : null;
+  const usable =
+    requested && (showAttribution || requested.id !== "source")
+      ? requested
+      : null;
+  const sortId = (usable?.id ?? LEADS_DEFAULT_SORT.id) as LeadSortKey;
+  const sortDesc = usable ? usable.desc : LEADS_DEFAULT_SORT.desc;
+  const column = SORT_COLUMNS[sortId];
+  return {
+    orderBy: sortDesc ? desc(column) : asc(column),
+    sort: { id: sortId, desc: sortDesc },
+  };
+}
+
+/**
+ * The Kanban board's data: the first `limits[stage]` cards of every stage plus
+ * the true count of each stage under the same visibility and filters.
+ *
+ * Six small indexed queries are easier to reason about than one window-function
+ * query, and at this scale the difference is noise. Duplicate-group counts are
+ * attached once over the combined result rather than per lane.
+ */
+export function listKanbanBoard(
+  query: TableQuery,
+  actor: Actor,
+  limits: Record<LeadStage, number>,
+): LeadsBoard {
+  const db = getDb();
+  const { where, showAttribution } = leadScope(query, actor);
+  const { orderBy, sort } = resolveBoardOrder(query, showAttribution);
+
+  // Counts ignore the lane window, so each header reflects the full backlog.
+  const counts = Object.fromEntries(
+    LEAD_STAGES.map((stage) => [stage, 0]),
+  ) as Record<LeadStage, number>;
+  let total = 0;
+  const countRows = db
+    .select({ stage: leads.stage, value: count() })
+    .from(leads)
+    .where(where)
+    .groupBy(leads.stage)
+    .all();
+  for (const row of countRows) {
+    counts[row.stage] = row.value;
+    total += row.value;
+  }
+
+  // Fetch each lane in the board's order. Visibility and filters apply to every
+  // query, so a lane can never surface a lead the viewer could not open.
+  const combined: LeadBaseRow[] = [];
+  for (const stage of LEAD_STAGES) {
+    const limit = Math.max(0, limits[stage] ?? KANBAN_DEFAULT_LANE_SIZE);
+    if (limit === 0) continue;
+
+    const stageRows = db
+      .select({ ...getTableColumns(leads), assignedToName: users.name })
+      .from(leads)
+      .leftJoin(users, eq(leads.assignedToId, users.id))
+      .where(allOf([where, eq(leads.stage, stage)]))
+      .orderBy(orderBy)
+      .limit(limit)
+      .all();
+
+    for (const { dupMatchString, ...row } of stageRows) {
+      // The matcher's comparison string never leaves the server.
+      void dupMatchString;
+      combined.push(row);
+    }
+  }
+
+  const visibleRows = showAttribution
+    ? combined
+    : combined.map(withoutAttribution);
+  const hydrated = attachDupCounts(visibleRows, actor);
+
+  const lanes = Object.fromEntries(
+    LEAD_STAGES.map((stage) => [stage, [] as LeadRow[]]),
+  ) as Record<LeadStage, LeadRow[]>;
+  for (const row of hydrated) lanes[row.stage].push(row);
+
+  return { lanes, counts, total, sort };
+}
+
