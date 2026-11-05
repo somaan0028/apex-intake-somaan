@@ -699,6 +699,7 @@ function ColumnFilter<TData extends RowData>({
   if (!column) return null;
 
   const selected = (column.getFilterValue() as string | undefined) ?? "";
+  const active = selected !== "";
 
   // `items` lets SelectValue render the human label (not the raw sentinel) in
   // the trigger, including during SSR before the popup items have mounted.
@@ -753,7 +754,11 @@ function ColumnFilter<TData extends RowData>({
       >
         <SelectTrigger
           size="sm"
-          className={stacked ? "w-full" : "w-fit"}
+          className={cn(
+            stacked ? "w-full" : "w-fit",
+            active &&
+              "border-primary/50 bg-primary/10 hover:bg-primary/15 dark:bg-primary/20 dark:hover:bg-primary/25",
+          )}
           aria-labelledby={labelId}
         >
           <SelectValue />

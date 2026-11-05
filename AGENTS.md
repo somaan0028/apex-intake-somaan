@@ -527,6 +527,9 @@ their Lawmatics CRM.
   only while the popover is open; the closed trigger always reads the parent's
   current value, so a URL changed elsewhere (Clear Filters, a stat-card link,
   back/forward) shows immediately instead of after the next click.
+  Every filter trigger (single select, multi-select and the Added range) shares
+  the same transparent, `h-7` look; a control with a value gets a subtle primary
+  tint (`border-primary/50 bg-primary/10`) so active filters are obvious.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("All Time"). It offers `24h`, `3d`, `7d`, `30d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional

@@ -8,7 +8,7 @@
  * carries the URL update finishes. The parent still owns the value: closing and
  * reopening reads the current query again.
  */
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -93,6 +93,7 @@ export function MultiSelectFilter({
 
   const allSelected =
     options.length > 0 && chosen.length === options.length;
+  const hasSelection = chosen.length > 0;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -103,7 +104,12 @@ export function MultiSelectFilter({
             variant="outline"
             size="sm"
             className={cn(
-              "w-fit justify-between gap-2 font-normal",
+              // Match the single-choice SelectTrigger exactly: transparent
+              // (not the outline button's solid background), same height,
+              // radius, border, text size and chevron.
+              "h-7 w-fit justify-between gap-1.5 rounded-[min(var(--radius-md),10px)] border-input bg-transparent px-2.5 pr-2 text-sm font-normal whitespace-nowrap dark:bg-input/30 dark:hover:bg-input/50",
+              hasSelection &&
+                "border-primary/50 bg-primary/10 hover:bg-primary/15 dark:bg-primary/20 dark:hover:bg-primary/25",
               className,
             )}
             aria-labelledby={labelId}
@@ -111,7 +117,7 @@ export function MultiSelectFilter({
         }
       >
         <span className="truncate">{summary}</span>
-        <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" aria-hidden />
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1.5">
         <div className="flex flex-col gap-0.5">

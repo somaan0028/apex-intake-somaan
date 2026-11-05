@@ -1473,7 +1473,11 @@ export function LeadsTable({
                       >
                         <SelectTrigger
                           id={`mobile-filter-${filter.columnId}`}
-                          className="w-full"
+                          className={cn(
+                            "w-full",
+                            current &&
+                              "border-primary/50 bg-primary/10 hover:bg-primary/15 dark:bg-primary/20 dark:hover:bg-primary/25",
+                          )}
                         >
                           <SelectValue />
                         </SelectTrigger>
@@ -1616,14 +1620,13 @@ export function LeadsTable({
           <DialogHeader>
             <DialogTitle>Saved views</DialogTitle>
             <DialogDescription>
-              Apply a saved view, or remove one you no longer need.
+              Presets for filters, sorting and visibility options.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-80 space-y-1 overflow-y-auto">
             {savedViews.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No saved views yet. Set the page up the way you like and press
-                the heart.
+                No saved views yet. Set the page up the way you like and save the view for quick future use.
               </p>
             ) : (
               savedViews.map((saved) => (

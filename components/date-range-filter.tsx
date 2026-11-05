@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export interface DateRangeOption {
   label: string;
@@ -54,6 +55,9 @@ export function DateRangeFilter({
   onChange: (from: string, to: string) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  // "Any time" means no date filter; every other preset (including a custom
+  // range) is an active filter and gets the same tint as the other controls.
+  const active = preset !== "any";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -69,7 +73,11 @@ export function DateRangeFilter({
       >
         <SelectTrigger
           size="sm"
-          className="w-40"
+          className={cn(
+            "w-40",
+            active &&
+              "border-primary/50 bg-primary/10 hover:bg-primary/15 dark:bg-primary/20 dark:hover:bg-primary/25",
+          )}
           aria-label={`${label} date range`}
         >
           <SelectValue />
