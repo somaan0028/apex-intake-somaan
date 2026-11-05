@@ -103,7 +103,7 @@ If your client reads a JSON config, add this server entry:
   }
 }
 
-The token acts as the signed-in Apex user, so the assistant can see and change exactly what that user can. Keep the token private and never commit it to a repository.`;
+The token acts as the signed-in Apex user, so the assistant can see and change exactly what that user can. Keep the token private and never commit it to a repository. The user can generate a token in the application. Ask them to do that, and then tell them where to paste it securely, so that the MCP connection can take place.`;
 }
 
 export function TokensCard({
@@ -224,7 +224,7 @@ export function TokensCard({
             <h3 className="text-sm font-semibold">Automatic setup</h3>
             <p className="text-sm text-muted-foreground">
               Paste these instructions into Claude Code, Cursor, or another
-              coding agent and it can set up the connection for you.
+              coding agent and it can set up the connection for you. It will tell you where to add the token.
             </p>
             <CopyButton
               value={instructionsFor(endpoint, state.token ?? null)}
