@@ -295,10 +295,13 @@ their Lawmatics CRM.
 - **Users** (`app/(app)/users/`) shows an **Assigned leads** count per person, loaded for the
   visible page in one grouped query. The underlined number links to the leads page filtered
   by `filter.assignedTo=<id>` with `filter.addedWithin=any`, so it matches the all-time
-  count. `any` is a real leads date preset ("Any time"), not a hack; a bare `/leads` still
-  defaults to `7d`.
-- The leads page defaults to a **Kanban view**; the URL only needs `view=table`
-  to show the grid. The server loads the filtered set (up to 1000 rows) for the
+  count. `any` is a real leads date preset ("Any time"), not a hack; a bare `/leads` has
+  no date window (the Added filter starts cleared).
+- The leads page **view is a persisted preference**, not a filter. An explicit
+  `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
+  cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
+  card therefore keeps the last chosen view, while filters and search still come from
+  the URL. The server loads the filtered set (up to 1000 rows) for the
   board; cards drag between stage columns through the same `saveLeadFields`
   action, carry an eye button that opens the detail dialog, and reuse the inline
   assignee control. Touch has no native HTML drag, so every card also carries a
@@ -318,7 +321,8 @@ their Lawmatics CRM.
   the server: `localStorage` holds the named views plus the last place the person
   left off (view, filter values, search, sort, filter/column visibility, hidden
   stages, page). A bare `/leads` visit restores the last state and its saved view;
-  a URL with filters is treated as explicit. The heart opens the save dialog and
+  a URL with filters keeps those filters but still applies the stored view when it
+  does not name one. The heart opens the save dialog and
   stays red only while the page still matches that saved view. **Clear Filters**
   resets the filter values and search but never deletes a saved view. Stage
   visibility is browser-local too, so the Kanban board shows a skeleton until the

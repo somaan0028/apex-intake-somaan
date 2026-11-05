@@ -108,7 +108,7 @@ Retained.
 | `/`                   | Public    | Lead intake form                              |
 | `/login`              | Public    | Email and password sign-in                    |
 | `/dashboard`          | Protected | Overview and pipeline summary                 |
-| `/leads`              | Protected | Kanban board, or the table with `?view=table` |
+| `/leads`              | Protected | Leads board/table; the last view is remembered, and `?view=table` or `?view=kanban` overrides it for that page |
 | `/campaign-analytics` | Admin     | Attribution and funnel reporting              |
 | `/users`              | Admin     | User management                               |
 | `/settings`           | Protected | MCP access tokens                             |

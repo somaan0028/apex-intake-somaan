@@ -118,7 +118,12 @@ export function writePersistedState(state: PersistedLeadState): void {
   localStorage.setItem(STATE_KEY, JSON.stringify(state));
 }
 
-/** Turn a view back into the leads URL. Kanban is the default, so it is omitted. */
+/**
+ * Turn a view back into the leads URL.
+ *
+ * The view is always named: applying a saved view or restoring the last state
+ * is an explicit choice and must win over the stored-preference fallback.
+ */
 export function viewStateToParams(
   state: LeadViewState,
   paging: { page?: number; pageSize?: number } = {},
@@ -131,6 +136,6 @@ export function viewStateToParams(
     filters: state.filters,
   };
   const params = tableQueryToParams(query);
-  if (state.view === "table") params.set("view", "table");
+  params.set("view", state.view);
   return params;
 }

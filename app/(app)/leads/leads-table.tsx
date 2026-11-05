@@ -126,6 +126,7 @@ import {
   type LeadViewState,
   type SavedLeadView,
 } from "@/lib/leads/saved-views";
+import { viewPreferenceCookie } from "@/lib/leads/view-preference";
 import {
   can,
   canAssignLead,
@@ -583,6 +584,14 @@ export function LeadsTable({
           scroll: false,
         });
       });
+    } else if (stored && !params.has("view") && stored.view !== view) {
+      // The URL carries explicit filters/search/sort/paging, so keep those, but
+      // the view is a preference rather than a filter. Apply the last view
+      // without restoring any of the other stored state.
+      params.set("view", stored.view);
+      startViewTransition(() => {
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      });
     }
     // Mount only: the values captured here are the ones read from storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -612,6 +621,10 @@ export function LeadsTable({
     // later bare /leads visit restores.
     const persistedFilters = { ...currentFilters };
     delete persistedFilters.dupGroup;
+
+    // Keep the server-visible preference in step with the view actually shown,
+    // including restores and saved views.
+    document.cookie = viewPreferenceCookie(view);
 
     writePersistedState({
       view,
@@ -817,16 +830,17 @@ export function LeadsTable({
   function changeView(next: LeadsView) {
     if (next === view) return;
     const params = new URLSearchParams(window.location.search);
+    // Always name the view explicitly: the choice must survive navigation and
+    // must win over the stored preference for this page.
+    params.set("view", next);
     if (next === "kanban") {
-      // Kanban is the default view, so the URL only needs `view=table`.
-      params.delete("view");
       // The board has no pages; start at the top if the user returns.
       params.delete("page");
       // The board groups by stage, so the stage filter makes no sense there.
       params.delete("filter.stage");
-    } else {
-      params.set("view", "table");
     }
+    // Record the preference immediately, before the next navigation can read it.
+    document.cookie = viewPreferenceCookie(next);
     const search = params.toString();
     startViewTransition(() => {
       router.replace(search ? `${pathname}?${search}` : pathname, {

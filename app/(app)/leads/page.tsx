@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { defaultAddedFrom, type LeadsView } from "@/lib/leads/constants";
 import { LEADS_DEFAULT_SORT, listLeads } from "@/lib/leads/queries";
+import {
+  LEADS_VIEW_COOKIE,
+  isLeadsView,
+} from "@/lib/leads/view-preference";
 import { loadTablePage } from "@/lib/table-query";
 import { listAssignees } from "@/lib/users/queries";
 import { LeadsTable } from "./leads-table";
@@ -26,8 +31,15 @@ export default async function LeadsPage({
   // plus their own leads (see `leadsVisibilityCondition`).
   const user = await requireUser();
   const params = await searchParams;
-  // Kanban is the default; the table is an explicit `view=table`.
-  const view: LeadsView = params.view === "table" ? "table" : "kanban";
+  // The view is a preference, not a filter: an explicit URL value wins, then
+  // the cookie from the last switch, then Kanban for a brand-new visitor.
+  const viewParam = typeof params.view === "string" ? params.view : null;
+  const preferredView = (await cookies()).get(LEADS_VIEW_COOKIE)?.value ?? null;
+  const view: LeadsView = isLeadsView(viewParam)
+    ? viewParam
+    : isLeadsView(preferredView)
+      ? preferredView
+      : "kanban";
   const sortExplicit = params.sort === "createdAt";
   const queryParams = { ...params };
   if (view === "kanban") {
