@@ -97,6 +97,7 @@ export default async function LeadsPage({
         viewer={user}
         view={view}
         sortExplicit={sortExplicit}
+        preserveFilters={params.preserveFilters === "true"}
       />
     </div>
   );

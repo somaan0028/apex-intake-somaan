@@ -47,9 +47,14 @@ export function MultiSelectFilter({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(selected);
 
+  // While the popover is closed the trigger must show the parent's current
+  // value, not a draft captured at mount: the URL can change from elsewhere
+  // (Clear Filters, a stat-card link, back/forward) without reopening it.
+  const active = open ? draft : selected;
+
   // Only valid choices from the current option list take part in the summary
   // and the next value; a stale id from an old assignee list is ignored.
-  const chosen = draft.filter((value) =>
+  const chosen = active.filter((value) =>
     options.some((option) => option.value === value),
   );
   const chosenLabels = chosen

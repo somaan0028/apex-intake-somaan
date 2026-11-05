@@ -547,6 +547,7 @@ export function LeadsTable({
   viewer,
   view,
   sortExplicit,
+  preserveFilters,
 }: {
   leads: LeadRow[];
   total: number;
@@ -562,6 +563,11 @@ export function LeadsTable({
   view: LeadsView;
   /** True when the URL explicitly asked for a date-added sort. */
   sortExplicit: boolean;
+  /**
+   * Restore the filters saved in this browser. Only the sidebar's Leads link
+   * asks for it; any other landing on `/leads` starts with cleared filters.
+   */
+  preserveFilters: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -618,7 +624,11 @@ export function LeadsTable({
     query.sort?.desc ? "desc" : "asc",
   ].join("|");
 
-  // Restore the last visit once, then keep writing it back as the person works.
+  // Restore browser-local state from the last visit. The UI preferences (which
+  // filters and columns show, hidden stages, saved views) always come back; the
+  // filter values themselves only return when the link asks for them with
+  // `preserveFilters=true`, which only the sidebar's Leads item does. A plain
+  // `/leads` landing deliberately starts with cleared filters.
   // Everything here is browser-local; nothing is sent to the server.
   /* eslint-disable react-hooks/set-state-in-effect -- hydrating from localStorage on mount is the external-system case */
   useEffect(() => {
@@ -635,15 +645,15 @@ export function LeadsTable({
     setSavedViews(readSavedViews());
     setViewsReady(true);
 
-    // A URL that already carries filters is an explicit request (a shared link
-    // or the back button), so only a bare /leads visit resumes the last view.
+    // A URL that already carries filters is an explicit request (a shared link,
+    // a stat card, or the back button), so it always wins over storage.
     const params = new URLSearchParams(window.location.search);
     const hasState = [...params.keys()].some(
       (key) =>
         key.startsWith("filter.") ||
         ["view", "search", "sort", "sortDir", "page", "pageSize"].includes(key),
     );
-    if (stored && !hasState) {
+    if (stored && preserveFilters && !hasState) {
       pendingRestore = {
         view: stored.view,
         filters: stored.filters,
@@ -671,9 +681,10 @@ export function LeadsTable({
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
       });
     }
-    // Mount only: the values captured here are the ones read from storage.
+    // Runs on mount and whenever the sidebar's preserve flag changes. The other
+    // values captured here are only read, so they are not dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [preserveFilters]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const sortId = query.sort?.id;

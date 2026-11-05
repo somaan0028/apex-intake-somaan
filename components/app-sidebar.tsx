@@ -54,6 +54,8 @@ import {
 type NavItem = {
   title: string;
   url: string;
+  /** Where the link actually points, when it needs a query string. */
+  href?: string;
   icon: typeof LayoutDashboard;
   permission: Permission | null;
 };
@@ -79,7 +81,15 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
     icon: LayoutDashboard,
     permission: null,
   },
-  { title: "Leads", url: "/leads", icon: ClipboardList, permission: null },
+  {
+    title: "Leads",
+    url: "/leads",
+    // Coming back to the desk should resume the filters this browser last used;
+    // a plain `/leads` landing (a shared link, a redirect) starts cleared.
+    href: "/leads?preserveFilters=true",
+    icon: ClipboardList,
+    permission: null,
+  },
   {
     title: "Analytics",
     url: "/analytics",
@@ -190,7 +200,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   <SidebarMenuButton
                     isActive={isCurrent(item.url)}
                     tooltip={item.title}
-                    render={<Link href={item.url} />}
+                    render={<Link href={item.href ?? item.url} />}
                   >
                     <item.icon className="text-sidebar-accent-foreground" />
                     <span>{item.title}</span>

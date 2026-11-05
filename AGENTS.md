@@ -493,7 +493,10 @@ their Lawmatics CRM.
   `parseFilterValues` / `readFilterList`, so one filter can match several values.
   A `DataTableFilter` opts into this with `multiple: true`; the shared
   `MultiSelectFilter` renders a checkbox popover with **Select all** / **Clear**
-  and keeps a local draft while the URL round-trip is in flight.
+  and keeps a local draft while the URL round-trip is in flight. The draft is used
+  only while the popover is open; the closed trigger always reads the parent's
+  current value, so a URL changed elsewhere (Clear Filters, a stat-card link,
+  back/forward) shows immediately instead of after the next click.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("All Time"). It offers `24h`, `3d`, `7d`, `30d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional
@@ -510,9 +513,12 @@ their Lawmatics CRM.
 - **Saved Views** (`lib/leads/saved-views.ts`) are browser-local, never sent to
   the server: `localStorage` holds the named views plus the last place the person
   left off (view, filter values, search, sort, filter/column visibility, hidden
-  stages, page). A bare `/leads` visit restores the last state and its saved view;
-  a URL with filters keeps those filters but still applies the stored view when it
-  does not name one. The heart opens the save dialog and
+  stages, page). Filter values are restored **only** when the URL asks for it with
+  `preserveFilters=true`, which the sidebar's Leads item does (`/leads?preserveFilters=true`);
+  a bare `/leads` visit (a shared link, the Overview's Active leads card) starts with
+  cleared filters but still restores the view and the UI preferences.
+  A URL with filters always keeps those filters and still applies the stored view when
+  it does not name one. The heart opens the save dialog and
   stays red only while the page still matches that saved view. **Clear Filters**
   resets the filter values and search but never deletes a saved view. Stage
   visibility is browser-local too, so the Kanban board shows a skeleton until the
