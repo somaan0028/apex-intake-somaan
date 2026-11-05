@@ -31,6 +31,15 @@ const SENT_STAGE: LeadStage = "SENT_TO_FIRM";
 /** The stage a lead must reach before it may be sent to the partner firm. */
 export const SEND_READY_STAGE: LeadStage = "RETAINED";
 
+/**
+ * A lead that reached `SENT_TO_FIRM` is final: the stage is a record of an
+ * actual submission, not a workflow choice, so it can never change again — for
+ * any role. The service refuses the write and the UI disables the controls.
+ */
+export function isLeadStageLocked(lead: { stage: LeadStage }): boolean {
+  return lead.stage === SENT_STAGE;
+}
+
 /** May `actor` see `lead`? */
 export function canViewLead(actor: Actor, lead: LeadSubject): boolean {
   if (can(actor.role, "leads.view.all")) return true;

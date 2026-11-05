@@ -78,7 +78,11 @@ import {
   sendLeadToFirm,
   setLeadBookmark,
 } from "@/lib/leads/actions";
-import { UNASSIGNED, DUPLICATE_GROUP_HIDDEN_MESSAGE } from "@/lib/leads/constants";
+import {
+  UNASSIGNED,
+  DUPLICATE_GROUP_HIDDEN_MESSAGE,
+  SENT_LEAD_LOCKED_MESSAGE,
+} from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
 import {
@@ -89,6 +93,7 @@ import {
   canDeleteLead,
   canEditLead,
   canSendLeadToFirm,
+  isLeadStageLocked,
   type Actor,
 } from "@/lib/rbac";
 import { COUNTIES_BY_STATE } from "@/lib/us-counties";
@@ -408,6 +413,9 @@ function LeadForm({
   };
 
   const canEdit = canEditLead(viewer, subject);
+  // A lead that reached Sent to Firm is final; the stage control locks for
+  // everyone, admins included.
+  const stageLocked = isLeadStageLocked({ stage });
   const canDelete = canDeleteLead(viewer);
   const canSeeAttribution = can(viewer.role, "leads.view.attribution");
   const canAssignAny = can(viewer.role, "leads.assign.any");
@@ -852,7 +860,7 @@ function LeadForm({
                   onValueChange={(value) => {
                     if (value) void changeStage(value as LeadStage);
                   }}
-                  disabled={!canEdit}
+                  disabled={!canEdit || stageLocked}
                 >
                   <SelectTrigger id="lead-stage" className="w-full">
                     <SelectValue />
@@ -875,7 +883,11 @@ function LeadForm({
                     ))}
                   </SelectContent>
                 </Select>
-                {!canEdit ? (
+                {stageLocked ? (
+                  <p className="text-xs text-muted-foreground">
+                    {SENT_LEAD_LOCKED_MESSAGE}
+                  </p>
+                ) : !canEdit ? (
                   <p className="text-xs text-muted-foreground">
                     Only the agent who owns this lead can edit it.
                   </p>

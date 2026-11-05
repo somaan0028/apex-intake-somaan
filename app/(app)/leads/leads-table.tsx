@@ -113,6 +113,7 @@ import type { AuthUser } from "@/lib/auth/session";
 import { saveLeadFields } from "@/lib/leads/actions";
 import {
   UNASSIGNED,
+  SENT_LEAD_LOCKED_MESSAGE,
   defaultAddedFrom,
   type LeadsView,
 } from "@/lib/leads/constants";
@@ -141,6 +142,7 @@ import {
   canAssignLead,
   canChangeLeadStage,
   canEditLead,
+  isLeadStageLocked,
 } from "@/lib/rbac";
 import {
   BOOLEAN_FILTER_OPTIONS,
@@ -1657,7 +1659,9 @@ function StageCell({ lead }: { lead: LeadRow }) {
   const editable = canEditLead(viewer, subject);
   const isSaving = Boolean(saving[lead.id]);
 
-  if (!editable) {
+  // Sent to Firm is final: show the badge rather than a control that the
+  // service would refuse anyway.
+  if (!editable || isLeadStageLocked({ stage })) {
     return (
       <Badge variant={STAGE_BADGE[stage]}>{LEAD_STAGE_LABELS[stage]}</Badge>
     );
@@ -1965,6 +1969,13 @@ function LeadsKanban({
     const subject = effective(lead);
     if (subject.stage === stage) return;
 
+    if (isLeadStageLocked(subject)) {
+      toast.error("Can't move this lead", {
+        description: SENT_LEAD_LOCKED_MESSAGE,
+      });
+      return;
+    }
+
     if (
       stage === "SENT_TO_FIRM" &&
       subject.sentToFirmAt === null &&
@@ -1991,6 +2002,7 @@ function LeadsKanban({
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
     if (saving[lead.id]) return;
+    if (isLeadStageLocked(effective(lead))) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -2161,11 +2173,12 @@ function LeadsKanban({
                         .filter(Boolean)
                         .join(" ") || "Unnamed lead";
                     const isSaving = Boolean(saving[lead.id]);
+                    const locked = isLeadStageLocked(lead);
 
                     return (
                       <article
                         key={lead.id}
-                        draggable={!isSaving}
+                        draggable={!isSaving && !locked}
                         onDragStart={(event) => {
                           const target = event.target as HTMLElement;
                           // Do not drag when the gesture starts on a control.
@@ -2234,8 +2247,8 @@ function LeadsKanban({
                               type="button"
                               data-drag-handle
                               aria-label={`Drag ${name} to another stage`}
-                              title="Drag to move"
-                              disabled={isSaving}
+                              title={locked ? SENT_LEAD_LOCKED_MESSAGE : "Drag to move"}
+                              disabled={isSaving || locked}
                               onPointerDown={(event) =>
                                 startPointerDrag(lead, event)
                               }

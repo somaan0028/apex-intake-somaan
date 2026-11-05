@@ -50,9 +50,13 @@ import { isValidEmail, normalizePostcode } from "@/lib/validation";
 import {
   canSendLeadToFirm,
   isLeadReadyToSend,
+  isLeadStageLocked,
   type Actor,
 } from "@/lib/rbac";
-import { DUPLICATE_GROUP_HIDDEN_MESSAGE } from "./constants";
+import {
+  DUPLICATE_GROUP_HIDDEN_MESSAGE,
+  SENT_LEAD_LOCKED_MESSAGE,
+} from "./constants";
 import { buildDupMatchString } from "./dup-matcher";
 import { reconcileDupGroup, recheckLead } from "./dup-groups";
 import { scheduleDupCheck } from "./dup-queue";
@@ -371,6 +375,11 @@ function applyLeadUpdate(
 
   if (otherKeys.length > 0) requireLeadEdit(actor, lead);
   if (stageChanged) {
+    // Once a lead is sent to the firm, its stage is a permanent record of that
+    // submission. Nobody — admin included — can move it again.
+    if (isLeadStageLocked(lead)) {
+      return { ok: false, error: SENT_LEAD_LOCKED_MESSAGE };
+    }
     // The sent stage is a record of an actual submission, not a free choice.
     if (
       update.stage === "SENT_TO_FIRM" &&

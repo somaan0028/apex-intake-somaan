@@ -29,6 +29,14 @@ export const DUPLICATE_GROUP_HIDDEN_MESSAGE =
   "You don't have access to some of the potentially similar leads. Please contact an Admin.";
 
 /**
+ * A lead that reached `SENT_TO_FIRM` is final. Shared by the service (the
+ * refusal) and the UI (the disabled control's explanation), so the two cannot
+ * drift apart.
+ */
+export const SENT_LEAD_LOCKED_MESSAGE =
+  "This lead was sent to the firm, so its stage can no longer change.";
+
+/**
  * Campaign selector on the Analytics page. `OTHER` is the same bucket the lead
  * grid uses: every stored case type that is not MVA or Mass Tort, including raw
  * ad-campaign values. `all` means no campaign filter.

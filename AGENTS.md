@@ -71,7 +71,10 @@ their Lawmatics CRM.
 - `SENT_TO_FIRM` records an actual submission: the service refuses to set that
   stage unless `sent_to_firm_at` or `brightwater_lead_id` is populated, so the
   stage cannot be chosen manually on an unsent lead. The dialog, inline select
-  and Kanban drop all surface the refusal.
+  and Kanban drop all surface the refusal. Once a lead **is** `SENT_TO_FIRM`, its
+  stage is final: `applyLeadUpdate` refuses any later stage change
+  (`SENT_LEAD_LOCKED_MESSAGE`, for every role including admins), and the dialog's
+  stage select, the grid's inline stage control and the Kanban drag are disabled.
 - Person data is split by role: `injured*` is always the injured person; `filler*` is
   the form submitter, populated only when `isFillingForSomeoneElse` is true (never
   duplicated). Brightwater receives the injured person's details.
