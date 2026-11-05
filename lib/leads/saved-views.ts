@@ -42,7 +42,10 @@ export interface PersistedLeadState extends LeadViewState {
 }
 
 const VIEWS_KEY = "apex.leads.views.v1";
-const STATE_KEY = "apex.leads.state.v1";
+// v2 drops the last-view state written while the leads date filter defaulted to
+// 7 days, so an existing browser starts with the cleared ("Any time") filter.
+// Named saved views stay on their own key and are untouched.
+const STATE_KEY = "apex.leads.state.v2";
 
 function sortedEntries(
   record: Record<string, string | boolean>,

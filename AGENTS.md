@@ -296,10 +296,10 @@ their Lawmatics CRM.
   stages free their width, the columns flex to fill the space, and the page
   scrolls rather than each stage getting its own scrollbar. The stage filter is
   dropped in Kanban because the board already groups by stage.
-- The leads grid and board default to `filter.addedWithin=7d` (also `24h` and
-  `3d`), with a Custom option that uses `filter.addedFrom` (required, default
-  seven days ago) and optional `filter.addedTo`; `listLeads` turns those into
-  `created_at` bounds, so a fresh visit never loads the whole backlog. The custom
+- The leads grid and board have **no date window by default**: the Added filter
+  starts cleared ("Any time"). It offers `24h`, `3d`, `7d`, and a Custom option
+  that uses `filter.addedFrom` (required, default seven days ago) and optional
+  `filter.addedTo`; `listLeads` turns those into `created_at` bounds. The custom
   lower date has no clear control; the upper date can be cleared.
 - **Saved Views** (`lib/leads/saved-views.ts`) are browser-local, never sent to
   the server: `localStorage` holds the named views plus the last place the person

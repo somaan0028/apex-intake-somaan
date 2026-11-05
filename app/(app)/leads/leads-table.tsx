@@ -707,7 +707,7 @@ export function LeadsTable({
       ...query,
       page: 1,
       search: "",
-      filters: { addedWithin: "7d" },
+      filters: {},
     });
   }
 
@@ -773,7 +773,7 @@ export function LeadsTable({
       ? addedWithin
       : query.filters.addedFrom || query.filters.addedTo
         ? "custom"
-        : "7d";
+        : "any";
 
   /** Change the board sort without touching the date filter. */
   function changeSort(value: string) {
@@ -852,37 +852,15 @@ export function LeadsTable({
     />
   );
 
-  /**
-   * Apply a query from any filter control.
-   *
-   * Asking for potential duplicates is a request to review the duplicate
-   * backlog, so the page's default 7-day window is lifted to "Any time". Only
-   * the 7d value is replaced; 24h/3d/custom are left untouched, and changing
-   * the date afterwards still applies.
-   */
-  function applyQueryChange(next: TableQuery) {
-    if (
-      next.filters.potentialDuplicate === "yes" &&
-      next.filters.addedWithin === "7d"
-    ) {
-      onQueryChange({
-        ...next,
-        filters: { ...next.filters, addedWithin: "any" },
-      });
-      return;
-    }
-    onQueryChange(next);
-  }
-
   /** Write one filter value from the compact panel. */
   function setFilterValue(columnId: string, value: string) {
     const filters: Record<string, string> = { ...query.filters };
     if (value) filters[columnId] = value;
     else delete filters[columnId];
-    applyQueryChange({ ...query, page: 1, filters });
+    onQueryChange({ ...query, page: 1, filters });
   }
 
-  // A quick signal on the compact trigger, ignoring the default date window.
+  // A quick signal on the compact trigger, ignoring the date filter.
   const activeFilterCount =
     Object.keys(query.filters).filter(
       (key) => key !== "addedWithin" && query.filters[key],
@@ -989,7 +967,7 @@ export function LeadsTable({
         data={leads}
         rowCount={total}
         query={query}
-        onQueryChange={applyQueryChange}
+        onQueryChange={onQueryChange}
         isPending={isPending || viewPending}
         getRowId={getRowId}
         ariaLabel="Leads"
