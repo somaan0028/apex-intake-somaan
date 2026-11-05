@@ -225,8 +225,9 @@ their Lawmatics CRM.
   `lib/leads/metrics.ts`, which scopes its counts with the same
   `leadsVisibilityCondition` the grid uses, so an agent's totals never include leads they
   could not open. The counts each link into the pre-filtered grid
-  (`/leads?filter.<columnId>=<value>`), and the "ready for Brightwater" callout is shown
-  only to a role that can actually send.
+  (`/leads?filter.<columnId>=<value>`), the "ready for Brightwater" callout is shown
+  only to a role that can actually send, and a potential-duplicates callout for every
+  role links to the grid with `filter.potentialDuplicate=yes`.
 - The **pipeline** is one stacked bar rather than a bar per stage: the stages are a
   composition of a single total, so a shared bar compares them at a glance, and no label
   has to fit inside a 1%-wide segment. Each segment carries a `title` and an

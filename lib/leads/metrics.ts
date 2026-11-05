@@ -11,7 +11,16 @@
  * much is in front of me, what is unclaimed, what is new, and what is waiting on
  * an action.
  */
-import { and, count, desc, eq, gte, isNull, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  type SQL,
+} from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { LEAD_STAGES, leads, type LeadStage } from "@/lib/db/schema";
 import type { Actor } from "@/lib/rbac";
@@ -33,6 +42,8 @@ export interface LeadMetrics {
   newThisWeek: number;
   /** MVA leads sitting at Retained that have not been sent on yet. */
   readyToSend: number;
+  /** Leads grouped by the matcher as potential duplicates. */
+  potentialDuplicates: number;
   /** Already delivered to the partner firm. */
   sentToFirm: number;
 }
@@ -87,6 +98,7 @@ export function leadMetrics(actor: Actor): LeadMetrics {
       eq(leads.caseType, "MVA"),
       isNull(leads.sentToFirmAt),
     ),
+    potentialDuplicates: countVisible(actor, isNotNull(leads.dupGroupId)),
     sentToFirm: byStage.SENT_TO_FIRM,
   };
 }

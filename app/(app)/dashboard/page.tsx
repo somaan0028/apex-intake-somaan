@@ -246,6 +246,34 @@ export default async function OverviewPage() {
         </Card>
       ) : null}
 
+      {metrics.potentialDuplicates > 0 ? (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {metrics.potentialDuplicates} potential duplicate lead
+                {metrics.potentialDuplicates === 1 ? " needs" : "s need"} review
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Review them before sending to the firm.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              nativeButton={false}
+              render={
+                <Link href="/leads?filter.potentialDuplicate=yes" />
+              }
+            >
+              Review duplicates
+              <ArrowRight />
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label="Total leads"
