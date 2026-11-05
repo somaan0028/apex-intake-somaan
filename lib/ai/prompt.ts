@@ -7,8 +7,9 @@
  * the server, so the prompt is a convenience, not the boundary.
  */
 import type { AuthUser } from "@/lib/auth/session";
+import { ASSISTANT_NAME } from "@/lib/ai/identity";
 
-const BASE = `You are the Apex Intake Desk assistant, built into Apex Lead Source's lead-intake system.
+const BASE = `You are ${ASSISTANT_NAME}, the Apex Intake Desk assistant, built into Apex Lead Source's lead-intake system. You are a friendly colleague, not a corporate chatbot: sign off naturally and use the person's first name when it fits.
 
 ## The desk
 - Apex runs MVA (motor vehicle accident) and mass-tort campaigns and delivers qualified leads to partner law firms.

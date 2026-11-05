@@ -203,6 +203,19 @@ their Lawmatics CRM.
   subtree with `data-theme`, so they never duplicate colour values in JavaScript.
 
 ## AI assistant
+- The assistant is **Larry** — `ASSISTANT_NAME` in `lib/ai/identity.ts`, used by the UI
+  copy and by the system prompt in `lib/ai/prompt.ts`. Keep the name in that module:
+  client components import it, and `lib/ai/config.ts` pulls in the OpenRouter adapter,
+  which must never reach the browser bundle.
+- Larry's mascot is the Lottie animation in `public/lottie/`: `larry.lottie` is the
+  designer's source file and `larry.json` is the animation extracted from it, which is
+  what `components/ai/larry-mascot.tsx` imports. The player (`lottie-web`, loaded lazily
+  because it touches `window`) loops the idle segment (frames 0–60) and recolours every
+  fill, stroke and gradient stop from the live `--primary`, keeping each colour's
+  brightness so the shading survives. It repaints when `data-theme`, `data-theme-mode`
+  or the `dark` class changes; do not replace it with a canvas player, because canvas
+  pixels cannot take their colour from CSS tokens. If the `.lottie` file is replaced,
+  re-extract `larry.json` (`a/Main Scene.json` inside the archive).
 - The panel is a **non-modal** slide-over in the app shell (`components/ai/`), opened from
   the header button in `app/(app)/layout.tsx`. It has no backdrop, does not close on an
   outside click or a page change, and remembers the last conversation in `localStorage`,
@@ -324,13 +337,15 @@ their Lawmatics CRM.
   hard-coded, so switching themes changes the pipeline as well. Adding a stage means
   adding a variable there.
 - The Overview's assistant card is a Client Component only because opening the panel is
-  an interaction. It is a **compact bar** (mascot, greeting, one button) under the
-  pipeline, not a feature card; the panel's own empty state offers the starter
-  questions. `AiAssistantProvider` (in the app shell) publishes `open(prompt)`
-  through `components/ai/assistant-context.tsx`, so any page can still open the panel
-  with a question waiting in the composer; `chat-thread.tsx` folds that prompt in
-  during render, keyed by a counter, rather than in an effect. The header button and
-  the Overview card call the same handle - never add a second way to open the panel.
+  an interaction and the mascot is animated. It is **Larry's home on the page**: the
+  first card in the content grid, with the Lottie mascot (~96px), "Hi {first} — I'm
+  Larry.", a one-line invite and a "Chat with Larry" button; the mascot and the button
+  both call `open()`. The mascot is decorative (`aria-hidden`) and the button carries
+  the label. `AiAssistantProvider` (in the app shell) publishes `open(prompt)` through
+  `components/ai/assistant-context.tsx`, so any page can still open the panel with a
+  question waiting in the composer; `chat-thread.tsx` folds that prompt in during
+  render, keyed by a counter, rather than in an effect. The header button and the
+  Overview card call the same handle - never add a second way to open the panel.
 - **Activity** (`app/(app)/activity/`) is the read-only audit trail, open to every role.
   Admins (holding `activities.view.all`) see every row; everyone else sees only rows where
   they are the doer. Search covers the description, and the filters run Date (shared

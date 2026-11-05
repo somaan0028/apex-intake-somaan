@@ -38,6 +38,7 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import { searchMentions } from "@/lib/ai/actions";
+import { ASSISTANT_NAME } from "@/lib/ai/identity";
 import {
   activeMentions,
   mentionToken,
@@ -451,9 +452,10 @@ export function ChatThread({
         {isEmpty ? (
           <div className="grid gap-3 py-6">
             <p className="text-sm text-muted-foreground">
-              What would you like to know? To point the assistant at a specific
-              lead or teammate, type <span className="font-medium">@</span> and
-              pick them from the list.
+              What would you like to know? To point {ASSISTANT_NAME} at a
+              specific lead or teammate, type{" "}
+              <span className="font-medium">@</span> and pick them from the
+              list.
             </p>
             <div className="grid gap-1.5">
               {STARTER_PROMPTS.map((prompt) => (

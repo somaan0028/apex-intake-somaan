@@ -33,6 +33,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { getChatList, loadChat, removeChat } from "@/lib/ai/actions";
+import { ASSISTANT_NAME } from "@/lib/ai/identity";
 import type { ChatSummary, StoredMessage } from "@/lib/ai/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -59,8 +60,8 @@ export function AiAssistantButton() {
       className="ml-auto"
       // Stable hook for automation; the label below is what users hear.
       id="open-ai-assistant"
-      aria-label="Open the AI assistant"
-      title="AI assistant"
+      aria-label={`Open ${ASSISTANT_NAME}, your AI assistant`}
+      title={`${ASSISTANT_NAME} — AI assistant`}
       onClick={() => open()}
     >
       <Sparkles />
@@ -210,9 +211,9 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         >
           <SheetHeader className="flex shrink-0 flex-row items-center gap-1 border-b p-3 pr-2">
             <Sparkles className="size-4 shrink-0 text-muted-foreground" />
-            <SheetTitle className="mr-auto text-sm">Apex Assistant</SheetTitle>
+            <SheetTitle className="mr-auto text-sm">{ASSISTANT_NAME}</SheetTitle>
             <SheetDescription className="sr-only">
-              Chat with the intake assistant about your leads and team.
+              Chat with {ASSISTANT_NAME} about your leads and team.
             </SheetDescription>
             <Button
               type="button"

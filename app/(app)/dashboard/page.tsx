@@ -341,8 +341,8 @@ export default async function OverviewPage() {
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="space-y-4">
+          <AssistantInvite firstName={firstName} />
           <Pipeline byStage={metrics.byStage} total={metrics.total} />
-          <AssistantInvite greeting={`Hi ${firstName} — need a hand?`} />
         </div>
         <LatestIntake leads={latest} />
       </div>
