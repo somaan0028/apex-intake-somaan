@@ -31,12 +31,15 @@ export function LeadHistoryDialog({
   triggerLabel,
   title,
   emptyMessage,
+  refreshKey = 0,
 }: {
   leadId: number;
   type: LeadHistoryType;
   triggerLabel: string;
   title: string;
   emptyMessage: string;
+  /** Bump to reload the trigger count after an action recorded a new row. */
+  refreshKey?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,8 +47,9 @@ export function LeadHistoryDialog({
   const [rows, setRows] = useState<LeadHistoryRow[]>([]);
   const [count, setCount] = useState<number | null>(null);
 
-  // Load the count when the lead dialog opens, so the trigger tells the reader
-  // whether there is anything to see before they click.
+  // Load the count when the lead dialog opens, and again whenever the caller
+  // reports a new activity (a stage change, a firm submission attempt), so the
+  // trigger is current without closing and reopening the lead.
   useEffect(() => {
     let cancelled = false;
     void getLeadActivityCount(leadId, type)
@@ -56,7 +60,7 @@ export function LeadHistoryDialog({
     return () => {
       cancelled = true;
     };
-  }, [leadId, type]);
+  }, [leadId, type, refreshKey]);
 
   async function load() {
     setLoading(true);

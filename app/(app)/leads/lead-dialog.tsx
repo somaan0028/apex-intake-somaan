@@ -361,6 +361,11 @@ function LeadForm({
     lead.assignedToId,
   );
 
+  // Bumped after an action records a new activity row, so the "View past
+  // changes (n)" and "View attempts (n)" counts refresh in place.
+  const [stageHistoryKey, setStageHistoryKey] = useState(0);
+  const [attemptHistoryKey, setAttemptHistoryKey] = useState(0);
+
   // Firm-submission facts live in local state so a successful send shows in the
   // form immediately, without waiting for the grid refresh to round-trip.
   const [sentAt, setSentAt] = useState<Date | null>(lead.sentToFirmAt);
@@ -542,6 +547,7 @@ function LeadForm({
     setStage(value);
     const ok = await saveNow({ stage: value });
     if (!ok) setStage(previous);
+    else setStageHistoryKey((key) => key + 1);
   }
 
   async function changeAssignee(value: string) {
@@ -631,6 +637,9 @@ function LeadForm({
 
     startSending(async () => {
       const result = await sendLeadToFirm(formData);
+      // The server records an attempt row for every send that reaches it,
+      // success or failure, so refresh the "View attempts (n)" count.
+      setAttemptHistoryKey((key) => key + 1);
       if (!result.ok) {
         // The server's refusal is already a complete sentence (e.g. the
         // potential-duplicate and already-submitted messages), so show it as
@@ -877,6 +886,7 @@ function LeadForm({
                   triggerLabel="View past changes"
                   title="Past stage changes"
                   emptyMessage="No stage changes have been recorded yet."
+                  refreshKey={stageHistoryKey}
                 />
               </FormField>
 
@@ -1405,6 +1415,7 @@ function LeadForm({
                   triggerLabel="View attempts"
                   title="Submission attempts"
                   emptyMessage="No submission attempts have been recorded yet."
+                  refreshKey={attemptHistoryKey}
                 />
               }
             >
