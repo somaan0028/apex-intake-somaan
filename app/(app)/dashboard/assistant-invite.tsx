@@ -9,8 +9,8 @@
  *
  * It is a tall, vertically-centred card in the right-hand column, deliberately
  * larger than a utility tile: the assistant should feel like a colleague
- * waiting on the page. The card stretches to the height of the two panels beside
- * it, so the page's right edge is one calm, personal block rather than a list.
+ * waiting on the page. It sizes to its content rather than stretching to the
+ * height of the two panels beside it, which left too much empty space.
  */
 import { Sparkles } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/assistant-context";
@@ -31,9 +31,12 @@ export function AssistantInvite({
 
   return (
     <Card
-      className={cn("h-full border-primary/30 bg-primary/5", className)}
+      className={cn(
+        "border-primary/30 bg-primary/5 lg:self-start",
+        className,
+      )}
     >
-      <CardContent className="flex h-full flex-col items-center justify-center gap-5 px-6 py-8 text-center">
+      <CardContent className="flex flex-col items-center justify-center gap-5 px-6 py-8 text-center">
         <button
           type="button"
           onClick={() => open()}

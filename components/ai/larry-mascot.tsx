@@ -173,11 +173,11 @@ export function LarryMascot({ className }: { className?: string }) {
         initialSegment: IDLE_SEGMENT,
         rendererSettings: {
           preserveAspectRatio: "xMidYMid meet",
-          // The artwork sits in the middle of a 512×512 canvas with a lot of
-          // empty margin. This box is the union of every frame in the idle
-          // segment (plus a little breathing room), so the mascot fills the
-          // card instead of floating in a third of it.
-          viewBoxSize: "84 108 338 338",
+          // The artwork sits in the middle of a 512×512 canvas, and the idle
+          // loop hops above it. This box is the union of the whole segment
+          // (x 120–387, y 74–433) with a margin, so the top of the jump is
+          // never clipped while the mascot still fills the card.
+          viewBoxSize: "58 58 391 391",
         },
       });
     };
