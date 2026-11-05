@@ -52,6 +52,9 @@ their Lawmatics CRM.
   (`DATABASE_PATH`, `AUTH_COOKIE_SECURE`, `AI_MODEL`) belong in `.env.local`.
 - Placeholder credentials satisfy the boot check, but the AI assistant and Brightwater
   need real values. Pass them in the shell or edit `.env`.
+- `npm run leads:dedupe` backfills `dup_match_string` and runs the one-time full
+  duplicate grouping pass for an existing database; `npm run leads:check` verifies the
+  similarity cases and threshold. A fresh seed runs the grouping pass automatically.
 
 ## Domain rules
 - Roles: `ADMIN` (all leads, any stage, assign, send, manage users) and `USER`
@@ -81,7 +84,9 @@ their Lawmatics CRM.
   `lib/labels.ts`), but an ad campaign we do not recognise is stored **verbatim** in this
   column, so read it through `caseTypeLabel()` rather than indexing `CASE_TYPE_LABELS`
   directly. The grid's `OTHER` filter is a bucket: it returns every stored case type that
-  is not `MVA` or `MASS_TORT`, including those raw campaign values.
+  is not `MVA` or `MASS_TORT`, including those raw campaign values. Case type is
+  **required**: the editor has no unset option, the CSV seeder refuses a missing
+  campaign, and the Firm submission UI is rendered only for MVA.
 - Public intake: the form posts to `POST /api/public/leads` (unauthenticated, allow-listed
   in `proxy.ts`, validated by `lib/leads/intake.ts`); every other API route is protected
   by the session cookie — except `/api/mcp`, which authenticates itself with a bearer
@@ -104,6 +109,8 @@ their Lawmatics CRM.
 - Free-text fields are stored as `TEXT` (trimmed on import). The boolean columns
   (`is_at_fault`, `has_attorney`, `has_received_settlement`, `is_filling_for_someone_else`)
   are normalised to real booleans and stored as SQLite `0`/`1` (`null` = unknown).
+- `notes` is free-form internal text; public intake never sets it and the Brightwater
+  payload never reads it.
 - Date/timestamp columns (`created_at`, `date_of_accident`, `sent_to_firm_at`, and the
   session timestamps) are stored as **Unix timestamps in seconds** (Drizzle `timestamp` mode).
 - Phone numbers are normalised to `(XXX) XXX-XXXX`.
@@ -121,6 +128,10 @@ their Lawmatics CRM.
 - `matter_id` is the Lawmatics business key and is only meaningful on imported leads.
   Public form submissions store an empty string; the unique index is partial
   (`WHERE matter_id <> ''`) so any number of those can coexist.
+- Potential-duplicate state lives on the lead: `dup_match_string` is the normalised
+  `name|email|phone` of the injured person (internal; stripped from client rows) and
+  `dup_group_id` is a random `dup_<uuid>`. A non-null group id always means a cluster
+  of at least two; unique and dismissed leads keep it null. See **Potential duplicates**.
 - `state` (2-letter code) and `county` are validated against the fixed lists in
   `lib/us-states.ts` / `lib/us-counties.ts`; the seeder throws on anything unrecognised.
 - `postcode` is canonicalised by `normalizePostcode` (`12345` or `12345-6789`, with
@@ -129,10 +140,10 @@ their Lawmatics CRM.
   invalid value is rejected (or, for the CSV, fails the import loudly); it never
   reaches SQLite. Validation is format-only — no bundled ZIP-to-state dataset.
 - The same final guard in `applyLeadUpdate` also validates required injured names,
-  email format, 10-digit phone, accident date, state/county, descriptions, stage and
-  assignee. The dialog mirrors it inline, the intake endpoint validates its own
-  payload, and the CSV seeder throws on any non-empty value it cannot canonicalise.
-  An invalid email can therefore not reach `leads` or `users`.
+  email format, 10-digit phone, accident date, state/county, descriptions/notes, a
+  required case type, stage and assignee. The dialog mirrors it inline, the intake
+  endpoint validates its own payload, and the CSV seeder throws on any non-empty value
+  it cannot canonicalise. An invalid email can therefore not reach `leads` or `users`.
 - Passwords are a single `scrypt$params$salt$hash` string (per-user salt).
 - `api_tokens` (one row per personal access token for external agents) stores only the
   SHA-256 hash of the token plus a display `prefix`, its owner and `last_used_at`; the raw
@@ -219,6 +230,37 @@ their Lawmatics CRM.
   into the first object type-checks and silently buries it inside `serverInfo` on the
   wire, where no client reads it — the option belongs in the second argument.
 
+## Potential duplicates
+- Identity and matching (`lib/leads/dup-matcher.ts`): `dup_match_string` is the
+  normalised injured `name|email|phone`. A pair matches when two segments are strongly
+  similar (name + email, name + phone, or email + phone) or the whole string reaches
+  `DUP_MATCH_THRESHOLD` (default 0.95, overridable with `DUP_MATCH_THRESHOLD`). A
+  name-only match is refused when both sides have neither an email nor a phone.
+- Grouping (`lib/leads/dup-groups.ts`): `rebuildDuplicateGroups` is the single full
+  pass; `recheckLead` is the O(n) incremental check; `reconcileDupGroup` enforces the
+  strict invariant that a group id exists only for a cluster of two or more. A member
+  leaving a pair resets the survivor to `null`.
+- Triggers: a full pass after the CSV import (and `npm run leads:dedupe`), a public
+  intake lead, and an edit to the injured name/email/phone. Intake and edits enqueue
+  through `lib/leads/dup-queue.ts`, which coalesces per lead and runs after the response.
+  There is no boot or periodic sweep: a dismissed lead stays dismissed until a new or
+  edited lead matches it.
+- Dismissal: `leads.resolve_duplicates` is ADMIN-only. **Mark as Not Duplicate** clears
+  only that lead's `dup_group_id`, reconciles a pair, and records
+  `lead:marked-not-duplicate`. **Check for Duplicates** re-runs `recheckLead` on demand
+  and returns fresh counts. The full pass re-links dismissed pairs, so do not run
+  `rebuildDuplicateGroups` routinely.
+- UI: an amber warning icon in the table and Kanban cards; a dialog banner with **View
+  similar** and **Mark as Not Duplicate**; **Check for Duplicates** beside Delete; the
+  **Duplicates** filter (`filter.potentialDuplicate=yes|no`); View similar uses
+  `filter.dupGroup=<id>` and ignores every other filter; the Overview shows the
+  potential-duplicates callout.
+- Send guard: `sendLeadForActor` refuses a grouped lead (until resolved) and refuses
+  when another lead with the same case-insensitive, trimmed email already has a
+  recorded send. See Domain rules.
+- Verification: `npm run leads:check` asserts the seeded pairs and the negative cases
+  against the threshold.
+
 ## Pages
 - **Overview** (`app/(app)/dashboard/`) is the at-a-glance page: headline numbers, the
   pipeline, the newest intake, and the assistant's invitation. Every number comes from
@@ -267,8 +309,10 @@ their Lawmatics CRM.
   facts; it is required (there is no unset option), offers the canonical codes,
   and keeps a stored raw campaign value selectable until the user changes it.
   The CSV seeder now preserves an unrecognised campaign verbatim and refuses a
-  missing one. The **Firm submission** section is shown
-  only while the lead's case type is MVA. On a
+  missing one. The **Firm submission** section is shown only while the lead's case
+  type is MVA. A potential-duplicate banner offers **View similar** and **Mark as Not
+  Duplicate**, and **Check for Duplicates** sits beside Delete for an on-demand re-run;
+  only admins can dismiss a grouping. On a
   lead filed for someone else, the filler's name, phone, email and relationship
   are editable under the same `leads.edit.*` permission as the injured person's
   fields. An agent
@@ -311,7 +355,10 @@ their Lawmatics CRM.
   A Stages menu beside Filters hides and shows columns; hidden
   stages free their width, the columns flex to fill the space, and the page
   scrolls rather than each stage getting its own scrollbar. The stage filter is
-  dropped in Kanban because the board already groups by stage.
+  dropped in Kanban because the board already groups by stage. Grouped leads carry an
+  amber warning icon in both views. The **Duplicates** filter
+  (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
+  `filter.dupGroup=<id>`, which ignores every other filter.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("Any time"). It offers `24h`, `3d`, `7d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional
@@ -351,9 +398,9 @@ their Lawmatics CRM.
   `<input type="date">`: the trigger reads like an input, month/year are dropdowns, and
   day cells are sized for touch in `components/ui/calendar.tsx`. Every calendar in the
   app goes through that pair.
-- **While the schema is still being built, do not stack migrations** — regenerate the single
-  `drizzle/0000_*.sql` instead (delete `drizzle/` and run `npm run db:generate`). Add
-  incremental migrations only once the schema is frozen.
+- The schema has moved past the initial migration: use incremental Drizzle migrations
+  (`npm run db:generate`) so an existing `data/apex.db` upgrades in place. Do not delete
+  or regenerate `drizzle/`; the live database tracks the applied migration journal.
 - Keep modules small, commented, and consistent with the existing structure.
 - Rendering `Button` as a link or any non-`<button>` needs `nativeButton={false}` (see
   `components/ui/pagination.tsx`); without it Base UI logs an accessibility warning and
