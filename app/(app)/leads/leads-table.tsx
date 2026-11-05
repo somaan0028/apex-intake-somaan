@@ -1122,7 +1122,7 @@ export function LeadsTable({
         isPending={isPending || viewPending}
         getRowId={getRowId}
         ariaLabel="Leads"
-        searchPlaceholder="Search leads…"
+        searchPlaceholder="Search by name, email, or phone"
         filters={boardFilters}
         defaultFilterVisibility={DEFAULT_FILTER_VISIBILITY}
         defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}

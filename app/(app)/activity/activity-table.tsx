@@ -221,7 +221,7 @@ export function ActivityTable({
       isPending={isPending}
       getRowId={getRowId}
       ariaLabel="Activity"
-      searchPlaceholder="Search activity…"
+      searchPlaceholder="Search by description"
       headerLeading={headerFilters}
       showColumnMenu={false}
       emptyMessage="No activity yet."
@@ -359,8 +359,8 @@ function LeadSearchFilter({
           <Input
             value={term}
             onChange={(event) => setTerm(event.target.value)}
-            placeholder="Search leads by name…"
-            aria-label="Search leads by name"
+            placeholder="Search leads by name, email, or phone"
+            aria-label="Search leads by name, email, or phone"
             autoFocus
           />
           <div className="max-h-64 overflow-y-auto">

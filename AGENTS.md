@@ -573,6 +573,9 @@ their Lawmatics CRM.
   the shell renders the viewer's name in the sidebar.
 
 ## Conventions
+- **Search boxes name the fields they search** in the placeholder — "Search by name,
+  email, or phone", never a bare "Search…" — so a person does not have to guess what
+  the box matches.
 - **Dates use `DatePicker`** (`components/ui/date-picker.tsx`), never a native
   `<input type="date">`: the trigger reads like an input, month/year are dropdowns, and
   day cells are sized for touch in `components/ui/calendar.tsx`. Every calendar in the

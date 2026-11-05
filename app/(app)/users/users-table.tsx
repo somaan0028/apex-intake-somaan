@@ -128,7 +128,7 @@ export function UsersTable({
         isPending={isPending}
         getRowId={getRowId}
         ariaLabel="Users"
-        searchPlaceholder="Search users…"
+        searchPlaceholder="Search by name or email"
         filters={filters}
         emptyMessage="No users yet."
         emptyFilteredMessage="No users match your search."
