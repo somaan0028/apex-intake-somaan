@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { cookies } from "next/headers";
+import { ArrowRight } from "lucide-react";
+import { AlertBar } from "@/components/alert-bar";
+import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
 import type { LeadsView } from "@/lib/leads/constants";
 import { parseKanbanLimits } from "@/lib/leads/kanban";
+import { potentialDuplicateCount } from "@/lib/leads/metrics";
 import { normalizeLeadsQueryParams } from "@/lib/leads/query-params";
 import {
   LEADS_DEFAULT_SORT,
@@ -79,13 +84,44 @@ export default async function LeadsPage({
     total = page.total;
   }
 
+  const potentialDuplicates = potentialDuplicateCount(user);
+  // The callout is a way in, so it steps aside once the person is already
+  // looking at the duplicates it points to.
+  const duplicatesViewActive = params["filter.potentialDuplicate"] === "yes";
+
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="text-muted-foreground">
-          Every lead captured by the intake desk.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
+          <p className="text-muted-foreground">
+            Every lead captured by the intake desk.
+          </p>
+        </div>
+        {/* Hidden once the duplicate filter is on: the list already is the warning. */}
+        {potentialDuplicates > 0 && !duplicatesViewActive ? (
+          <AlertBar
+            tone="warning"
+            className="shrink-0"
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/leads?filter.potentialDuplicate=yes" />}
+              >
+                Show
+                <ArrowRight />
+              </Button>
+            }
+          >
+            <span className="font-medium">
+              {potentialDuplicates} potential duplicate lead
+              {potentialDuplicates === 1 ? "" : "s"}
+            </span>{" "}
+            {potentialDuplicates === 1 ? "needs" : "need"} review
+          </AlertBar>
+        ) : null}
       </div>
       <LeadsTable
         leads={rows}

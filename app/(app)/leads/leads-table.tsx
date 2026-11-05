@@ -500,8 +500,8 @@ function buildFilters(
       label: "Duplicates",
       allLabel: "Show All",
       options: [
-        { label: "Only Potential Duplicates", value: "yes" },
-        { label: "Only Unique", value: "no" },
+        { label: "Potential Duplicates", value: "yes" },
+        { label: "Unique", value: "no" },
       ],
     },
     {

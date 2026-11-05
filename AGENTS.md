@@ -488,7 +488,10 @@ their Lawmatics CRM.
   the stage control (the board already groups by stage) and switching views clears it
   from the URL, but an explicit `filter.stage` arriving from a link is honoured in both
   views so a dashboard card always lands on the leads it counted. Grouped leads carry an
-  amber warning icon in both views. The **Duplicates** filter
+  amber warning icon in both views. The page header carries the same potential-duplicates
+  callout as the Overview (shared `components/alert-bar.tsx`), with a **Show** button
+  that applies `filter.potentialDuplicate=yes`; it steps aside while that filter is on.
+  The **Duplicates** filter
   (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
   `filter.dupGroup=<id>`, which ignores every other filter. A **Bookmarked** filter
   (`filter.bookmarked=yes|no`) is visible by default and is always personal: "yes"

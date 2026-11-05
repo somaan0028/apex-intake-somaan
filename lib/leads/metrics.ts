@@ -64,6 +64,15 @@ function countVisible(
 }
 
 /**
+ * Leads that may be the same person as another lead, visible to this viewer.
+ * Shared by the Overview's callout and the leads page's header warning so the
+ * two can never disagree.
+ */
+export function potentialDuplicateCount(actor: Actor): number {
+  return countVisible(actor, isNotNull(leads.dupGroupId));
+}
+
+/**
  * The Overview page's numbers for one viewer.
  *
  * `byStage` is filled from a single grouped query; the rest are narrow counts.
@@ -113,7 +122,7 @@ export function leadMetrics(actor: Actor): LeadMetrics {
       eq(leads.caseType, "MVA"),
       isNull(leads.sentToFirmAt),
     ),
-    potentialDuplicates: countVisible(actor, isNotNull(leads.dupGroupId)),
+    potentialDuplicates: potentialDuplicateCount(actor),
     sentToFirm: byStage.SENT_TO_FIRM,
   };
 }
