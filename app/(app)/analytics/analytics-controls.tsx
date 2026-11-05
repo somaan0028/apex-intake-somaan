@@ -55,7 +55,9 @@ export function AnalyticsControls({
         if (next.dateTo) params.set("dateTo", next.dateTo);
       }
     }
-    if (next.campaign !== "all") params.set("campaign", next.campaign);
+    // Always write the campaign, including `all`: the page's default is MVA,
+    // so an omitted parameter would silently snap back to MVA.
+    params.set("campaign", next.campaign);
 
     const search = params.toString();
     startTransition(() => {

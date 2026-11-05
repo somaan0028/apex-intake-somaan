@@ -37,7 +37,7 @@ import {
 } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
-import { LEAD_STAGES, leads, type LeadStage } from "@/lib/db/schema";
+import { leads } from "@/lib/db/schema";
 import {
   CAMPAIGN_FILTER_OPTIONS,
   type CampaignFilterValue,
@@ -194,12 +194,6 @@ export interface CombinationRow extends DimensionCounts {
   campaign: string;
 }
 
-/** One stage in the filtered pipeline, always in canonical stage order. */
-export interface StageRow {
-  stage: LeadStage;
-  total: number;
-}
-
 /** One bucket in the trend chart, carrying every plotted series. */
 export interface TrendPoint extends DimensionCounts {
   /** Stable bucket key (hour/day/week/month). */
@@ -220,7 +214,6 @@ export interface CampaignAnalytics {
   byContent: DimensionRow[];
   sourceCampaign: SourceCampaignRow[];
   combinations: CombinationRow[];
-  byStage: StageRow[];
   trend: TrendPoint[];
 }
 
@@ -390,24 +383,6 @@ function groupBySourceCampaign(where: SQL | undefined): SourceCampaignRow[] {
     source: row.source ?? "Not tracked",
     campaign: row.campaign ?? "Not tracked",
     ...toCounts(row),
-  }));
-}
-
-/** The filtered leads split by stage, in the canonical pipeline order. */
-function stageBreakdown(where: SQL | undefined): StageRow[] {
-  const rows = getDb()
-    .select({ stage: leads.stage, total: count() })
-    .from(leads)
-    .where(where)
-    .groupBy(leads.stage)
-    .all();
-
-  const counts = new Map(
-    rows.map((row) => [row.stage, Number(row.total)]),
-  );
-  return LEAD_STAGES.map((stage) => ({
-    stage,
-    total: counts.get(stage) ?? 0,
   }));
 }
 
@@ -620,7 +595,6 @@ export function campaignAnalytics(
     byContent: groupByDimension(leads.content, where, 12),
     sourceCampaign: groupBySourceCampaign(where),
     combinations: topCombinations(where, 12),
-    byStage: stageBreakdown(where),
     trend: trendFor(window, where),
   };
 }

@@ -345,10 +345,9 @@ their Lawmatics CRM.
   **MVA**; the date filter falls back to 30 days when the URL carries no preset. The
   trend is a multi-series line chart with dots
   (`app/(app)/analytics/trend-chart.tsx`) showing Leads, Qualified+, Retained+ and Sent.
-  The **Campaign mix** card is the filtered stage pipeline, reusing the Overview's
-  stacked-bar + two-column legend and `--stage-*` colours (a campaign composition would
-  collapse to one colour under the MVA default); the campaign totals still live in the
-  Campaigns table below.
+  The **Campaign mix** card still shows the campaign composition, but reuses the
+  Overview pipeline's design: one stacked bar with a two-column dot legend directly
+  below it. Campaign totals also appear in the Campaigns table below.
 - The **lead detail dialog** (`app/(app)/leads/lead-dialog.tsx`) auto-saves: every
   editable field writes through `saveLeadFields` (`lib/leads/actions.ts`) as it changes,
   so there is no Save button. Text fields debounce, selects and the date save

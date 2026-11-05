@@ -19,9 +19,8 @@ import {
   type AnalyticsFilters,
   type DimensionCounts,
   type DimensionRow,
-  type StageRow,
 } from "@/lib/leads/analytics";
-import { LEAD_STAGE_LABELS, caseTypeLabel } from "@/lib/labels";
+import { caseTypeLabel } from "@/lib/labels";
 import { can } from "@/lib/rbac";
 import { AnalyticsControls } from "./analytics-controls";
 import { TrendChart } from "./trend-chart";
@@ -78,24 +77,33 @@ function KpiCard({
   );
 }
 
+/** Segment colours for the campaign mix, shared by the bar and its legend. */
+const MIX_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
+
 /**
- * The filtered stage mix, using the same single stacked bar + two-column legend
- * as the Overview pipeline. Each segment and legend row drills into the grid
- * with the active window and campaign filters.
+ * Campaign composition, using the Overview pipeline's design: one stacked bar
+ * with the legend directly below it. The data is still the campaign mix; only
+ * the presentation follows the pipeline card.
  */
-function CampaignPipeline({
+function CampaignMix({
   rows,
   total,
-  hrefFor,
+  linkFor,
 }: {
-  rows: StageRow[];
+  rows: DimensionRow[];
   total: number;
-  hrefFor: (stage: StageRow["stage"]) => string;
+  linkFor?: (key: string) => string | null;
 }) {
-  if (total === 0) {
+  if (rows.length === 0 || total === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No leads in this window, so there is nothing to break down.
+        No campaign data in this window.
       </p>
     );
   }
@@ -103,50 +111,80 @@ function CampaignPipeline({
   return (
     <>
       <div className="flex h-4 w-full gap-px overflow-hidden rounded-full bg-muted">
-        {rows.map((row) => {
+        {rows.map((row, index) => {
           if (row.total === 0) return null;
-          const label = LEAD_STAGE_LABELS[row.stage];
-          return (
+          const share = (row.total / total) * 100;
+          const href = linkFor?.(row.key) ?? null;
+          const title = `${campaignLabel(row.key)}: ${row.total} (${Math.round(
+            share,
+          )}%)`;
+          const label = `${campaignLabel(row.key)}: ${row.total} lead${
+            row.total === 1 ? "" : "s"
+          }`;
+          const style = {
+            width: `${share}%`,
+            backgroundColor: MIX_COLORS[index % MIX_COLORS.length],
+          };
+
+          return href ? (
             <Link
-              key={row.stage}
-              href={hrefFor(row.stage)}
-              title={`${label}: ${row.total}`}
-              aria-label={`${label}: ${row.total} lead${
-                row.total === 1 ? "" : "s"
-              }`}
+              key={row.key}
+              href={href}
+              title={title}
+              aria-label={label}
               className="h-full outline-offset-2 transition-opacity hover:opacity-80"
-              style={{
-                width: `${(row.total / total) * 100}%`,
-                backgroundColor: `var(--stage-${row.stage.toLowerCase()})`,
-              }}
+              style={style}
+            />
+          ) : (
+            <div
+              key={row.key}
+              title={title}
+              aria-label={label}
+              className="h-full"
+              style={style}
             />
           );
         })}
       </div>
 
       <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-        {rows.map((row) => (
-          <li key={row.stage}>
-            <Link
-              href={hrefFor(row.stage)}
-              className="flex items-center gap-2 rounded-md py-1.5 text-sm hover:underline"
-            >
+        {rows.map((row, index) => {
+          const href = linkFor?.(row.key) ?? null;
+          const content = (
+            <>
               <span
                 aria-hidden
                 className="size-2.5 shrink-0 rounded-full"
                 style={{
-                  backgroundColor: `var(--stage-${row.stage.toLowerCase()})`,
+                  backgroundColor: MIX_COLORS[index % MIX_COLORS.length],
                 }}
               />
               <span className="min-w-0 flex-1 truncate">
-                {LEAD_STAGE_LABELS[row.stage]}
+                {campaignLabel(row.key)}
               </span>
               <span className="tabular-nums text-muted-foreground">
                 {row.total}
               </span>
-            </Link>
-          </li>
-        ))}
+            </>
+          );
+
+          return (
+            <li key={row.key}>
+              {href ? (
+                <Link
+                  href={href}
+                  className="flex items-center gap-2 rounded-md py-1.5 text-sm hover:underline"
+                >
+                  {content}
+                </Link>
+              ) : (
+                <div className="flex items-center gap-2 rounded-md py-1.5 text-sm">
+                  {content}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </>
   );
@@ -392,23 +430,14 @@ export default async function AnalyticsPage({
       ? leadsHref(filters, { "filter.source": key })
       : null;
 
-  // Stage segments/legend rows keep the active window and campaign filter.
-  const stageLink = (stage: StageRow["stage"]) =>
-    leadsHref(filters, { "filter.stage": stage });
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground">
             Which campaigns, sources, mediums and creatives bring the best
             leads.
-            {filtered ? (
-              <span className="ml-1">
-                Showing {campaignFilterLabel(filters.campaign)} only.
-              </span>
-            ) : null}
           </p>
         </div>
         <AnalyticsControls
@@ -487,15 +516,15 @@ export default async function AnalyticsPage({
             {filtered
               ? `${data.totals.total} ${campaignFilterLabel(
                   filters.campaign,
-                )} leads across the stages in this window.`
-              : `${data.totals.total} leads across the stages in this window.`}
+                )} leads in this window.`
+              : `How the ${data.totals.total} leads split across campaigns.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <CampaignPipeline
-            rows={data.byStage}
+          <CampaignMix
+            rows={data.byCampaign}
             total={data.totals.total}
-            hrefFor={stageLink}
+            linkFor={campaignLink}
           />
         </CardContent>
       </Card>
