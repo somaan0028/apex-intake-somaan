@@ -17,7 +17,7 @@
  *     release one they own) with a button rather than an assignee dropdown.
  */
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
 import {
   Bookmark,
   Check,
@@ -511,6 +511,25 @@ function LeadForm({
     schedule(key, { [key]: value } as LeadFieldPatch);
   }
 
+  /**
+   * Typing over a complete number should start a new one, not be swallowed by
+   * the 10-digit cap. Without this, a person who clicks at the end of
+   * `(713) 555-0180` and types sees nothing happen at all.
+   */
+  function phoneKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+    key: "injuredPhone" | "fillerPhone",
+  ) {
+    if (event.key.length !== 1 || !/\d/.test(event.key)) return;
+    const input = event.currentTarget;
+    const atEnd =
+      input.selectionStart === input.value.length &&
+      input.selectionEnd === input.value.length;
+    if (!atEnd || input.value.replace(/\D/g, "").length < 10) return;
+    event.preventDefault();
+    changeText(key, event.key);
+  }
+
   async function changeCaseType(value: string) {
     const previous = draft.caseType;
     updateDraft("caseType", value);
@@ -963,6 +982,9 @@ function LeadForm({
                           formatPhone(event.target.value),
                         )
                       }
+                      onKeyDown={(event) =>
+                        phoneKeyDown(event, "fillerPhone")
+                      }
                       onBlur={() => flush("fillerPhone")}
                     />
                     <CopyButton
@@ -1072,6 +1094,9 @@ function LeadForm({
                         "injuredPhone",
                         formatPhone(event.target.value),
                       )
+                    }
+                    onKeyDown={(event) =>
+                      phoneKeyDown(event, "injuredPhone")
                     }
                     onBlur={() => flush("injuredPhone")}
                   />

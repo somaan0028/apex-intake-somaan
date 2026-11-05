@@ -68,7 +68,7 @@ export function buildBrightwaterPayload(
   if (missing.length > 0) {
     return {
       ok: false,
-      error: `Brightwater requires the injured person's ${joinList(missing)}.`,
+      error: `The injured person's ${joinList(missing)} is missing.`,
     };
   }
 
