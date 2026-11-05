@@ -47,7 +47,7 @@ export const PERMISSIONS = [
   "leads.view.attribution",
   /** See every user's activity, not just your own. */
   "activities.view.all",
-  /** See the Campaign Analytics dashboard (campaign/source/medium/content performance). */
+  /** See the Analytics dashboard (campaign/source/medium/content performance). */
   "analytics.view",
   /** Create and manage intake users. */
   "users.manage",

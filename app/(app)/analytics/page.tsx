@@ -12,26 +12,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/session";
-import { LEAD_SOURCES } from "@/lib/leads/constants";
+import { LEAD_SOURCES, type CampaignFilterValue } from "@/lib/leads/constants";
 import {
-  ANALYTICS_RANGES,
   campaignAnalytics,
-  readAnalyticsRange,
-  type AnalyticsRange,
+  readAnalyticsFilters,
+  type AnalyticsFilters,
   type DimensionCounts,
   type DimensionRow,
-  type TrendPoint,
 } from "@/lib/leads/analytics";
 import { caseTypeLabel } from "@/lib/labels";
 import { can } from "@/lib/rbac";
+import { AnalyticsControls } from "./analytics-controls";
+import { TrendChart } from "./trend-chart";
 
 export const metadata: Metadata = {
-  title: "Campaign Analytics · Apex Intake Desk",
+  title: "Analytics - Apex Intake Desk",
 };
 
 /** Percentage with no decimals; an em dash when there is nothing to divide by. */
 function rate(value: number, total: number): string {
-  if (total <= 0) return "—";
+  if (total <= 0) return "\u2014";
   return `${Math.round((value / total) * 100)}%`;
 }
 
@@ -41,36 +41,18 @@ function campaignLabel(key: string): string {
   return caseTypeLabel(key);
 }
 
-/** Range switcher — links so the view stays server-rendered and shareable. */
-function RangeTabs({ active }: { active: AnalyticsRange }) {
-  return (
-    <nav
-      aria-label="Analytics time range"
-      className="inline-flex items-center gap-1 rounded-lg border bg-card p-1"
-    >
-      {ANALYTICS_RANGES.map((range) => {
-        const isActive = range.value === active;
-        return (
-          <Link
-            key={range.value}
-            href={
-              range.value === "all"
-                ? "/campaign-analytics"
-                : `/campaign-analytics?range=${range.value}`
-            }
-            aria-current={isActive ? "page" : undefined}
-            className={
-              isActive
-                ? "rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-                : "rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            }
-          >
-            {range.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+/** The label for the selected campaign filter. */
+function campaignFilterLabel(value: CampaignFilterValue): string {
+  if (value === "all") return "All campaigns";
+  if (value === "OTHER") return "Other campaigns";
+  return caseTypeLabel(value);
+}
+
+function granularityLabel(value: "hour" | "day" | "week" | "month"): string {
+  if (value === "hour") return "Hourly";
+  if (value === "day") return "Daily";
+  if (value === "week") return "Weekly";
+  return "Monthly";
 }
 
 function KpiCard({
@@ -148,6 +130,68 @@ function ShareBar({
   );
 }
 
+/**
+ * The campaign mix legend. Each row is its own bordered card with a fixed-width
+ * percentage, so a left column's value can never visually run into the next
+ * column's label (the bug in the old two-column key).
+ */
+function CampaignMixLegend({
+  rows,
+  total,
+}: {
+  rows: DimensionRow[];
+  total: number;
+}) {
+  if (rows.length === 0 || total === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No campaign data in this window.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2">
+      {rows.map((row, index) => {
+        const share = total > 0 ? (row.total / total) * 100 : 0;
+        const color = MIX_COLORS[index % MIX_COLORS.length];
+        return (
+          <li
+            key={row.key}
+            className="rounded-lg border bg-muted/20 px-3 py-2"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="min-w-0 flex-1 truncate text-sm">
+                {campaignLabel(row.key)}
+              </span>
+              <span className="text-sm font-medium tabular-nums">
+                {row.total}
+              </span>
+              <span className="w-11 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                {rate(row.total, total)}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, share)}%`,
+                  backgroundColor: color,
+                }}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** The dimension table: volume plus the funnel outcomes that show quality. */
 function DimensionTable({
   title,
@@ -177,17 +221,19 @@ function DimensionTable({
           <p className="text-sm text-muted-foreground">{emptyHint}</p>
         ) : (
           <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[26rem] border-separate border-spacing-0 text-sm">
+            <table className="w-full min-w-[28rem] border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-2 pb-2 font-medium">Name</th>
                   <th className="px-2 pb-2 text-right font-medium">Leads</th>
                   <th className="px-2 pb-2 text-right font-medium">
-                    Qualified
+                    Qualified %
                   </th>
-                  <th className="px-2 pb-2 text-right font-medium">Retained</th>
+                  <th className="px-2 pb-2 text-right font-medium">
+                    Retained %
+                  </th>
                   <th className="px-2 pb-2 text-right font-medium">Sent</th>
-                  <th className="px-2 pb-2 text-right font-medium">Disq.</th>
+                  <th className="px-2 pb-2 text-right font-medium">Disq. %</th>
                 </tr>
               </thead>
               <tbody>
@@ -227,16 +273,25 @@ function DimensionTable({
                       <td className="px-2 py-2 text-right tabular-nums">
                         {row.total}
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        title={`${row.qualified} of ${row.total} leads`}
+                      >
                         {rate(row.qualified, row.total)}
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        title={`${row.retained} of ${row.total} leads`}
+                      >
                         {rate(row.retained, row.total)}
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
                         {row.sent}
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        title={`${row.disqualified} of ${row.total} leads`}
+                      >
                         {rate(row.disqualified, row.total)}
                       </td>
                     </tr>
@@ -292,12 +347,18 @@ function BestCard({
   );
 }
 
-/** Best retention among rows with enough volume to be meaningful. */
-function bestByRetention(
-  rows: DimensionRow[],
-  minimum = 10,
-): DimensionRow | null {
-  const eligible = rows.filter((row) => row.total >= minimum);
+/**
+ * Best retention among groups with enough volume to be meaningful.
+ *
+ * "Not tracked" is excluded: unattributed leads are a data gap, not a channel
+ * that is working, and they would otherwise win every time UTM data is absent.
+ */
+const MIN_BEST_VOLUME = 25;
+
+function bestByRetention(rows: DimensionRow[]): DimensionRow | null {
+  const eligible = rows.filter(
+    (row) => row.key !== "Not tracked" && row.total >= MIN_BEST_VOLUME,
+  );
   if (eligible.length === 0) return null;
   return eligible.reduce((best, row) => {
     const bestRate = best.total ? best.retained / best.total : 0;
@@ -306,60 +367,39 @@ function bestByRetention(
   });
 }
 
-/** Trend as CSS bars — server-rendered, responsive and accessible. */
-function TrendChart({ points }: { points: TrendPoint[] }) {
-  const peak = points.reduce((max, point) => Math.max(max, point.total), 0);
-
-  if (points.length === 0 || peak === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No leads in this window yet.
-      </p>
-    );
+/** Leads links carry the current window and campaign so a drilldown matches. */
+function leadsHref(
+  filters: AnalyticsFilters,
+  extra: Record<string, string> = {},
+): string {
+  const params = new URLSearchParams();
+  if (filters.dateWithin !== "any") {
+    params.set("filter.addedWithin", filters.dateWithin);
+    if (filters.dateWithin === "custom") {
+      if (filters.dateFrom) params.set("filter.addedFrom", filters.dateFrom);
+      if (filters.dateTo) params.set("filter.addedTo", filters.dateTo);
+    }
   }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex h-36 items-end gap-1">
-        {points.map((point) => (
-          <div
-            key={point.key}
-            className="group relative flex h-full min-w-0 flex-1 items-end"
-          >
-            <div
-              title={`${point.label}: ${point.total} lead${point.total === 1 ? "" : "s"}`}
-              aria-label={`${point.label}: ${point.total} lead${point.total === 1 ? "" : "s"}`}
-              className="w-full rounded-t-sm bg-primary/70 transition-colors group-hover:bg-primary"
-              style={{
-                // An empty bucket stays empty; otherwise keep a visible sliver.
-                height: point.total
-                  ? `${Math.max(2, (point.total / peak) * 100)}%`
-                  : "0%",
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
-        <span>{points[0]?.label}</span>
-        <span>{points[points.length - 1]?.label}</span>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Peak: {peak} lead{peak === 1 ? "" : "s"} per period.
-      </p>
-    </div>
-  );
+  if (filters.campaign !== "all") {
+    params.set("filter.caseType", filters.campaign);
+  }
+  for (const [key, value] of Object.entries(extra)) {
+    params.set(key, value);
+  }
+  const search = params.toString();
+  return search ? `/leads?${search}` : "/leads";
 }
 
 function funnelSummary(counts: DimensionCounts) {
   return {
     qualifiedRate: rate(counts.qualified, counts.total),
     retentionRate: rate(counts.retained, counts.total),
+    sentRate: rate(counts.sent, counts.total),
     disqualificationRate: rate(counts.disqualified, counts.total),
   };
 }
 
-export default async function CampaignAnalyticsPage({
+export default async function AnalyticsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -369,10 +409,10 @@ export default async function CampaignAnalyticsPage({
   // hand-typed URL must not reach attribution data without the permission.
   if (!can(user.role, "analytics.view")) redirect("/dashboard");
 
-  const params = await searchParams;
-  const range = readAnalyticsRange(params.range);
-  const data = campaignAnalytics(range);
+  const filters = readAnalyticsFilters(await searchParams);
+  const data = campaignAnalytics(filters);
   const totals = funnelSummary(data.totals);
+  const filtered = filters.campaign !== "all";
 
   const bestSource = bestByRetention(data.bySource);
   const bestMedium = bestByRetention(data.byMedium);
@@ -382,32 +422,40 @@ export default async function CampaignAnalyticsPage({
   // stored verbatim and the grid's caseType filter only accepts the enum.
   const campaignLink = (key: string) =>
     key === "MVA" || key === "MASS_TORT" || key === "OTHER"
-      ? `/leads?filter.caseType=${key}`
+      ? leadsHref(filters, { "filter.caseType": key })
       : null;
 
   // The grid's source filter accepts only the known sources, so "Not tracked"
   // and raw values get no link rather than one that silently does nothing.
   const sourceLink = (key: string) =>
     (LEAD_SOURCES as readonly string[]).includes(key)
-      ? `/leads?filter.source=${encodeURIComponent(key)}`
+      ? leadsHref(filters, { "filter.source": key })
       : null;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Campaign Analytics
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground">
             Which campaigns, sources, mediums and creatives bring the best
             leads.
+            {filtered ? (
+              <span className="ml-1">
+                Showing {campaignFilterLabel(filters.campaign)} only.
+              </span>
+            ) : null}
           </p>
         </div>
-        <RangeTabs active={range} />
+        <AnalyticsControls
+          dateWithin={filters.dateWithin}
+          dateFrom={filters.dateFrom}
+          dateTo={filters.dateTo}
+          campaign={filters.campaign}
+        />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         <KpiCard
           label="Leads"
           value={data.totals.total}
@@ -426,7 +474,12 @@ export default async function CampaignAnalyticsPage({
         <KpiCard
           label="Sent to firm"
           value={data.totals.sent}
-          hint={`${totals.disqualificationRate} disqualified`}
+          hint={`${totals.sentRate} of all leads`}
+        />
+        <KpiCard
+          label="Disqualified"
+          value={data.totals.disqualified}
+          hint={`${totals.disqualificationRate} of all leads`}
         />
       </div>
 
@@ -435,7 +488,8 @@ export default async function CampaignAnalyticsPage({
           <CardHeader>
             <CardTitle className="text-base">Leads over time</CardTitle>
             <CardDescription>
-              Intake volume in the selected window.
+              {granularityLabel(data.window.granularity)} intake volume and
+              funnel outcomes in the selected window.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -447,7 +501,7 @@ export default async function CampaignAnalyticsPage({
           <CardHeader>
             <CardTitle className="text-base">What&apos;s working</CardTitle>
             <CardDescription>
-              Best retention among groups with at least 10 leads.
+              Best retention among groups with at least {MIN_BEST_VOLUME} leads.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -466,7 +520,9 @@ export default async function CampaignAnalyticsPage({
         <CardHeader>
           <CardTitle className="text-base">Campaign mix</CardTitle>
           <CardDescription>
-            How the {data.totals.total} leads split across campaigns.
+            {filtered
+              ? `${data.totals.total} leads from ${campaignFilterLabel(filters.campaign)} in this window.`
+              : `How the ${data.totals.total} leads split across campaigns.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -475,28 +531,7 @@ export default async function CampaignAnalyticsPage({
             total={data.totals.total}
             colors={MIX_COLORS}
           />
-          <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-            {data.byCampaign.map((row, index) => (
-              <li
-                key={row.key}
-                className="flex items-center gap-2 py-1 text-sm"
-              >
-                <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: MIX_COLORS[index % MIX_COLORS.length],
-                  }}
-                />
-                <span className="min-w-0 flex-1 truncate">
-                  {campaignLabel(row.key)}
-                </span>
-                <span className="tabular-nums text-muted-foreground">
-                  {row.total} ({rate(row.total, data.totals.total)})
-                </span>
-              </li>
-            ))}
-          </ul>
+          <CampaignMixLegend rows={data.byCampaign} total={data.totals.total} />
         </CardContent>
       </Card>
 
@@ -555,7 +590,7 @@ export default async function CampaignAnalyticsPage({
             </p>
           ) : (
             <div className="-mx-2 overflow-x-auto">
-              <table className="w-full min-w-[42rem] border-separate border-spacing-0 text-sm">
+              <table className="w-full min-w-[44rem] border-separate border-spacing-0 text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-2 pb-2 font-medium">Source</th>
@@ -564,10 +599,10 @@ export default async function CampaignAnalyticsPage({
                     <th className="px-2 pb-2 font-medium">Campaign</th>
                     <th className="px-2 pb-2 text-right font-medium">Leads</th>
                     <th className="px-2 pb-2 text-right font-medium">
-                      Qualified
+                      Qualified %
                     </th>
                     <th className="px-2 pb-2 text-right font-medium">
-                      Retained
+                      Retained %
                     </th>
                     <th className="px-2 pb-2 text-right font-medium">Sent</th>
                   </tr>
@@ -593,10 +628,16 @@ export default async function CampaignAnalyticsPage({
                       <td className="px-2 py-2 text-right tabular-nums">
                         {row.total}
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        title={`${row.qualified} of ${row.total} leads`}
+                      >
                         {rate(row.qualified, row.total)}
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        title={`${row.retained} of ${row.total} leads`}
+                      >
                         {rate(row.retained, row.total)}
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
@@ -621,16 +662,18 @@ export default async function CampaignAnalyticsPage({
         </CardHeader>
         <CardContent>
           <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[30rem] border-separate border-spacing-0 text-sm">
+            <table className="w-full min-w-[32rem] border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-2 pb-2 font-medium">Source</th>
                   <th className="px-2 pb-2 font-medium">Campaign</th>
                   <th className="px-2 pb-2 text-right font-medium">Leads</th>
                   <th className="px-2 pb-2 text-right font-medium">
-                    Qualified
+                    Qualified %
                   </th>
-                  <th className="px-2 pb-2 text-right font-medium">Retained</th>
+                  <th className="px-2 pb-2 text-right font-medium">
+                    Retained %
+                  </th>
                   <th className="px-2 pb-2 text-right font-medium">Sent</th>
                 </tr>
               </thead>
@@ -647,10 +690,16 @@ export default async function CampaignAnalyticsPage({
                     <td className="px-2 py-2 text-right tabular-nums">
                       {row.total}
                     </td>
-                    <td className="px-2 py-2 text-right tabular-nums">
+                    <td
+                      className="px-2 py-2 text-right tabular-nums"
+                      title={`${row.qualified} of ${row.total} leads`}
+                    >
                       {rate(row.qualified, row.total)}
                     </td>
-                    <td className="px-2 py-2 text-right tabular-nums">
+                    <td
+                      className="px-2 py-2 text-right tabular-nums"
+                      title={`${row.retained} of ${row.total} leads`}
+                    >
                       {rate(row.retained, row.total)}
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums">
@@ -673,7 +722,7 @@ export default async function CampaignAnalyticsPage({
           variant="outline"
           size="sm"
           nativeButton={false}
-          render={<Link href="/leads?sort=createdAt&sortDir=desc" />}
+          render={<Link href={leadsHref(filters)} />}
         >
           Open the lead grid
           <ArrowRight />

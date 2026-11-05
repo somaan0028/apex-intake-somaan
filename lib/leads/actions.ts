@@ -67,7 +67,7 @@ export async function deleteLead(
     revalidatePath("/leads");
     revalidatePath("/dashboard");
     revalidatePath("/activity");
-    revalidatePath("/campaign-analytics");
+    revalidatePath("/analytics");
   }
   return result;
 }

@@ -331,14 +331,18 @@ their Lawmatics CRM.
   presets/custom range), Performed by (a select), then Affected Lead (a debounced name
   search over the visibility-scoped lead query). It deliberately has no detail modal, no
   row click, and no column or filter-visibility menus.
-- **Campaign Analytics** (`app/(app)/campaign-analytics/`) is admin-only: the sidebar
-  hides it and the page redirects without `analytics.view`, so a hand-typed URL cannot
-  reach attribution data. `lib/leads/analytics.ts` groups the same leads by campaign
-  (`case_type`), source, medium, and content, and every grouped row carries the funnel
-  counts so volume is read beside quality. Empty attribution collapses into a single
-  "Not tracked" bucket, and campaign labels go through `caseTypeLabel()`. Drilldown
-  links only target filters the grid actually accepts: canonical `caseType` codes and
-  sources in `LEAD_SOURCES`, never raw campaign values.
+- **Analytics** (`app/(app)/analytics/`) is admin-only: the sidebar hides it and the
+  page redirects without `analytics.view`, so a hand-typed URL cannot reach attribution
+  data. `lib/leads/analytics.ts` groups the same leads by campaign (`case_type`),
+  source, medium, and content, and every grouped row carries the funnel counts so
+  volume is read beside quality. Empty attribution collapses into a single "Not
+  tracked" bucket, and campaign labels go through `caseTypeLabel()`. Drilldown links
+  carry the active window/campaign and only target filters the grid actually accepts:
+  canonical `caseType` codes and sources in `LEAD_SOURCES`, never raw campaign values.
+  The toolbar reuses `components/date-range-filter.tsx` (the leads/activity presets and
+  custom range) and adds a campaign selector (`all`, `MVA`, `MASS_TORT`, `OTHER`, where
+  `OTHER` is the grid's bucket). The trend is a multi-series line chart with dots
+  (`app/(app)/analytics/trend-chart.tsx`) showing Leads, Qualified+, Retained+ and Sent.
 - The **lead detail dialog** (`app/(app)/leads/lead-dialog.tsx`) auto-saves: every
   editable field writes through `saveLeadFields` (`lib/leads/actions.ts`) as it changes,
   so there is no Save button. Text fields debounce, selects and the date save
@@ -429,7 +433,7 @@ their Lawmatics CRM.
   The profile header shows a clickable avatar (the photo is the upload control), the
   person's name, role and member-since date. The email is intentionally not repeated there;
   it appears in the details form below.
-- The sidebar (`components/app-sidebar.tsx`) keeps Overview, Leads, and Campaign Analytics
+- The sidebar (`components/app-sidebar.tsx`) keeps Overview, Leads, and Analytics
   flat, then folds **Staff** (Users, Activity) and **Settings** (Connect Your Agent,
   Preferences) into collapsible groups. It uses the sidebar's `inset` variant, so the
   desktop shell shows the sidebar colour behind a main panel that floats with an 8px

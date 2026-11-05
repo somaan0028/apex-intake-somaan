@@ -1,60 +1,156 @@
 /**
- * Campaign Analytics — acquisition performance for admins.
+ * Analytics - acquisition performance for admins.
  *
  * Everything here reads the same `leads` table the grid does, but groups it by
  * the four attribution columns the ad platforms give us:
  *
- *   - `caseType` — the campaign (MVA / Mass Tort / a raw `utm_campaign` value)
- *   - `source`   — where the lead came from (Facebook, Google Ads, …)
- *   - `medium`   — the channel type (`utm_medium`, e.g. `cpc`, `organic`)
- *   - `content`  — the creative (`utm_content`, e.g. a specific ad variant)
+ *   - `caseType` - the campaign (MVA / Mass Tort / a raw `utm_campaign` value)
+ *   - `source`   - where the lead came from (Facebook, Google Ads, ...)
+ *   - `medium`   - the channel type (`utm_medium`, e.g. `cpc`, `organic`)
+ *   - `content`  - the creative (`utm_content`, e.g. a specific ad variant)
  *
  * Volume alone does not answer "what is working", so each grouped row also
  * carries the funnel outcome: how many leads qualified, retained, were sent to
  * the partner firm, or were disqualified. The dashboard turns those counts into
  * conversion rates.
  *
+ * Filters mirror the leads and activity grids: a rolling date preset or a
+ * custom from/to range, plus a campaign selector where `OTHER` is a bucket for
+ * every stored case type that is not MVA or Mass Tort.
+ *
  * The functions are server-only (they import the database) and are called from
- * the Campaign Analytics page, which re-checks the admin policy itself. The
- * module never widens visibility: an admin sees every lead, which is exactly
- * the audience this page is for.
+ * the Analytics page, which re-checks the admin policy itself. The module never
+ * widens visibility: an admin sees every lead, which is exactly the audience
+ * this page is for.
  */
-import { count, desc, gte, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  lte,
+  notInArray,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import { leads } from "@/lib/db/schema";
+import {
+  CAMPAIGN_FILTER_OPTIONS,
+  type CampaignFilterValue,
+} from "./constants";
 
-/** How far back the dashboard can look. `all` means no lower bound. */
-export const ANALYTICS_RANGES = [
-  { value: "7d", label: "7 days", days: 7 },
-  { value: "30d", label: "30 days", days: 30 },
-  { value: "90d", label: "90 days", days: 90 },
-  { value: "12m", label: "12 months", days: 365 },
-  { value: "all", label: "All time", days: null },
-] as const;
+/** URL param names, kept together so the page and the controls agree. */
+export const ANALYTICS_PARAMS = {
+  dateWithin: "dateWithin",
+  dateFrom: "dateFrom",
+  dateTo: "dateTo",
+  campaign: "campaign",
+} as const;
 
-export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number]["value"];
+/** The date presets shared with `DateRangeFilter`. */
+export type AnalyticsDatePreset = "any" | "24h" | "3d" | "7d" | "custom";
 
-/** The default when the URL carries no (or an unknown) range. */
-export const DEFAULT_ANALYTICS_RANGE: AnalyticsRange = "all";
+const DATE_PRESETS: readonly AnalyticsDatePreset[] = [
+  "any",
+  "24h",
+  "3d",
+  "7d",
+  "custom",
+];
 
-/** Reads a range from URL params, falling back to the default. */
-export function readAnalyticsRange(
-  value: string | string[] | undefined,
-): AnalyticsRange {
-  const raw = Array.isArray(value) ? value[0] : value;
-  return (
-    ANALYTICS_RANGES.find((range) => range.value === raw)?.value ??
-    DEFAULT_ANALYTICS_RANGE
-  );
+/** The active filters for one analytics render. */
+export interface AnalyticsFilters {
+  dateWithin: AnalyticsDatePreset;
+  /** `YYYY-MM-DD`, only meaningful for a custom range. */
+  dateFrom?: string;
+  /** `YYYY-MM-DD`, only meaningful for a custom range. */
+  dateTo?: string;
+  campaign: CampaignFilterValue;
 }
 
-/** The lower bound of `range`, or `undefined` for all time. */
-function rangeCondition(range: AnalyticsRange): SQL | undefined {
-  const days = ANALYTICS_RANGES.find((entry) => entry.value === range)?.days;
-  if (!days) return undefined;
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return gte(leads.createdAt, since);
+/** Default custom lower bound, matching the leads/activity grids. */
+export const DEFAULT_ANALYTICS_FROM_DAYS = 7;
+
+/** Parse `YYYY-MM-DD`; the end bound covers the whole local day. */
+function parseFilterDate(
+  value: string | undefined,
+  endOfDay = false,
+): Date | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  );
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+/** A valid `YYYY-MM-DD` string, or `undefined`. */
+function readDateParam(value: string | undefined): string | undefined {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+/**
+ * Read filters from URL params, clamping anything unknown to a safe default.
+ * A URL that carries from/to dates without a preset is treated as a custom
+ * range so drilldown links keep their window.
+ */
+export function readAnalyticsFilters(
+  params: Record<string, string | string[] | undefined>,
+): AnalyticsFilters {
+  const read = (key: string): string | undefined => {
+    const value = params[key];
+    return Array.isArray(value) ? value[0] : value;
+  };
+
+  const dateFrom = readDateParam(read(ANALYTICS_PARAMS.dateFrom));
+  const dateTo = readDateParam(read(ANALYTICS_PARAMS.dateTo));
+  const rawPreset = read(ANALYTICS_PARAMS.dateWithin);
+  const dateWithin: AnalyticsDatePreset = DATE_PRESETS.includes(
+    rawPreset as AnalyticsDatePreset,
+  )
+    ? (rawPreset as AnalyticsDatePreset)
+    : dateFrom || dateTo
+      ? "custom"
+      : "any";
+
+  const rawCampaign = read(ANALYTICS_PARAMS.campaign);
+  const campaign = CAMPAIGN_FILTER_OPTIONS.some(
+    (option) => option.value === rawCampaign,
+  )
+    ? (rawCampaign as CampaignFilterValue)
+    : "all";
+
+  return { dateWithin, dateFrom, dateTo, campaign };
+}
+
+/** The bucket width the trend chart uses for a given window. */
+type Granularity = "hour" | "day" | "week" | "month";
+
+interface ResolvedWindow {
+  start: Date;
+  end: Date;
+  granularity: Granularity;
 }
 
 /** The funnel counts every grouped row reports. */
@@ -77,7 +173,7 @@ export interface DimensionRow extends DimensionCounts {
   key: string;
 }
 
-/** A grouped row for the source × campaign crosstab. */
+/** A grouped row for the source x campaign crosstab. */
 export interface SourceCampaignRow extends DimensionCounts {
   source: string;
   campaign: string;
@@ -91,17 +187,19 @@ export interface CombinationRow extends DimensionCounts {
   campaign: string;
 }
 
-/** One bucket in the trend chart. */
-export interface TrendPoint {
-  /** Stable bucket key (day/week/month). */
+/** One bucket in the trend chart, carrying every plotted series. */
+export interface TrendPoint extends DimensionCounts {
+  /** Stable bucket key (hour/day/week/month). */
   key: string;
-  /** Display label for the axis. */
+  /** Short label for the axis. */
   label: string;
-  total: number;
+  /** Full label for the hover tooltip. */
+  fullLabel: string;
 }
 
 export interface CampaignAnalytics {
-  range: AnalyticsRange;
+  filters: AnalyticsFilters;
+  window: { start: Date; end: Date; granularity: Granularity };
   totals: DimensionCounts;
   byCampaign: DimensionRow[];
   bySource: DimensionRow[];
@@ -112,15 +210,7 @@ export interface CampaignAnalytics {
   trend: TrendPoint[];
 }
 
-/** `count(*)` as a plain number. */
-function totalLeads(where: SQL | undefined): number {
-  return (
-    getDb().select({ value: count() }).from(leads).where(where).get()?.value ??
-    0
-  );
-}
-
-/** Funnel counts for one grouped expression. */
+/** The funnel counts for one grouped expression. */
 function countsFor() {
   return {
     total: count(),
@@ -134,11 +224,11 @@ function countsFor() {
 /** Normalises an aggregate row's nullable sums to numbers. */
 function toCounts(row: DimensionCounts | undefined): DimensionCounts {
   return {
-    total: row?.total ?? 0,
-    qualified: row?.qualified ?? 0,
-    retained: row?.retained ?? 0,
-    sent: row?.sent ?? 0,
-    disqualified: row?.disqualified ?? 0,
+    total: Number(row?.total ?? 0),
+    qualified: Number(row?.qualified ?? 0),
+    retained: Number(row?.retained ?? 0),
+    sent: Number(row?.sent ?? 0),
+    disqualified: Number(row?.disqualified ?? 0),
   };
 }
 
@@ -148,6 +238,97 @@ function toCounts(row: DimensionCounts | undefined): DimensionCounts {
  */
 function dimensionColumn(column: AnySQLiteColumn): SQL<string> {
   return sql<string>`coalesce(nullif(trim(${column}), ''), 'Not tracked')`;
+}
+
+/** Every non-date condition (currently just the campaign bucket). */
+function campaignCondition(campaign: CampaignFilterValue): SQL | undefined {
+  if (campaign === "all") return undefined;
+  if (campaign === "OTHER") {
+    // "Other" is a bucket, not just the literal code: it covers every stored
+    // case type that is not one of the two ad campaigns, including raw
+    // campaign values we did not recognise (e.g. `workers_comp`).
+    return and(
+      isNotNull(leads.caseType),
+      notInArray(leads.caseType, ["MVA", "MASS_TORT"]),
+    );
+  }
+  return eq(leads.caseType, campaign);
+}
+
+/** The earliest lead inside the campaign scope (for the "Any time" start). */
+function earliestLead(campaignWhere: SQL | undefined): Date | null {
+  const row = getDb()
+    .select({ value: sql<number | null>`min(${leads.createdAt})` })
+    .from(leads)
+    .where(campaignWhere)
+    .get();
+  return row?.value ? new Date(row.value * 1000) : null;
+}
+
+/** A rolling preset converted to a lower bound, or `null` for custom/any. */
+function presetDays(preset: AnalyticsDatePreset): number | null {
+  if (preset === "24h") return 1;
+  if (preset === "3d") return 3;
+  if (preset === "7d") return 7;
+  return null;
+}
+
+/** Choose a bucket width that keeps the chart readable at every range. */
+function granularityFor(start: Date, end: Date): Granularity {
+  const days = (end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
+  if (days <= 2) return "hour";
+  if (days <= 45) return "day";
+  if (days <= 180) return "week";
+  return "month";
+}
+
+/**
+ * Resolve the actual window. Presets roll back from now; `custom` uses the
+ * picker dates (and falls back to seven days when a hand-edited URL has no
+ * lower bound); `any` starts at the earliest lead in scope.
+ */
+function resolveWindow(
+  filters: AnalyticsFilters,
+  campaignWhere: SQL | undefined,
+): ResolvedWindow {
+  const now = new Date();
+  const days = presetDays(filters.dateWithin);
+
+  let start: Date;
+  let end = now;
+
+  if (days) {
+    start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  } else {
+    const from = parseFilterDate(filters.dateFrom);
+    const to = parseFilterDate(filters.dateTo, true);
+
+    if (from) {
+      start = from;
+    } else if (filters.dateWithin === "custom") {
+      start = new Date(
+        now.getTime() -
+          DEFAULT_ANALYTICS_FROM_DAYS * 24 * 60 * 60 * 1000,
+      );
+    } else {
+      start = earliestLead(campaignWhere) ?? now;
+    }
+
+    if (to && to < now) end = to;
+  }
+
+  // A reversed or hand-edited range must not produce an empty or runaway axis.
+  if (start > end) start = end;
+
+  return { start, end, granularity: granularityFor(start, end) };
+}
+
+/** Combine the window with the campaign scope. */
+function dateCondition(window: ResolvedWindow): SQL | undefined {
+  return and(
+    gte(leads.createdAt, window.start),
+    lte(leads.createdAt, window.end),
+  );
 }
 
 /** Group the visible window by one attribution dimension. */
@@ -178,7 +359,7 @@ function overallTotals(where: SQL | undefined): DimensionCounts {
   return toCounts(row);
 }
 
-/** Source × campaign, ordered by volume. */
+/** Source x campaign, ordered by volume. */
 function groupBySourceCampaign(where: SQL | undefined): SourceCampaignRow[] {
   const source = dimensionColumn(leads.source);
   const campaign = dimensionColumn(leads.caseType);
@@ -224,131 +405,181 @@ function topCombinations(
   }));
 }
 
-/**
- * The trend bucket expression. Daily buckets for short windows read better than
- * a smooth line over 30 points, and monthly buckets keep a year readable.
- */
-function trendExpression(range: AnalyticsRange): SQL<string> {
-  if (range === "7d" || range === "30d") {
-    return sql<string>`strftime('%Y-%m-%d', ${leads.createdAt}, 'unixepoch')`;
+/** The SQL bucket expression for a granularity. */
+function trendExpression(granularity: Granularity): SQL<string> {
+  switch (granularity) {
+    case "hour":
+      return sql<string>`strftime('%Y-%m-%dT%H', ${leads.createdAt}, 'unixepoch', 'localtime')`;
+    case "day":
+      return sql<string>`strftime('%Y-%m-%d', ${leads.createdAt}, 'unixepoch', 'localtime')`;
+    case "week":
+      // Monday of the week, so weekly buckets align to a real calendar week.
+      return sql<string>`date(${leads.createdAt}, 'unixepoch', 'localtime', 'weekday 0', '-6 days')`;
+    case "month":
+      return sql<string>`strftime('%Y-%m', ${leads.createdAt}, 'unixepoch', 'localtime')`;
   }
-  if (range === "90d") {
-    // Monday of the week, so weekly buckets align to a real calendar week.
-    return sql<string>`date(${leads.createdAt}, 'unixepoch', 'weekday 0', '-6 days')`;
-  }
-  return sql<string>`strftime('%Y-%m', ${leads.createdAt}, 'unixepoch')`;
 }
 
+const HOUR_LABEL = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+});
 const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
-  timeZone: "UTC",
+});
+const DAY_FULL_LABEL = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
 });
 const MONTH_LABEL = new Intl.DateTimeFormat("en-US", {
   month: "short",
   year: "2-digit",
-  timeZone: "UTC",
+});
+const MONTH_FULL_LABEL = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
 });
 
-function bucketKey(date: Date, range: AnalyticsRange): string {
-  if (range === "7d" || range === "30d") return date.toISOString().slice(0, 10);
-  if (range === "90d") return mondayOf(date).toISOString().slice(0, 10);
-  return date.toISOString().slice(0, 7);
-}
-
-function bucketLabel(key: string, range: AnalyticsRange): string {
-  if (range === "90d" || range === "7d" || range === "30d") {
-    return DAY_LABEL.format(new Date(`${key}T00:00:00Z`));
-  }
-  return MONTH_LABEL.format(new Date(`${key}-01T00:00:00Z`));
-}
-
-/** UTC Monday that starts the week containing `date`. */
+/** Monday that starts the local week containing `date`. */
 function mondayOf(date: Date): Date {
-  const start = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-  const daysSinceMonday = (start.getUTCDay() + 6) % 7;
-  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysSinceMonday = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - daysSinceMonday);
   return start;
+}
+
+/** The first instant of the local bucket containing `date`. */
+function startOfBucket(date: Date, granularity: Granularity): Date {
+  const cursor = new Date(date);
+  cursor.setMinutes(0, 0, 0);
+  if (granularity !== "hour") cursor.setHours(0, 0, 0, 0);
+  if (granularity === "week") return mondayOf(cursor);
+  if (granularity === "month") cursor.setDate(1);
+  return cursor;
+}
+
+const pad = (value: number) => String(value).padStart(2, "0");
+
+/** A stable local key for the bucket containing `date`. */
+function bucketKey(date: Date, granularity: Granularity): string {
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  if (granularity === "hour") return `${year}-${month}-${day}T${pad(date.getHours())}`;
+  if (granularity === "day") return `${year}-${month}-${day}`;
+  if (granularity === "week") {
+    const monday = mondayOf(date);
+    return `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
+  }
+  return `${year}-${month}`;
+}
+
+/** Parse a bucket key back into a local Date. */
+function keyToDate(key: string, granularity: Granularity): Date {
+  const [datePart, hourPart] = key.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  if (granularity === "month") return new Date(year, month - 1, 1);
+  if (granularity === "hour") {
+    return new Date(year, month - 1, day, Number(hourPart));
+  }
+  return new Date(year, month - 1, day);
+}
+
+/** Short axis label for a bucket key. */
+function bucketLabel(key: string, granularity: Granularity): string {
+  const date = keyToDate(key, granularity);
+  if (granularity === "hour") return HOUR_LABEL.format(date);
+  if (granularity === "day" || granularity === "week") {
+    return DAY_LABEL.format(date);
+  }
+  return MONTH_LABEL.format(date);
+}
+
+/** Full label for the hover tooltip. */
+function bucketFullLabel(key: string, granularity: Granularity): string {
+  const date = keyToDate(key, granularity);
+  if (granularity === "hour") return HOUR_LABEL.format(date);
+  if (granularity === "day") return DAY_FULL_LABEL.format(date);
+  if (granularity === "week") {
+    return `Week of ${DAY_FULL_LABEL.format(date)}`;
+  }
+  return MONTH_FULL_LABEL.format(date);
 }
 
 /** Walk from `start` to `end` inclusive, one bucket at a time. */
 function bucketsBetween(
   start: Date,
   end: Date,
-  range: AnalyticsRange,
+  granularity: Granularity,
 ): string[] {
   const keys: string[] = [];
-  const cursor = new Date(start);
-  const stepDays = range === "7d" || range === "30d" ? 1 : 7;
-  if (range === "12m" || range === "all") {
-    cursor.setUTCDate(1);
-  }
-  while (cursor <= end) {
-    keys.push(bucketKey(cursor, range));
-    if (range === "12m" || range === "all") {
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  const cursor = startOfBucket(start, granularity);
+  const last = startOfBucket(end, granularity);
+
+  while (cursor <= last) {
+    keys.push(bucketKey(cursor, granularity));
+    if (granularity === "hour") {
+      cursor.setHours(cursor.getHours() + 1);
+    } else if (granularity === "day") {
+      cursor.setDate(cursor.getDate() + 1);
+    } else if (granularity === "week") {
+      cursor.setDate(cursor.getDate() + 7);
     } else {
-      cursor.setUTCDate(cursor.getUTCDate() + stepDays);
+      cursor.setMonth(cursor.getMonth() + 1);
     }
   }
+
   return keys;
 }
 
-/** The earliest lead's timestamp, for the "all time" trend start. */
-function earliestLead(): Date | null {
-  const row = getDb()
-    .select({ value: sql<number | null>`min(${leads.createdAt})` })
-    .from(leads)
-    .get();
-  return row?.value ? new Date(row.value * 1000) : null;
-}
-
 /** Trend buckets, with empty periods filled in so the axis stays continuous. */
-function trendFor(range: AnalyticsRange, where: SQL | undefined): TrendPoint[] {
-  const expression = trendExpression(range);
+function trendFor(
+  window: ResolvedWindow,
+  where: SQL | undefined,
+): TrendPoint[] {
+  const expression = trendExpression(window.granularity);
   const rows = getDb()
-    .select({ key: expression, total: count() })
+    .select({ key: expression, ...countsFor() })
     .from(leads)
     .where(where)
     .groupBy(expression)
     .orderBy(expression)
     .all();
 
-  const now = new Date();
-  const days = ANALYTICS_RANGES.find((entry) => entry.value === range)?.days;
-  let start: Date;
-  if (days) {
-    start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  } else {
-    start = earliestLead() ?? now;
-  }
-  if (range === "90d") start = mondayOf(start);
-  if (range === "12m" || range === "all") {
-    start = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
-  }
-
-  const totalsByKey = new Map(rows.map((row) => [row.key, row.total]));
-  return bucketsBetween(start, now, range).map((key) => ({
-    key,
-    label: bucketLabel(key, range),
-    total: totalsByKey.get(key) ?? 0,
-  }));
+  const totalsByKey = new Map(rows.map((row) => [row.key, row]));
+  return bucketsBetween(window.start, window.end, window.granularity).map(
+    (key) => {
+      const row = totalsByKey.get(key);
+      return {
+        key,
+        label: bucketLabel(key, window.granularity),
+        fullLabel: bucketFullLabel(key, window.granularity),
+        ...toCounts(row),
+      };
+    },
+  );
 }
 
 /**
- * Everything the Campaign Analytics page renders, for one time window.
+ * Everything the Analytics page renders, for one window and campaign scope.
  *
- * The grouped queries are independent, so they run as separate round trips —
+ * The grouped queries are independent, so they run as separate round trips -
  * cheap against the indexed `case_type` and `stage` columns on a desktop-sized
  * dataset, and far easier to read than one clever union.
  */
-export function campaignAnalytics(range: AnalyticsRange): CampaignAnalytics {
-  const where = rangeCondition(range);
+export function campaignAnalytics(
+  filters: AnalyticsFilters,
+): CampaignAnalytics {
+  const campaignWhere = campaignCondition(filters.campaign);
+  const window = resolveWindow(filters, campaignWhere);
+  const where = and(dateCondition(window), campaignWhere);
 
   return {
-    range,
+    filters,
+    window,
     totals: overallTotals(where),
     byCampaign: groupByDimension(leads.caseType, where, 12),
     bySource: groupByDimension(leads.source, where, 12),
@@ -356,11 +587,6 @@ export function campaignAnalytics(range: AnalyticsRange): CampaignAnalytics {
     byContent: groupByDimension(leads.content, where, 12),
     sourceCampaign: groupBySourceCampaign(where),
     combinations: topCombinations(where, 12),
-    trend: trendFor(range, where),
+    trend: trendFor(window, where),
   };
-}
-
-/** Exposed for callers that need the same "leads in this window" count. */
-export function analyticsLeadCount(range: AnalyticsRange): number {
-  return totalLeads(rangeCondition(range));
 }

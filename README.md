@@ -98,8 +98,8 @@ Retained.
   scoped to the signed-in user.
 - **MCP server** at `POST|GET|DELETE /api/mcp`, authenticated with a personal
   access token and sharing the same tools as the assistant.
-- **Campaign Analytics** for admins, grouped by campaign, source, medium, and
-  content.
+- **Analytics** for admins, grouped by campaign, source, medium, and content,
+  with the shared date-range filter and a campaign selector.
 
 ## Routes
 
@@ -109,7 +109,7 @@ Retained.
 | `/login`              | Public    | Email and password sign-in                    |
 | `/dashboard`          | Protected | Overview and pipeline summary                 |
 | `/leads`              | Protected | Leads board/table; the last view is remembered, and `?view=table` or `?view=kanban` overrides it for that page |
-| `/campaign-analytics` | Admin     | Attribution and funnel reporting              |
+| `/analytics`          | Admin     | Attribution and funnel reporting              |
 | `/users`              | Admin     | User management                               |
 | `/settings`           | Protected | MCP access tokens                             |
 | `/profile`            | Protected | Name, password, and account details           |

@@ -80,8 +80,8 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   },
   { title: "Leads", url: "/leads", icon: ClipboardList, permission: null },
   {
-    title: "Campaign Analytics",
-    url: "/campaign-analytics",
+    title: "Analytics",
+    url: "/analytics",
     icon: ChartColumn,
     permission: "analytics.view",
   },

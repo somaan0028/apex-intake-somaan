@@ -20,6 +20,21 @@ export type LeadSource = (typeof LEAD_SOURCES)[number];
 /** Assignee filter value meaning "no one owns this lead yet". */
 export const UNASSIGNED = "unassigned";
 
+/**
+ * Campaign selector on the Analytics page. `OTHER` is the same bucket the lead
+ * grid uses: every stored case type that is not MVA or Mass Tort, including raw
+ * ad-campaign values. `all` means no campaign filter.
+ */
+export const CAMPAIGN_FILTER_OPTIONS = [
+  { value: "all", label: "All campaigns" },
+  { value: "MVA", label: "MVA" },
+  { value: "MASS_TORT", label: "Mass Tort" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
+export type CampaignFilterValue =
+  (typeof CAMPAIGN_FILTER_OPTIONS)[number]["value"];
+
 /** How the leads page is displayed. */
 export type LeadsView = "table" | "kanban";
 
