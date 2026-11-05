@@ -225,14 +225,6 @@ export function firstErrorStep(
   return null;
 }
 
-/** Progressive US phone formatting, e.g. "(303) 555-0168". */
-export function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 10);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
-
 /** Whether the given step has enough to move on. */
 export function isStepComplete(key: StepKey, v: IntakeValues): boolean {
   switch (key) {

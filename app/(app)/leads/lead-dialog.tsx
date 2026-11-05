@@ -63,7 +63,7 @@ import {
   RELATIONSHIPS,
   type LeadStage,
 } from "@/lib/db/schema";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatPhone } from "@/lib/format";
 import {
   CASE_TYPE_LABELS,
   LEAD_STAGE_LABELS,
@@ -958,7 +958,10 @@ function LeadForm({
                       placeholder="(555) 555-5555"
                       className="min-w-0 flex-1"
                       onChange={(event) =>
-                        changeText("fillerPhone", event.target.value)
+                        changeText(
+                          "fillerPhone",
+                          formatPhone(event.target.value),
+                        )
                       }
                       onBlur={() => flush("fillerPhone")}
                     />
@@ -1065,7 +1068,10 @@ function LeadForm({
                     className="min-w-0 flex-1"
                     aria-invalid={fieldErrors.injuredPhone !== null}
                     onChange={(event) =>
-                      changeText("injuredPhone", event.target.value)
+                      changeText(
+                        "injuredPhone",
+                        formatPhone(event.target.value),
+                      )
                     }
                     onBlur={() => flush("injuredPhone")}
                   />

@@ -51,6 +51,21 @@ export function formatDateTime(
   return Number.isNaN(date.getTime()) ? "—" : DATE_TIME_FORMAT.format(date);
 }
 
+/**
+ * Progressive US phone formatting for a field being typed or pasted:
+ * `3035550168`, `303-555-0168`, `+1 303 555 0168` all become
+ * `(303) 555-0168` as far as the digits go. A leading country code is dropped;
+ * the server normalises the stored value with `toUsPhone`.
+ */
+export function formatPhone(value: string): string {
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 const RELATIVE_TIME_FORMAT = new Intl.RelativeTimeFormat("en-US", {
   numeric: "auto",
 });

@@ -31,6 +31,7 @@ import {
   readUtmParams,
   type UtmParams,
 } from "@/lib/leads/utm";
+import { formatPhone } from "@/lib/format";
 import { Field, OptionCards, StepHeader, YesNoField } from "./fields";
 import {
   CASE_TYPE_OPTIONS,
@@ -38,7 +39,6 @@ import {
   INITIAL_VALUES,
   buildIntakeSubmission,
   firstErrorStep,
-  formatPhone,
   getStepKeys,
   isStepComplete,
   stepMeta,
