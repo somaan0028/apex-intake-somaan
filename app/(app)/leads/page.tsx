@@ -50,7 +50,7 @@ export default async function LeadsPage({
       ? preferredView
       : "kanban";
   const sortExplicit = params.sort === "createdAt";
-  const queryParams = normalizeLeadsQueryParams(params, view);
+  const queryParams = normalizeLeadsQueryParams(params);
   const assignees = listAssignees(user);
   const limits = parseKanbanLimits(params);
 

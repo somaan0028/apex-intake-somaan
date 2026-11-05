@@ -2,11 +2,11 @@
  * Normalisation of the leads page URL into the params the list queries use.
  *
  * The page and the CSV export must interpret a link the same way, so this lives
- * in one place. It only rewrites the two view-dependent defaults the grid relies
- * on: the board drops the stage filter (it groups by stage itself), and a custom
- * date range always carries a lower bound.
+ * in one place. Table and Kanban honour the same filters; the board only hides
+ * the stage control in its toolbar. The one rewrite left is the date window: a
+ * custom range always carries a lower bound.
  */
-import { defaultAddedFrom, type LeadsView } from "./constants";
+import { defaultAddedFrom } from "./constants";
 
 /** The shape Next.js hands a page (or `Object.fromEntries(url.searchParams)`). */
 export type LeadsSearchParams = Record<
@@ -16,14 +16,8 @@ export type LeadsSearchParams = Record<
 
 export function normalizeLeadsQueryParams(
   params: LeadsSearchParams,
-  view: LeadsView,
 ): LeadsSearchParams {
   const queryParams = { ...params };
-  if (view === "kanban") {
-    // The board groups by stage, so an inherited stage filter would silently
-    // hide every other column.
-    delete queryParams["filter.stage"];
-  }
   // No date window by default: the Added filter starts cleared ("Any time").
   // A URL that already carries from/to dates is treated as a custom range, and
   // a custom range without a lower bound still gets the picker's default.

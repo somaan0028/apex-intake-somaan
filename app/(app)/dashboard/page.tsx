@@ -315,6 +315,11 @@ export default async function OverviewPage() {
   const activity = recentActivities(user, 5);
 
   const firstName = user.name.split(" ")[0] ?? user.name;
+  // The stage filter the headline cards land on: every open stage, so the grid
+  // shows the same leads the card counted (Disqualified is closed).
+  const activeStages = LEAD_STAGES.filter(
+    (stage) => stage !== "DISQUALIFIED",
+  ).join(",");
   // Only an admin can send to the firm, so only an admin is shown a queue for it.
   const showSendQueue = can(user.role, "leads.send_to_firm");
   const hasAlerts =
@@ -390,26 +395,26 @@ export default async function OverviewPage() {
         <StatCard
           label="Active leads"
           value={metrics.total}
-          hint="Leade upto stage 'Retained'"
-          href="/leads"
+          hint="Open leads, excluding Disqualified"
+          href={`/leads?filter.stage=${activeStages}`}
         />
         <StatCard
           label="Unassigned"
           value={metrics.unassigned}
           hint="Active and waiting to be claimed"
-          href="/leads?filter.assignedTo=unassigned"
+          href={`/leads?filter.assignedTo=unassigned&filter.stage=${activeStages}`}
         />
         <StatCard
           label="New this week"
           value={metrics.newThisWeek}
           hint="Arrived in the last 7 days"
-          href="/leads?sort=createdAt&sortDir=desc"
+          href="/leads?filter.addedWithin=7d&sort=createdAt&sortDir=desc"
         />
         <StatCard
           label="Assigned to you"
           value={metrics.assignedToMe}
           hint="Active leads you own"
-          href={`/leads?filter.assignedTo=${user.id}`}
+          href={`/leads?filter.assignedTo=${user.id}&filter.stage=${activeStages}`}
         />
       </div>
 

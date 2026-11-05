@@ -351,8 +351,13 @@ their Lawmatics CRM.
   could not open. The headline **Active leads**, **Unassigned** and **Assigned to you**
   cards all exclude `DISQUALIFIED` (closed leads), and so does the pipeline: `PIPELINE_STAGES`
   filters that stage out of both the bar and its legend, and the card's total is the sum
-  of the stages it draws. The counts each link into the pre-filtered grid
-  (`/leads?filter.<columnId>=<value>`), the "ready for Brightwater" callout is shown
+  of the stages it draws. Each count links into the pre-filtered grid
+  (`/leads?filter.<columnId>=<value>`), carrying **both** the card's own filter and a
+  `filter.stage` for every open stage, so the grid total matches the number on the
+  card (Disqualified never leaks in). "Active leads" uses that stage filter alone,
+  "Unassigned" adds `filter.assignedTo=unassigned`, "Assigned to you" adds the
+  viewer's id, and "New this week" uses `filter.addedWithin=7d`. The "ready for
+  Brightwater" callout is shown
   only to a role that can actually send, and a potential-duplicates callout for every
   role links to the grid with `filter.potentialDuplicate=yes`. Both callouts are slim
   one-line bars (`AlertBar` in the page) rather than cards: the Brightwater queue is
@@ -479,8 +484,10 @@ their Lawmatics CRM.
   stage in a floating pill. Keep that path intact when changing the card layout.
   A Stages menu beside Filters hides and shows columns; hidden
   stages free their width, the columns flex to fill the space, and the page
-  scrolls rather than each stage getting its own scrollbar. The stage filter is
-  dropped in Kanban because the board already groups by stage. Grouped leads carry an
+  scrolls rather than each stage getting its own scrollbar. The Kanban toolbar hides
+  the stage control (the board already groups by stage) and switching views clears it
+  from the URL, but an explicit `filter.stage` arriving from a link is honoured in both
+  views so a dashboard card always lands on the leads it counted. Grouped leads carry an
   amber warning icon in both views. The **Duplicates** filter
   (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
   `filter.dupGroup=<id>`, which ignores every other filter. A **Bookmarked** filter
@@ -505,7 +512,7 @@ their Lawmatics CRM.
 - **Export CSV** (`app/api/leads/export/route.ts`, download icon beside Clear
   Filters) downloads every lead under the current filters, search and sort — not
   the visible page or the loaded Kanban cards. `lib/leads/query-params.ts` applies
-  the same view/date normalisation the page uses, and the route reuses
+  the same date normalisation the page uses, and the route reuses
   `listLeadsForExport` (the `listLeads` query with no page window), so visibility,
   attribution, and duplicate-group scoping can never disagree with the grid.
   Attribution columns are included only for viewers with `leads.view.attribution`;

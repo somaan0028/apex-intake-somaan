@@ -7,19 +7,13 @@
  * download contains every lead under the current filters — never just the
  * visible page or the loaded Kanban cards.
  */
-import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/session";
-import type { LeadsView } from "@/lib/leads/constants";
 import { buildLeadsCsv } from "@/lib/leads/csv";
 import {
   normalizeLeadsQueryParams,
   type LeadsSearchParams,
 } from "@/lib/leads/query-params";
 import { LEADS_DEFAULT_SORT, listLeadsForExport } from "@/lib/leads/queries";
-import {
-  LEADS_VIEW_COOKIE,
-  isLeadsView,
-} from "@/lib/leads/view-preference";
 import { can } from "@/lib/rbac";
 import { parseTableQuery } from "@/lib/table-query";
 
@@ -36,17 +30,8 @@ export async function GET(request: Request) {
     url.searchParams.entries(),
   );
 
-  // The board drops the stage filter, so decide the view exactly as the page
-  // does: explicit URL value, then the preference cookie, then Kanban.
-  const explicitView = url.searchParams.get("view");
-  const preferredView = (await cookies()).get(LEADS_VIEW_COOKIE)?.value ?? null;
-  const view: LeadsView = isLeadsView(explicitView)
-    ? explicitView
-    : isLeadsView(preferredView)
-      ? preferredView
-      : "kanban";
-
-  const query = parseTableQuery(normalizeLeadsQueryParams(params, view), {
+  // The filters travel in the URL, so the export needs no view preference.
+  const query = parseTableQuery(normalizeLeadsQueryParams(params), {
     defaultSort: LEADS_DEFAULT_SORT,
   });
   const rows = listLeadsForExport(query, viewer);
