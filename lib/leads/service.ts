@@ -869,14 +869,15 @@ export function checkLeadForDuplicatesForActor(
 /**
  * Send a lead to Brightwater, then record the outcome.
  *
- * Guarded four ways before the network call: the actor must hold
+ * Guarded five ways before the network call: the actor must hold
  * `leads.send_to_firm`, the lead must be MVA, neither `sent_to_firm_at` nor
- * `brightwater_lead_id` may already be set, and no other lead with the same
- * email may already have a recorded submission. Brightwater rejects a second
- * submission for an email, so catching that ourselves avoids a guaranteed
- * provider error. The write that follows is a conditional update on the same
- * two columns, so two requests racing on one lead cannot both record a send —
- * the loser is told it was already sent.
+ * `brightwater_lead_id` may already be set, the lead must not currently belong
+ * to a potential-duplicate group, and no other lead with the same email may
+ * already have a recorded submission. Brightwater rejects a second submission
+ * for an email, so catching that ourselves avoids a guaranteed provider error.
+ * The write that follows is a conditional update on the same two columns, so
+ * two requests racing on one lead cannot both record a send — the loser is told
+ * it was already sent.
  */
 export async function sendLeadForActor(
   actor: Actor,
@@ -900,6 +901,18 @@ export async function sendLeadForActor(
     if (error instanceof ForbiddenError)
       return { ok: false, error: error.message };
     throw error;
+  }
+
+  // The desk has already warned that this lead may be the same person as
+  // another. Sending it anyway ignores that warning, so make the server refuse
+  // until the grouping is reviewed (View similar) and resolved (Mark as Not
+  // Duplicate, or an edit that breaks the match).
+  if (lead.dupGroupId !== null) {
+    return {
+      ok: false,
+      error:
+        "This lead is a potential duplicate. Review it with View similar, or mark it as not a duplicate, before sending it to the firm.",
+    };
   }
 
   // Brightwater refuses a second lead with the same email. Our own sent records

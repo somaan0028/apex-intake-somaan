@@ -62,7 +62,9 @@ their Lawmatics CRM.
 - Only `MVA` leads are sent to partner firm Brightwater (form-urlencoded API),
   **at most once per lead**. Brightwater also rejects a second submission for the
   same email, so the send guard additionally refuses when any other lead with
-  the same case-insensitive, trimmed email already has a recorded send.
+  the same case-insensitive, trimmed email already has a recorded send. A lead
+  in a potential-duplicate group cannot be sent either, until the grouping is
+  resolved (marked as not a duplicate, or an edit that dissolves the match).
 - `SENT_TO_FIRM` records an actual submission: the service refuses to set that
   stage unless `sent_to_firm_at` or `brightwater_lead_id` is populated, so the
   stage cannot be chosen manually on an unsent lead. The dialog, inline select
