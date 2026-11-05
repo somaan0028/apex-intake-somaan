@@ -29,6 +29,7 @@ export const ACTIVITY_TYPES = [
   "lead:assigned",
   "lead:unassigned",
   "lead:send_to_firm",
+  "lead:marked-not-duplicate",
   "lead:deleted",
   "user:added",
   "user:deleted",

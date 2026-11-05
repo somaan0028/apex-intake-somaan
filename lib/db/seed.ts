@@ -34,6 +34,8 @@ import {
   type NewUser,
   type UserRole,
 } from "./schema";
+import { buildDupMatchString } from "../leads/dup-matcher";
+import { rebuildDuplicateGroups } from "../leads/dup-groups";
 
 /** Password shared by every seeded demo account (per the assessment brief). */
 export const DEFAULT_DEMO_PASSWORD = "apex-demo-2026";
@@ -293,6 +295,15 @@ function seedLeads(db: AppDatabase): number {
         trustedform: toNullableText(record.trustedform),
         journaya: toNullableText(record.journaya),
 
+        // The comparison string is part of the imported record; grouping runs
+        // once after the whole file has been inserted.
+        dupMatchString: buildDupMatchString(
+          injured.injuredFirstName,
+          injured.injuredLastName,
+          injured.injuredEmail,
+          injured.injuredPhone,
+        ),
+
         brightwaterLeadId: toNullableText(record.brightwater_lead_id),
         sentToFirmAt: toNullableDate(record.sent_to_firm_at),
       };
@@ -314,5 +325,20 @@ export function seedDatabase(db: AppDatabase = getDb()): SeedResult {
     leads: seedLeads(db),
   }));
 
-  return run();
+  const result = run();
+
+  // The only full fuzzy pass in normal operation: once, after the import has
+  // committed. Inline checks handle leads that arrive later. Grouping is
+  // auxiliary, so a matcher failure must not stop the app from booting with
+  // the imported data intact.
+  try {
+    rebuildDuplicateGroups();
+  } catch (error) {
+    console.error(
+      "[db] Duplicate grouping failed; leads were imported ungrouped.",
+      error,
+    );
+  }
+
+  return result;
 }

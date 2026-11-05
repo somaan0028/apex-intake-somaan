@@ -41,6 +41,7 @@ import {
   SlidersHorizontal,
   Table2,
   Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -239,6 +240,7 @@ const DEFAULT_COLUMN_VISIBILITY = {
   isAtFault: false,
   hasAttorney: false,
   hasReceivedSettlement: false,
+  potentialDuplicate: false,
 };
 
 /** Filter controls hidden on first render; the Filters menu can reveal them. */
@@ -265,7 +267,24 @@ const columns = columnHelper.columns([
       const name = [row.original.injuredFirstName, row.original.injuredLastName]
         .filter(Boolean)
         .join(" ");
-      return <span className="font-medium">{name || "—"}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 font-medium">
+          {name || "—"}
+          {row.original.dupGroupId ? (
+            <span
+              role="img"
+              aria-label="Potential duplicate"
+              title="Potential duplicate"
+              className="shrink-0"
+            >
+              <TriangleAlert
+                className="size-3.5 text-amber-600 dark:text-amber-400"
+                aria-hidden
+              />
+            </span>
+          ) : null}
+        </span>
+      );
     },
   }),
   columnHelper.accessor("injuredEmail", {
@@ -370,6 +389,13 @@ const columns = columnHelper.columns([
     enableSorting: false,
     cell: (info) => <TriStateCell value={info.getValue()} />,
   }),
+  // The "Duplicates" filter is hosted by this (hidden by default) column.
+  columnHelper.accessor((row) => row.dupGroupId !== null, {
+    id: "potentialDuplicate",
+    header: "Potential duplicate",
+    enableSorting: false,
+    cell: (info) => (info.getValue() ? "Yes" : EMPTY),
+  }),
 ]);
 
 /** Stable row id so sorting/filtering preserves row identity. */
@@ -424,6 +450,15 @@ function buildFilters(
           label: assigneeLabel(assignee, viewerId),
           value: String(assignee.id),
         })),
+      ],
+    },
+    {
+      columnId: "potentialDuplicate",
+      label: "Duplicates",
+      allLabel: "Show All",
+      options: [
+        { label: "Only Potential Duplicates", value: "yes" },
+        { label: "Only Unique", value: "no" },
       ],
     },
     {
@@ -573,9 +608,14 @@ export function LeadsTable({
       if (restored !== viewSignature(pendingRestore)) return;
       pendingRestore = null;
     }
+    // A "View similar" drill-down is transient: do not make it the state a
+    // later bare /leads visit restores.
+    const persistedFilters = { ...currentFilters };
+    delete persistedFilters.dupGroup;
+
     writePersistedState({
       view,
-      filters: currentFilters,
+      filters: persistedFilters,
       search: query.search,
       sort: sortId ? { id: sortId, desc: Boolean(sortDesc) } : null,
       filterVisibility,
@@ -812,12 +852,34 @@ export function LeadsTable({
     />
   );
 
+  /**
+   * Apply a query from any filter control.
+   *
+   * Asking for potential duplicates is a request to review the duplicate
+   * backlog, so the page's default 7-day window is lifted to "Any time". Only
+   * the 7d value is replaced; 24h/3d/custom are left untouched, and changing
+   * the date afterwards still applies.
+   */
+  function applyQueryChange(next: TableQuery) {
+    if (
+      next.filters.potentialDuplicate === "yes" &&
+      next.filters.addedWithin === "7d"
+    ) {
+      onQueryChange({
+        ...next,
+        filters: { ...next.filters, addedWithin: "any" },
+      });
+      return;
+    }
+    onQueryChange(next);
+  }
+
   /** Write one filter value from the compact panel. */
   function setFilterValue(columnId: string, value: string) {
     const filters: Record<string, string> = { ...query.filters };
     if (value) filters[columnId] = value;
     else delete filters[columnId];
-    onQueryChange({ ...query, page: 1, filters });
+    applyQueryChange({ ...query, page: 1, filters });
   }
 
   // A quick signal on the compact trigger, ignoring the default date window.
@@ -906,12 +968,28 @@ export function LeadsTable({
 
   return (
     <LeadTableContext.Provider value={contextValue}>
+      {query.filters.dupGroup ? (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">
+            Showing potential duplicates for this lead.
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+          >
+            Clear
+          </Button>
+        </div>
+      ) : null}
+
       <DataTable
         columns={visibleColumns}
         data={leads}
         rowCount={total}
         query={query}
-        onQueryChange={onQueryChange}
+        onQueryChange={applyQueryChange}
         isPending={isPending || viewPending}
         getRowId={getRowId}
         ariaLabel="Leads"
@@ -1882,8 +1960,21 @@ function LeadsKanban({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {name}
+                            <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+                              <span className="truncate">{name}</span>
+                              {lead.dupGroupId ? (
+                                <span
+                                  role="img"
+                                  aria-label="Potential duplicate"
+                                  title="Potential duplicate"
+                                  className="shrink-0"
+                                >
+                                  <TriangleAlert
+                                    className="size-3.5 text-amber-600 dark:text-amber-400"
+                                    aria-hidden
+                                  />
+                                </span>
+                              ) : null}
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-1">
                               {lead.caseType ? (

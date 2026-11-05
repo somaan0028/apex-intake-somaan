@@ -37,7 +37,9 @@ export default async function LeadsPage({
   }
   // Default to the simple "within 7 days" preset. A URL that carries explicit
   // from/to dates is a custom range, even if it predates the preset control.
-  if (!queryParams["filter.addedWithin"]) {
+  // A "View similar" request is an explicit duplicate-group view: the server
+  // ignores every other filter, so do not inject the default date window.
+  if (!queryParams["filter.addedWithin"] && !queryParams["filter.dupGroup"]) {
     const hasCustomDates =
       Boolean(queryParams["filter.addedFrom"]) ||
       Boolean(queryParams["filter.addedTo"]);

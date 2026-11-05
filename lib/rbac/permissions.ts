@@ -41,6 +41,8 @@ export const PERMISSIONS = [
   "leads.send_to_firm",
   /** Permanently delete a lead. */
   "leads.delete",
+  /** Dismiss a potential-duplicate grouping (admin only). */
+  "leads.resolve_duplicates",
   /** See a lead's attribution/tracking fields (IP, TrustedForm, Journaya, source). */
   "leads.view.attribution",
   /** See every user's activity, not just your own. */

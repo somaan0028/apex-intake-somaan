@@ -7,9 +7,10 @@
  * is read from the database here, never taken from a client payload, because a
  * caller could otherwise claim ownership they don't have.
  */
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import {
   ForbiddenError,
+  requireDuplicateResolve,
   requireLeadAssignment,
   requireLeadDelete,
   requireLeadEdit,
@@ -38,7 +39,11 @@ import {
 } from "@/lib/db/schema";
 import { isValidEmail, normalizePostcode } from "@/lib/validation";
 import type { Actor } from "@/lib/rbac";
+import { buildDupMatchString } from "./dup-matcher";
+import { reconcileDupGroup, recheckLead } from "./dup-groups";
+import { scheduleDupCheck } from "./dup-queue";
 import type { LeadFieldPatch } from "./editable";
+import { leadsVisibilityCondition } from "./queries";
 
 /** Result of a lead mutation; `ok` means the change was applied. */
 export interface LeadMutationResult {
@@ -59,6 +64,13 @@ export interface LeadMutationOptions {
 export interface SendLeadResult extends LeadMutationResult {
   sentToFirmAt?: Date;
   brightwaterLeadId?: string | null;
+}
+
+/** Result of an explicit duplicate re-check; counts are the fresh group sizes. */
+export interface DuplicateCheckResult extends LeadMutationResult {
+  dupGroupId?: string | null;
+  dupGroupCount?: number;
+  dupGroupVisibleCount?: number;
 }
 
 /** The raw lead row, or `undefined` when no such lead exists. */
@@ -342,6 +354,33 @@ function applyLeadUpdate(
     }
   }
 
+  // The injured person's name/email/phone is the duplicate identity. Rebuild
+  // the comparison string now (cheap) and let the matcher run afterwards, so
+  // an autosave never waits for the fuzzy pass.
+  const identityChanged =
+    set.injuredFirstName !== undefined ||
+    set.injuredLastName !== undefined ||
+    set.injuredEmail !== undefined ||
+    set.injuredPhone !== undefined;
+
+  let matchStringChanged = false;
+  if (identityChanged) {
+    const nextMatchString = buildDupMatchString(
+      set.injuredFirstName !== undefined
+        ? set.injuredFirstName
+        : lead.injuredFirstName,
+      set.injuredLastName !== undefined
+        ? set.injuredLastName
+        : lead.injuredLastName,
+      set.injuredEmail !== undefined ? set.injuredEmail : lead.injuredEmail,
+      set.injuredPhone !== undefined ? set.injuredPhone : lead.injuredPhone,
+    );
+    if (nextMatchString !== lead.dupMatchString) {
+      set.dupMatchString = nextMatchString;
+      matchStringChanged = true;
+    }
+  }
+
   if (Object.keys(set).length === 0) return { ok: true };
 
   getDb().transaction(() => {
@@ -395,6 +434,8 @@ function applyLeadUpdate(
       }
     }
   });
+
+  if (matchStringChanged) scheduleDupCheck(lead.id);
 
   return { ok: true };
 }
@@ -667,6 +708,9 @@ export function deleteLeadForActor(
 
     getDb().transaction(() => {
       getDb().delete(leads).where(eq(leads.id, id)).run();
+      // The lead may have been one half of a pair; never leave the survivor
+      // holding a group id for a cluster of one.
+      reconcileDupGroup(lead.dupGroupId);
       recordActivity({
         type: "lead:deleted",
         leadId: id,
@@ -677,6 +721,100 @@ export function deleteLeadForActor(
     });
 
     return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Clear a lead's potential-duplicate grouping without deleting the lead.
+ *
+ * Admin-only: dismissing a match is a judgement about records the actor may
+ * not be able to see. Other members keep the group id; if only one remains,
+ * reconciliation returns it to a unique lead. The matcher is deliberately not
+ * run here — a future new or edited lead can still re-link it, because nobody
+ * knows whether that new signal is the same person.
+ */
+export function markLeadNotDuplicateForActor(
+  actor: Actor,
+  id: number,
+): LeadMutationResult {
+  try {
+    const lead = requireVisibleLead(actor, id);
+    requireDuplicateResolve(actor);
+    if (lead.dupGroupId === null) return { ok: true };
+
+    const groupId = lead.dupGroupId;
+    getDb().transaction(() => {
+      getDb()
+        .update(leads)
+        .set({ dupGroupId: null })
+        .where(eq(leads.id, id))
+        .run();
+      reconcileDupGroup(groupId);
+      recordActivity({
+        type: "lead:marked-not-duplicate",
+        leadId: id,
+        doerId: actor.id,
+      });
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Re-run the duplicate matcher for one lead on demand.
+ *
+ * This is the recovery path for an accidental "Not duplicate": the matcher
+ * compares the lead against every other lead, including dismissed ones, so it
+ * can re-link it. Any viewer who can see the lead may run it; it changes only
+ * the grouping, never the lead's own fields.
+ */
+export function checkLeadForDuplicatesForActor(
+  actor: Actor,
+  id: number,
+): DuplicateCheckResult {
+  try {
+    requireVisibleLead(actor, id);
+    recheckLead(id);
+
+    const updated = findLead(id);
+    const dupGroupId = updated?.dupGroupId ?? null;
+    if (!dupGroupId) {
+      return {
+        ok: true,
+        dupGroupId: null,
+        dupGroupCount: 0,
+        dupGroupVisibleCount: 0,
+      };
+    }
+
+    const dupGroupCount =
+      getDb()
+        .select({ value: count() })
+        .from(leads)
+        .where(eq(leads.dupGroupId, dupGroupId))
+        .get()?.value ?? 0;
+    const dupGroupVisibleCount =
+      getDb()
+        .select({ value: count() })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.dupGroupId, dupGroupId),
+            leadsVisibilityCondition(actor),
+          ),
+        )
+        .get()?.value ?? 0;
+
+    return { ok: true, dupGroupId, dupGroupCount, dupGroupVisibleCount };
   } catch (error) {
     if (error instanceof ForbiddenError)
       return { ok: false, error: error.message };

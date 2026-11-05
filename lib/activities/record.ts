@@ -60,6 +60,10 @@ export type ActivityInput =
       providerResponse?: string | null;
     })
   | (ActivityBase & {
+      type: "lead:marked-not-duplicate";
+      leadId: number;
+    })
+  | (ActivityBase & {
       type: "lead:deleted";
       leadId: number;
       /**
@@ -95,6 +99,8 @@ function describeActivity(input: ActivityInput): string {
         ? `Failed to send lead to firm. Response: ${response}`
         : "Failed to send lead to firm. Unexpected error occurred.";
     }
+    case "lead:marked-not-duplicate":
+      return "Marked lead as not a duplicate.";
     case "lead:deleted":
       return `Deleted lead: ${input.leadName}.`;
     case "user:added":

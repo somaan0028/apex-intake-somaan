@@ -30,6 +30,8 @@ export interface LeadAutoSave {
   cancel: (key: string) => void;
   /** Send every debounced patch now (e.g. when the dialog closes). */
   flushAll: () => void;
+  /** Flush, then resolve once every queued save has settled. */
+  flushAllNow: () => Promise<void>;
 }
 
 export function useLeadAutoSave(leadId: number): LeadAutoSave {
@@ -151,5 +153,22 @@ export function useLeadAutoSave(leadId: number): LeadAutoSave {
     for (const key of Array.from(timers.current.keys())) flush(key);
   }, [flush]);
 
-  return { status, error, saveNow, schedule, flush, cancel, flushAll };
+  const flushAllNow = useCallback(async () => {
+    flushAll();
+    // `flushAll` queues its saves synchronously, so the current promise covers
+    // them. Awaiting here is what lets "Check for Duplicates" see the edits the
+    // person has just typed rather than the last persisted values.
+    await queue.current;
+  }, [flushAll]);
+
+  return {
+    status,
+    error,
+    saveNow,
+    schedule,
+    flush,
+    cancel,
+    flushAll,
+    flushAllNow,
+  };
 }

@@ -3,6 +3,8 @@ import { getDb } from "@/lib/db";
 import { toNullableDate } from "@/lib/db/normalize";
 import { leads, type NewLead } from "@/lib/db/schema";
 import { clientIpFromHeaders } from "@/lib/leads/client-ip";
+import { buildDupMatchString } from "@/lib/leads/dup-matcher";
+import { scheduleDupCheck } from "@/lib/leads/dup-queue";
 import {
   INTAKE_FIELD_LABELS,
   validateIntakeSubmission,
@@ -76,10 +78,24 @@ export async function POST(request: Request) {
     // Transport fact, not user input: the form never sends this and the body
     // cannot set it. `x-forwarded-for` is populated from the connection.
     ipaddress: clientIpFromHeaders(request.headers),
+    // Cheap to build, so it is stored with the row. The fuzzy comparison
+    // against existing leads runs after the response has been sent.
+    dupMatchString: buildDupMatchString(
+      data.injuredFirstName,
+      data.injuredLastName,
+      data.injuredEmail,
+      data.injuredPhone,
+    ),
   };
 
+  let insertedId: number;
   try {
-    getDb().insert(leads).values(lead).run();
+    const inserted = getDb()
+      .insert(leads)
+      .values(lead)
+      .returning({ id: leads.id })
+      .get();
+    insertedId = inserted.id;
   } catch (error) {
     console.error("[intake] Failed to save lead:", error);
     return NextResponse.json(
@@ -87,6 +103,10 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  // Fire-and-forget: the submitter never waits for, or learns about, the
+  // duplicate check.
+  scheduleDupCheck(insertedId);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

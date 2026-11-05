@@ -97,6 +97,20 @@ export function requireLeadDelete(actor: Actor): void {
   }
 }
 
+/**
+ * Throw unless `actor` may dismiss a potential-duplicate grouping.
+ *
+ * Admin-only: a User may see only some members of a cluster, so they cannot
+ * judge whether the records are actually the same person.
+ */
+export function requireDuplicateResolve(actor: Actor): void {
+  if (!can(actor.role, "leads.resolve_duplicates")) {
+    throw new ForbiddenError(
+      "Only an administrator can mark a lead as not a duplicate.",
+    );
+  }
+}
+
 /** Throw unless `lead` has reached the stage from which it may be sent. */
 export function requireLeadReadyToSend(lead: { stage: LeadStage }): void {
   if (!isLeadReadyToSend(lead)) {

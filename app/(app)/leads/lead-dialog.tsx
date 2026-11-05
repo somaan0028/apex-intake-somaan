@@ -18,7 +18,13 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { Check, Loader2, Trash2 } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  RefreshCw,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,7 +63,12 @@ import {
   RELATIONSHIP_LABELS,
   assigneeLabel,
 } from "@/lib/labels";
-import { deleteLead, sendLeadToFirm } from "@/lib/leads/actions";
+import {
+  checkLeadForDuplicates,
+  deleteLead,
+  markLeadNotDuplicate,
+  sendLeadToFirm,
+} from "@/lib/leads/actions";
 import { UNASSIGNED } from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
@@ -313,8 +324,23 @@ function LeadForm({
   const [sending, startSending] = useTransition();
   const [deleting, startDeleting] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const { status, error, saveNow, schedule, flush, cancel, flushAll } =
-    useLeadAutoSave(lead.id);
+  const [dupGroupId, setDupGroupId] = useState<string | null>(lead.dupGroupId);
+  const [dupCount, setDupCount] = useState(lead.dupGroupCount);
+  const [dupVisibleCount, setDupVisibleCount] = useState(
+    lead.dupGroupVisibleCount,
+  );
+  const [dismissingDup, startDismissingDup] = useTransition();
+  const [checkingDuplicates, startCheckingDuplicates] = useTransition();
+  const {
+    status,
+    error,
+    saveNow,
+    schedule,
+    flush,
+    cancel,
+    flushAll,
+    flushAllNow,
+  } = useLeadAutoSave(lead.id);
 
   const [stage, setStage] = useState<LeadStage>(lead.stage);
   const [assignedToId, setAssignedToId] = useState<number | null>(
@@ -563,6 +589,75 @@ function LeadForm({
     });
   }
 
+  /** Drill into the duplicate group, dropping every other filter. */
+  function viewSimilar() {
+    if (!dupGroupId) return;
+
+    // The grid is visibility-scoped, so an agent may be looking at only part of
+    // the cluster. Say so rather than silently showing a shorter list.
+    if (dupCount > dupVisibleCount) {
+      toast.warning(
+        "You don't have access to some of the potentially similar leads. Please contact an Admin.",
+      );
+    }
+
+    const params = new URLSearchParams({
+      view: "table",
+      "filter.dupGroup": dupGroupId,
+    });
+    onClose();
+    router.push(`/leads?${params.toString()}`);
+  }
+
+  /** Clear this lead's grouping. The server refuses anyone but an admin. */
+  function markNotDuplicate() {
+    startDismissingDup(async () => {
+      const result = await markLeadNotDuplicate(lead.id);
+      if (!result.ok) {
+        toast.error("Could not update duplicate status", {
+          description: result.error ?? "Please try again.",
+        });
+        return;
+      }
+
+      setDupGroupId(null);
+      setDupCount(0);
+      setDupVisibleCount(0);
+      toast.success("Marked as not a duplicate");
+      router.refresh();
+    });
+  }
+
+  /** Re-run the matcher, e.g. after an accidental "Not duplicate". */
+  function checkForDuplicates() {
+    startCheckingDuplicates(async () => {
+      // Make sure a just-typed email/phone has reached the database first.
+      await flushAllNow();
+
+      const result = await checkLeadForDuplicates(lead.id);
+      if (!result.ok) {
+        toast.error("Could not check for duplicates", {
+          description: result.error ?? "Please try again.",
+        });
+        return;
+      }
+
+      setDupGroupId(result.dupGroupId ?? null);
+      setDupCount(result.dupGroupCount ?? 0);
+      setDupVisibleCount(result.dupGroupVisibleCount ?? 0);
+
+      if (result.dupGroupId) {
+        toast.success("Potential duplicates found", {
+          description: "This lead is now linked to similar leads.",
+        });
+      } else {
+        toast.success("No potential duplicates found");
+      }
+
+      router.refresh();
+    });
+  }
+
   /** Delete after the confirmation, then close the now-stale dialog. */
   function handleDelete() {
     const formData = new FormData();
@@ -594,6 +689,44 @@ function LeadForm({
       </DialogHeader>
 
       <div className="grid gap-4">
+        {dupGroupId ? (
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <TriangleAlert
+              className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div>
+                <p className="text-sm font-medium">Potential duplicate</p>
+                <p className="text-xs text-muted-foreground">
+                  This lead may be the same person as{" "}
+                  {Math.max(dupCount - 1, 1)} other lead
+                  {dupCount - 1 === 1 ? "" : "s"}.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={viewSimilar}
+                >
+                  View similar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={markNotDuplicate}
+                  disabled={dismissingDup}
+                >
+                  {dismissingDup ? "Updating…" : "Mark as Not Duplicate"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid max-h-[60vh] gap-5 overflow-y-auto pr-1">
           {/* Stage + assignment. */}
           <section className="grid gap-3">
@@ -1156,17 +1289,31 @@ function LeadForm({
         ) : null}
 
         <DialogFooter className="sm:justify-between">
-          {canDelete ? (
+          <div className="flex flex-wrap items-center gap-3">
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleting}
+                onClick={() => setConfirmingDelete(true)}
+              >
+                <Trash2 />
+                Delete
+              </Button>
+            ) : null}
             <Button
               type="button"
-              variant="destructive"
-              disabled={deleting}
-              onClick={() => setConfirmingDelete(true)}
+              variant="outline"
+              onClick={checkForDuplicates}
+              disabled={checkingDuplicates}
             >
-              <Trash2 />
-              Delete
+              <RefreshCw
+                className={checkingDuplicates ? "animate-spin" : undefined}
+                aria-hidden
+              />
+              {checkingDuplicates ? "Checking…" : "Check for Duplicates"}
             </Button>
-          ) : null}
+          </div>
           <div className="flex flex-wrap items-center justify-end gap-3 sm:ml-auto">
             <p className="text-xs text-muted-foreground">
               Changes save automatically.

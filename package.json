@@ -13,7 +13,9 @@
     "db:studio": "drizzle-kit studio",
     "mcp:token": "tsx scripts/mcp-token.ts",
     "geo:generate": "tsx scripts/generate-counties.ts",
-    "rbac:check": "tsx scripts/check-rbac.ts"
+    "rbac:check": "tsx scripts/check-rbac.ts",
+    "leads:dedupe": "tsx scripts/backfill-duplicates.ts",
+    "leads:check": "tsx scripts/check-dup-matching.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

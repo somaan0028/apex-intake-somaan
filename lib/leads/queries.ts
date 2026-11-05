@@ -7,9 +7,11 @@
  */
 import {
   and,
+  count,
   eq,
   getTableColumns,
   gte,
+  inArray,
   isNotNull,
   isNull,
   lte,
@@ -56,23 +58,91 @@ const ATTRIBUTION_KEYS = [
 ] as const;
 type AttributionKey = (typeof ATTRIBUTION_KEYS)[number];
 
+/** A row as it comes out of SQL, before the duplicate group counts are added. */
+type LeadBaseRow = Omit<Lead, "dupMatchString"> & {
+  assignedToName: string | null;
+};
+
 /**
  * A lead as the grid *and* the detail dialog consume it: its columns plus the
- * joined assignee's display name. It satisfies `LeadSubject`, so the dialog can
- * run the same RBAC policies the server does.
+ * joined assignee's display name and the size of its duplicate group. It
+ * satisfies `LeadSubject`, so the dialog can run the same RBAC policies the
+ * server does.
  *
  * The attribution fields are optional: `listLeads` only includes them for
- * viewers allowed to see them, so for anyone else the keys are absent.
+ * viewers allowed to see them, so for anyone else the keys are absent. The
+ * matcher's `dupMatchString` is never sent — it is an internal comparison key.
  */
-export type LeadRow = Omit<Lead, AttributionKey> & {
+export type LeadRow = Omit<Lead, AttributionKey | "dupMatchString"> & {
   assignedToName: string | null;
+  /** Every lead in this lead's duplicate group, including itself. */
+  dupGroupCount: number;
+  /** Group members this viewer is allowed to see, including itself. */
+  dupGroupVisibleCount: number;
 } & Partial<Pick<Lead, AttributionKey>>;
 
 /** Copies a row without its attribution keys (for viewers who may not see them). */
-function withoutAttribution(row: LeadRow): LeadRow {
+function withoutAttribution(row: LeadBaseRow): LeadBaseRow {
   const copy = { ...row };
   for (const key of ATTRIBUTION_KEYS) delete copy[key];
   return copy;
+}
+
+/** Split an array into fixed-size chunks (SQLite bind-variable safety). */
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Attach the total and viewer-visible sizes of each row's duplicate group.
+ *
+ * Two grouped queries per page (not per row). The visible count is scoped by
+ * the same visibility rule as the grid, so the dialog can tell an agent when
+ * part of the cluster is out of reach.
+ */
+function attachDupCounts(rows: LeadBaseRow[], actor: Actor): LeadRow[] {
+  const db = getDb();
+  const groupIds = [
+    ...new Set(
+      rows
+        .map((row) => row.dupGroupId)
+        .filter((value): value is string => value !== null),
+    ),
+  ];
+
+  const totals = new Map<string, number>();
+  const visible = new Map<string, number>();
+
+  for (const batch of chunk(groupIds, 300)) {
+    db.select({ id: leads.dupGroupId, value: count() })
+      .from(leads)
+      .where(inArray(leads.dupGroupId, batch))
+      .groupBy(leads.dupGroupId)
+      .all()
+      .forEach((row) => {
+        if (row.id) totals.set(row.id, row.value);
+      });
+
+    db.select({ id: leads.dupGroupId, value: count() })
+      .from(leads)
+      .where(and(inArray(leads.dupGroupId, batch), leadsVisibilityCondition(actor)))
+      .groupBy(leads.dupGroupId)
+      .all()
+      .forEach((row) => {
+        if (row.id) visible.set(row.id, row.value);
+      });
+  }
+
+  return rows.map((row) => {
+    const id = row.dupGroupId;
+    return {
+      ...row,
+      dupGroupCount: id ? (totals.get(id) ?? 0) : 0,
+      dupGroupVisibleCount: id ? (visible.get(id) ?? 0) : 0,
+    };
+  });
 }
 
 /**
@@ -179,90 +249,112 @@ export function listLeads(
   const db = getDb();
   const showAttribution = can(actor.role, "leads.view.attribution");
 
-  // Search spans the matter id and the injured person's contact details.
-  const conditions: Array<SQL | undefined> = [
-    leadsVisibilityCondition(actor),
-    searchCondition(query.search, [
-      leads.matterId,
-      leads.injuredFirstName,
-      leads.injuredLastName,
-      leads.injuredEmail,
-      leads.injuredPhone,
-    ]),
-  ];
+  // "View similar" is an explicit request for one duplicate group. It ignores
+  // every other filter (including the date window) so the whole cluster can be
+  // inspected; visibility still applies.
+  const dupGroupValue = query.filters.dupGroup?.trim();
+  const dupGroup =
+    dupGroupValue && dupGroupValue.length <= 128 ? dupGroupValue : null;
 
-  const caseType = readFilter(query, "caseType", isCaseType);
-  if (caseType === "OTHER") {
-    // "Other" is a bucket, not just the literal code: it covers every stored
-    // case type that is not one of the ad campaigns, including a raw campaign
-    // value we did not recognise (e.g. `workers_comp`).
+  let conditions: Array<SQL | undefined>;
+
+  if (dupGroup) {
+    conditions = [leadsVisibilityCondition(actor), eq(leads.dupGroupId, dupGroup)];
+  } else {
+    // Search spans the matter id and the injured person's contact details.
+    conditions = [
+      leadsVisibilityCondition(actor),
+      searchCondition(query.search, [
+        leads.matterId,
+        leads.injuredFirstName,
+        leads.injuredLastName,
+        leads.injuredEmail,
+        leads.injuredPhone,
+      ]),
+    ];
+
+    const caseType = readFilter(query, "caseType", isCaseType);
+    if (caseType === "OTHER") {
+      // "Other" is a bucket, not just the literal code: it covers every stored
+      // case type that is not one of the ad campaigns, including a raw campaign
+      // value we did not recognise (e.g. `workers_comp`).
+      conditions.push(
+        and(
+          isNotNull(leads.caseType),
+          notInArray(leads.caseType, ["MVA", "MASS_TORT"]),
+        ),
+      );
+    } else if (caseType) {
+      conditions.push(eq(leads.caseType, caseType));
+    }
+
+    const stage = readFilter(query, "stage", isLeadStage);
+    if (stage) conditions.push(eq(leads.stage, stage));
+
+    // Source is attribution data: filtering by it would leak which leads came
+    // from where, so the condition is only applied for viewers allowed to see it.
+    const source = showAttribution
+      ? readFilter(query, "source", isLeadSource)
+      : null;
+    if (source) conditions.push(eq(leads.source, source));
+
+    // The assignee filter carries either a user id or the "unassigned" sentinel.
+    const assignee = query.filters.assignedTo;
+    if (assignee === UNASSIGNED) {
+      conditions.push(isNull(leads.assignedToId));
+    } else if (assignee) {
+      const id = Number(assignee);
+      if (Number.isInteger(id) && id > 0) {
+        conditions.push(eq(leads.assignedToId, id));
+      }
+    }
+
+    // "Duplicates" filter: non-null group ids are exactly the leads in a
+    // cluster of two or more (the grouping invariant guarantees it).
+    const potentialDuplicate = query.filters.potentialDuplicate;
+    if (potentialDuplicate === "yes") {
+      conditions.push(isNotNull(leads.dupGroupId));
+    } else if (potentialDuplicate === "no") {
+      conditions.push(isNull(leads.dupGroupId));
+    }
+
+    // Tri-state qualifying answers (yes / no / unknown).
+    conditions.push(booleanFilter(query, "isAtFault", leads.isAtFault));
+    conditions.push(booleanFilter(query, "hasAttorney", leads.hasAttorney));
     conditions.push(
-      and(
-        isNotNull(leads.caseType),
-        notInArray(leads.caseType, ["MVA", "MASS_TORT"]),
-      ),
+      booleanFilter(query, "hasReceivedSettlement", leads.hasReceivedSettlement),
     );
-  } else if (caseType) {
-    conditions.push(eq(leads.caseType, caseType));
-  }
 
-  const stage = readFilter(query, "stage", isLeadStage);
-  if (stage) conditions.push(eq(leads.stage, stage));
-
-  // Source is attribution data: filtering by it would leak which leads came from
-  // where, so the condition is only applied for viewers allowed to see it.
-  const source = showAttribution
-    ? readFilter(query, "source", isLeadSource)
-    : null;
-  if (source) conditions.push(eq(leads.source, source));
-
-  // The assignee filter carries either a user id or the "unassigned" sentinel.
-  const assignee = query.filters.assignedTo;
-  if (assignee === UNASSIGNED) {
-    conditions.push(isNull(leads.assignedToId));
-  } else if (assignee) {
-    const id = Number(assignee);
-    if (Number.isInteger(id) && id > 0) {
-      conditions.push(eq(leads.assignedToId, id));
+    // Added-date range. The presets use a rolling window; the custom option uses
+    // explicit from/to dates.
+    const addedWithin = query.filters.addedWithin;
+    const windowDays =
+      addedWithin === "24h"
+        ? 1
+        : addedWithin === "3d"
+          ? 3
+          : addedWithin === "7d"
+            ? 7
+            : null;
+    if (windowDays) {
+      const from = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+      conditions.push(gte(leads.createdAt, from));
+    } else if (addedWithin !== "any") {
+      // "Any time" is an explicit request for the whole backlog; every other
+      // non-preset value still gets a lower bound.
+      const addedFrom = parseFilterDate(query.filters.addedFrom);
+      if (addedFrom) {
+        conditions.push(gte(leads.createdAt, addedFrom));
+      } else if (addedWithin === "custom") {
+        // The custom range always has a lower bound; never load the full backlog
+        // just because a hand-edited request omitted it.
+        const fallback = new Date();
+        fallback.setDate(fallback.getDate() - 7);
+        conditions.push(gte(leads.createdAt, fallback));
+      }
+      const addedTo = parseFilterDate(query.filters.addedTo, true);
+      if (addedTo) conditions.push(lte(leads.createdAt, addedTo));
     }
-  }
-
-  // Tri-state qualifying answers (yes / no / unknown).
-  conditions.push(booleanFilter(query, "isAtFault", leads.isAtFault));
-  conditions.push(booleanFilter(query, "hasAttorney", leads.hasAttorney));
-  conditions.push(
-    booleanFilter(query, "hasReceivedSettlement", leads.hasReceivedSettlement),
-  );
-
-  // Added-date range. The presets use a rolling window; the custom option uses
-  // explicit from/to dates.
-  const addedWithin = query.filters.addedWithin;
-  const windowDays =
-    addedWithin === "24h"
-      ? 1
-      : addedWithin === "3d"
-        ? 3
-        : addedWithin === "7d"
-          ? 7
-          : null;
-  if (windowDays) {
-    const from = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-    conditions.push(gte(leads.createdAt, from));
-  } else if (addedWithin !== "any") {
-    // "Any time" is an explicit request for the whole backlog; every other
-    // non-preset value still gets a lower bound.
-    const addedFrom = parseFilterDate(query.filters.addedFrom);
-    if (addedFrom) {
-      conditions.push(gte(leads.createdAt, addedFrom));
-    } else if (addedWithin === "custom") {
-      // The custom range always has a lower bound; never load the full backlog
-      // just because a hand-edited request omitted it.
-      const fallback = new Date();
-      fallback.setDate(fallback.getDate() - 7);
-      conditions.push(gte(leads.createdAt, fallback));
-    }
-    const addedTo = parseFilterDate(query.filters.addedTo, true);
-    if (addedTo) conditions.push(lte(leads.createdAt, addedTo));
   }
 
   // Sorting by source is the same side-channel as filtering by it; fall back to
@@ -291,9 +383,21 @@ export function listLeads(
     .offset(plan.offset)
     .all();
 
-  // Omit the attribution fields for viewers who may not see them — the values
-  // never leave the server, so the grid and dialog have nothing to render.
-  const rows = showAttribution ? selected : selected.map(withoutAttribution);
+  // Drop the internal comparison string for every viewer, then the attribution
+  // fields for viewers who may not see them. Neither value leaves the server.
+  const baseRows: LeadBaseRow[] = selected.map(({ dupMatchString, ...row }) => {
+    // The comparison string is internal; drop it on the way out.
+    void dupMatchString;
+    return row;
+  });
+  const rows = showAttribution
+    ? baseRows
+    : baseRows.map(withoutAttribution);
 
-  return { rows, total: plan.total, page: plan.page, sort: plan.sort };
+  return {
+    rows: attachDupCounts(rows, actor),
+    total: plan.total,
+    page: plan.page,
+    sort: plan.sort,
+  };
 }

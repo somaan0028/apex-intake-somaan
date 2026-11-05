@@ -13,14 +13,21 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import type { LeadFieldPatch } from "./editable";
 import {
+  checkLeadForDuplicatesForActor,
   deleteLeadForActor,
+  markLeadNotDuplicateForActor,
   saveLeadFieldsForActor,
   sendLeadForActor,
+  type DuplicateCheckResult,
   type LeadMutationResult,
   type SendLeadResult,
 } from "./service";
 
-export type { LeadMutationResult as LeadActionResult, SendLeadResult };
+export type {
+  DuplicateCheckResult,
+  LeadMutationResult as LeadActionResult,
+  SendLeadResult,
+};
 
 /**
  * Auto-save one or more editable fields of a lead.
@@ -62,6 +69,36 @@ export async function deleteLead(
     revalidatePath("/activity");
     revalidatePath("/campaign-analytics");
   }
+  return result;
+}
+
+/** Dismiss one lead's potential-duplicate grouping (admin only). */
+export async function markLeadNotDuplicate(
+  id: number,
+): Promise<LeadMutationResult> {
+  const actor = await requireUser();
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, error: "Unknown lead." };
+  }
+
+  const result = markLeadNotDuplicateForActor(actor, id);
+  if (result.ok) revalidatePath("/leads");
+  return result;
+}
+
+/** Re-run the duplicate matcher for one lead (explicit user action). */
+export async function checkLeadForDuplicates(
+  id: number,
+): Promise<DuplicateCheckResult> {
+  const actor = await requireUser();
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, error: "Unknown lead." };
+  }
+
+  const result = checkLeadForDuplicatesForActor(actor, id);
+  if (result.ok) revalidatePath("/leads");
   return result;
 }
 

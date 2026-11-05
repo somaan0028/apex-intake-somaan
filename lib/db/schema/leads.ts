@@ -130,6 +130,18 @@ export const leads = sqliteTable(
     trustedform: text("trustedform"),
     journaya: text("journaya"),
 
+    // --- Potential-duplicate detection ---
+    /**
+     * Normalised `name|email|phone` of the injured person, used by the fuzzy
+     * matcher. Internal only — it is stripped before a row reaches the client.
+     */
+    dupMatchString: text("dup_match_string"),
+    /**
+     * Random token shared by leads in the same potential-duplicate cluster.
+     * Non-null only while the cluster has two or more members.
+     */
+    dupGroupId: text("dup_group_id"),
+
     // --- Brightwater submission state ---
     /** Lead id returned by Brightwater on a successful send. */
     brightwaterLeadId: text("brightwater_lead_id"),
@@ -146,6 +158,7 @@ export const leads = sqliteTable(
     index("leads_assigned_to_idx").on(table.assignedToId),
     index("leads_case_type_idx").on(table.caseType),
     index("leads_filler_email_idx").on(table.fillerEmail),
+    index("leads_dup_group_id_idx").on(table.dupGroupId),
     // Enforce the fixed relationship set at the storage level (NULL is allowed).
     check(
       "leads_relationship_check",
