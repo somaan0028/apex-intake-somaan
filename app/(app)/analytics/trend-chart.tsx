@@ -29,6 +29,48 @@ const PADDING = { top: 18, right: 18, bottom: 34, left: 46 };
 const PLOT_WIDTH = WIDTH - PADDING.left - PADDING.right;
 const PLOT_HEIGHT = HEIGHT - PADDING.top - PADDING.bottom;
 
+/**
+ * A soft Catmull-Rom path through the dots. Control points are clamped to each
+ * segment's vertical range so the curve cannot dip below zero or overshoot the
+ * axis on a sharp change.
+ */
+function smoothPath(coords: Array<{ x: number; y: number }>): string {
+  if (coords.length === 0) return "";
+  const first = coords[0];
+  if (coords.length === 1) return `M${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
+
+  const tension = 1 / 6;
+  let path = `M${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
+
+  for (let index = 0; index < coords.length - 1; index += 1) {
+    const previous = coords[index - 1] ?? coords[index];
+    const current = coords[index];
+    const next = coords[index + 1];
+    const after = coords[index + 2] ?? next;
+
+    const clamp = (value: number) =>
+      Math.min(
+        Math.max(value, Math.min(current.y, next.y)),
+        Math.max(current.y, next.y),
+      );
+
+    const control1X = current.x + (next.x - previous.x) * tension;
+    const control1Y = clamp(
+      current.y + (next.y - previous.y) * tension,
+    );
+    const control2X = next.x - (after.x - current.x) * tension;
+    const control2Y = clamp(next.y - (after.y - current.y) * tension);
+
+    path += ` C${control1X.toFixed(2)} ${control1Y.toFixed(
+      2,
+    )}, ${control2X.toFixed(2)} ${control2Y.toFixed(2)}, ${next.x.toFixed(
+      2,
+    )} ${next.y.toFixed(2)}`;
+  }
+
+  return path;
+}
+
 /** Round the axis up to a 1/2/5-style step so tick labels stay whole numbers. */
 function axisScale(value: number): { max: number; step: number } {
   if (value <= 0) return { max: 1, step: 1 };
@@ -162,14 +204,12 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
             ) : null}
 
             {SERIES.map((series) => {
-              const path = points
-                .map(
-                  (point, index) =>
-                    `${index === 0 ? "M" : "L"}${xFor(index).toFixed(2)} ${yFor(
-                      point[series.key as SeriesKey],
-                    ).toFixed(2)}`,
-                )
-                .join(" ");
+              const path = smoothPath(
+                points.map((point, index) => ({
+                  x: xFor(index),
+                  y: yFor(point[series.key as SeriesKey]),
+                })),
+              );
 
               return (
                 <g key={series.key}>
