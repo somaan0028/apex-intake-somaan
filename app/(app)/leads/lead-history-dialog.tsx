@@ -124,13 +124,15 @@ export function LeadHistoryDialog({
                       name={row.doerName}
                       avatarPath={row.doerAvatarPath}
                     />
-                    <p className="min-w-0">
-                      <span className="font-medium">{row.doerName}</span>:{" "}
-                      {row.description}{" "}
-                      <span className="whitespace-nowrap text-muted-foreground">
+                    <div className="min-w-0">
+                      <p>
+                        <span className="font-medium">{row.doerName}</span>:{" "}
+                        {row.description}
+                      </p>
+                      <p className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatDateTime(row.createdAt)}
-                      </span>
-                    </p>
+                      </p>
+                    </div>
                   </div>
                 </li>
               ))}
