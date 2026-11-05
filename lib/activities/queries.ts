@@ -128,7 +128,9 @@ export function listActivities(
         ? 3
         : dateWithin === "7d"
           ? 7
-          : null;
+          : dateWithin === "30d"
+            ? 30
+            : null;
   if (windowDays) {
     const from = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     conditions.push(gte(activities.createdAt, from));

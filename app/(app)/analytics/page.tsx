@@ -19,8 +19,9 @@ import {
   type AnalyticsFilters,
   type DimensionCounts,
   type DimensionRow,
+  type StageRow,
 } from "@/lib/leads/analytics";
-import { caseTypeLabel } from "@/lib/labels";
+import { LEAD_STAGE_LABELS, caseTypeLabel } from "@/lib/labels";
 import { can } from "@/lib/rbac";
 import { AnalyticsControls } from "./analytics-controls";
 import { TrendChart } from "./trend-chart";
@@ -44,7 +45,7 @@ function campaignLabel(key: string): string {
 /** The label for the selected campaign filter. */
 function campaignFilterLabel(value: CampaignFilterValue): string {
   if (value === "all") return "All campaigns";
-  if (value === "OTHER") return "Other campaigns";
+  if (value === "OTHER") return "Other";
   return caseTypeLabel(value);
 }
 
@@ -77,118 +78,77 @@ function KpiCard({
   );
 }
 
-/** Segment colours for the campaign mix, shared by the bar and its legend. */
-const MIX_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
-
 /**
- * One stacked bar for a composition. Reuses the Overview pipeline's idea: a
- * single bar compares shares better than separate bars, and each segment keeps
- * a title/aria-label for screen readers and hover.
+ * The filtered stage mix, using the same single stacked bar + two-column legend
+ * as the Overview pipeline. Each segment and legend row drills into the grid
+ * with the active window and campaign filters.
  */
-function ShareBar({
+function CampaignPipeline({
   rows,
   total,
-  colors,
+  hrefFor,
 }: {
-  rows: DimensionRow[];
+  rows: StageRow[];
   total: number;
-  colors: string[];
+  hrefFor: (stage: StageRow["stage"]) => string;
 }) {
-  if (total <= 0) {
-    return (
-      <div className="flex h-3 w-full items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
-        No data in this window
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-3 w-full gap-px overflow-hidden rounded-full bg-muted">
-      {rows.map((row, index) => {
-        if (row.total === 0) return null;
-        const share = (row.total / total) * 100;
-        return (
-          <div
-            key={row.key}
-            title={`${campaignLabel(row.key)}: ${row.total} (${Math.round(share)}%)`}
-            aria-label={`${campaignLabel(row.key)}: ${row.total} leads`}
-            className="h-full"
-            style={{
-              width: `${share}%`,
-              backgroundColor: colors[index % colors.length],
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * The campaign mix legend. Each row is its own bordered card with a fixed-width
- * percentage, so a left column's value can never visually run into the next
- * column's label (the bug in the old two-column key).
- */
-function CampaignMixLegend({
-  rows,
-  total,
-}: {
-  rows: DimensionRow[];
-  total: number;
-}) {
-  if (rows.length === 0 || total === 0) {
+  if (total === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No campaign data in this window.
+        No leads in this window, so there is nothing to break down.
       </p>
     );
   }
 
   return (
-    <ul className="grid gap-2 sm:grid-cols-2">
-      {rows.map((row, index) => {
-        const share = total > 0 ? (row.total / total) * 100 : 0;
-        const color = MIX_COLORS[index % MIX_COLORS.length];
-        return (
-          <li
-            key={row.key}
-            className="rounded-lg border bg-muted/20 px-3 py-2"
-          >
-            <div className="flex items-center gap-2">
+    <>
+      <div className="flex h-4 w-full gap-px overflow-hidden rounded-full bg-muted">
+        {rows.map((row) => {
+          if (row.total === 0) return null;
+          const label = LEAD_STAGE_LABELS[row.stage];
+          return (
+            <Link
+              key={row.stage}
+              href={hrefFor(row.stage)}
+              title={`${label}: ${row.total}`}
+              aria-label={`${label}: ${row.total} lead${
+                row.total === 1 ? "" : "s"
+              }`}
+              className="h-full outline-offset-2 transition-opacity hover:opacity-80"
+              style={{
+                width: `${(row.total / total) * 100}%`,
+                backgroundColor: `var(--stage-${row.stage.toLowerCase()})`,
+              }}
+            />
+          );
+        })}
+      </div>
+
+      <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+        {rows.map((row) => (
+          <li key={row.stage}>
+            <Link
+              href={hrefFor(row.stage)}
+              className="flex items-center gap-2 rounded-md py-1.5 text-sm hover:underline"
+            >
               <span
                 aria-hidden
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {campaignLabel(row.key)}
-              </span>
-              <span className="text-sm font-medium tabular-nums">
-                {row.total}
-              </span>
-              <span className="w-11 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                {rate(row.total, total)}
-              </span>
-            </div>
-            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full"
                 style={{
-                  width: `${Math.min(100, share)}%`,
-                  backgroundColor: color,
+                  backgroundColor: `var(--stage-${row.stage.toLowerCase()})`,
                 }}
               />
-            </div>
+              <span className="min-w-0 flex-1 truncate">
+                {LEAD_STAGE_LABELS[row.stage]}
+              </span>
+              <span className="tabular-nums text-muted-foreground">
+                {row.total}
+              </span>
+            </Link>
           </li>
-        );
-      })}
-    </ul>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -353,7 +313,7 @@ function BestCard({
  * "Not tracked" is excluded: unattributed leads are a data gap, not a channel
  * that is working, and they would otherwise win every time UTM data is absent.
  */
-const MIN_BEST_VOLUME = 25;
+const MIN_BEST_VOLUME = 10;
 
 function bestByRetention(rows: DimensionRow[]): DimensionRow | null {
   const eligible = rows.filter(
@@ -431,6 +391,10 @@ export default async function AnalyticsPage({
     (LEAD_SOURCES as readonly string[]).includes(key)
       ? leadsHref(filters, { "filter.source": key })
       : null;
+
+  // Stage segments/legend rows keep the active window and campaign filter.
+  const stageLink = (stage: StageRow["stage"]) =>
+    leadsHref(filters, { "filter.stage": stage });
 
   return (
     <div className="space-y-6">
@@ -521,17 +485,18 @@ export default async function AnalyticsPage({
           <CardTitle className="text-base">Campaign mix</CardTitle>
           <CardDescription>
             {filtered
-              ? `${data.totals.total} leads from ${campaignFilterLabel(filters.campaign)} in this window.`
-              : `How the ${data.totals.total} leads split across campaigns.`}
+              ? `${data.totals.total} ${campaignFilterLabel(
+                  filters.campaign,
+                )} leads across the stages in this window.`
+              : `${data.totals.total} leads across the stages in this window.`}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <ShareBar
-            rows={data.byCampaign}
+        <CardContent className="space-y-5">
+          <CampaignPipeline
+            rows={data.byStage}
             total={data.totals.total}
-            colors={MIX_COLORS}
+            hrefFor={stageLink}
           />
-          <CampaignMixLegend rows={data.byCampaign} total={data.totals.total} />
         </CardContent>
       </Card>
 

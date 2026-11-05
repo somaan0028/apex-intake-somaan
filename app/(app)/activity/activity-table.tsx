@@ -106,6 +106,7 @@ function rangePreset(value: string | undefined): string {
   return value === "24h" ||
     value === "3d" ||
     value === "7d" ||
+    value === "30d" ||
     value === "custom"
     ? value
     : "any";

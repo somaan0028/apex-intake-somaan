@@ -23,15 +23,16 @@ export interface DateRangeOption {
 }
 
 export const DATE_RANGE_PRESET_OPTIONS: DateRangeOption[] = [
-  { label: "Within 24 hours", value: "24h" },
-  { label: "Within 3 days", value: "3d" },
-  { label: "Within 7 days", value: "7d" },
+  { label: "Last 24 hours", value: "24h" },
+  { label: "Last 3 days", value: "3d" },
+  { label: "Last 7 days", value: "7d" },
+  { label: "Last 30 days", value: "30d" },
   { label: "Custom range", value: "custom" },
 ];
 
 /** The same presets with a way to clear the filter. */
 export const DATE_RANGE_ANY_OPTIONS: DateRangeOption[] = [
-  { label: "Any time", value: "any" },
+  { label: "All Time", value: "any" },
   ...DATE_RANGE_PRESET_OPTIONS,
 ];
 

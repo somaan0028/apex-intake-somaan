@@ -782,6 +782,7 @@ export function LeadsTable({
     addedWithin === "24h" ||
     addedWithin === "3d" ||
     addedWithin === "7d" ||
+    addedWithin === "30d" ||
     addedWithin === "custom"
       ? addedWithin
       : query.filters.addedFrom || query.filters.addedTo

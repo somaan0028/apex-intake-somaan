@@ -341,8 +341,14 @@ their Lawmatics CRM.
   canonical `caseType` codes and sources in `LEAD_SOURCES`, never raw campaign values.
   The toolbar reuses `components/date-range-filter.tsx` (the leads/activity presets and
   custom range) and adds a campaign selector (`all`, `MVA`, `MASS_TORT`, `OTHER`, where
-  `OTHER` is the grid's bucket). The trend is a multi-series line chart with dots
+  `OTHER` is the grid's bucket). Analytics opens on **Last 30 days** and campaign
+  **MVA**; the date filter falls back to 30 days when the URL carries no preset. The
+  trend is a multi-series line chart with dots
   (`app/(app)/analytics/trend-chart.tsx`) showing Leads, Qualified+, Retained+ and Sent.
+  The **Campaign mix** card is the filtered stage pipeline, reusing the Overview's
+  stacked-bar + two-column legend and `--stage-*` colours (a campaign composition would
+  collapse to one colour under the MVA default); the campaign totals still live in the
+  Campaigns table below.
 - The **lead detail dialog** (`app/(app)/leads/lead-dialog.tsx`) auto-saves: every
   editable field writes through `saveLeadFields` (`lib/leads/actions.ts`) as it changes,
   so there is no Save button. Text fields debounce, selects and the date save
@@ -385,8 +391,8 @@ their Lawmatics CRM.
 - **Users** (`app/(app)/users/`) shows an **Assigned leads** count per person, loaded for the
   visible page in one grouped query. The underlined number links to the leads page filtered
   by `filter.assignedTo=<id>` with `filter.addedWithin=any`, so it matches the all-time
-  count. `any` is a real leads date preset ("Any time"), not a hack; a bare `/leads` has
-  no date window (the Added filter starts cleared).
+  count. `any` is a real leads date preset ("All Time"), not a hack; a bare `/leads`
+  has no date window (the Added filter starts cleared).
 - The leads page **view is a persisted preference**, not a filter. An explicit
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
@@ -406,7 +412,7 @@ their Lawmatics CRM.
   (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
   `filter.dupGroup=<id>`, which ignores every other filter.
 - The leads grid and board have **no date window by default**: the Added filter
-  starts cleared ("Any time"). It offers `24h`, `3d`, `7d`, and a Custom option
+  starts cleared ("All Time"). It offers `24h`, `3d`, `7d`, `30d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional
   `filter.addedTo`; `listLeads` turns those into `created_at` bounds. The custom
   lower date has no clear control; the upper date can be cleared.

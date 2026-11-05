@@ -335,7 +335,9 @@ export function listLeads(
           ? 3
           : addedWithin === "7d"
             ? 7
-            : null;
+            : addedWithin === "30d"
+              ? 30
+              : null;
     if (windowDays) {
       const from = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
       conditions.push(gte(leads.createdAt, from));
