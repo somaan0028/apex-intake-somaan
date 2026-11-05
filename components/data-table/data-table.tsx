@@ -81,9 +81,11 @@ import {
   filtersFromKey,
   filtersKey,
   PAGE_SIZE_OPTIONS,
+  parseFilterValues,
   type TableQuery,
 } from "@/lib/table-query";
 import { dataTableFeatures, type DataTableFeatures } from "./features";
+import { MultiSelectFilter } from "./multi-select-filter";
 
 /** One choice in a declarative column filter. */
 export interface DataTableFilterOption {
@@ -100,6 +102,12 @@ export interface DataTableFilter {
   /** Text for the "no filter" choice, e.g. "All roles". */
   allLabel: string;
   options: DataTableFilterOption[];
+  /**
+   * When true the control is a checkbox popover and the URL value is a
+   * comma-separated list (`filter.stage=NEW,CONTACTED`). Defaults to a single
+   * choice select.
+   */
+  multiple?: boolean;
 }
 
 export interface DataTableProps<TData extends RowData> {
@@ -639,8 +647,7 @@ function ColumnFilter<TData extends RowData>({
   const column = table.getColumn(filter.columnId);
   if (!column) return null;
 
-  const selected =
-    (column.getFilterValue() as string | undefined) ?? ALL_FILTER_VALUE;
+  const selected = (column.getFilterValue() as string | undefined) ?? "";
 
   // `items` lets SelectValue render the human label (not the raw sentinel) in
   // the trigger, including during SSR before the popup items have mounted.
@@ -653,6 +660,28 @@ function ColumnFilter<TData extends RowData>({
   // without this several filters (all three booleans, for one) read identically.
   const labelId = `${filter.columnId}-filter-label`;
 
+  if (filter.multiple) {
+    return (
+      <div className="flex items-center gap-2">
+        <span
+          id={labelId}
+          className="text-sm font-medium whitespace-nowrap text-muted-foreground"
+        >
+          {filter.label}
+        </span>
+        <MultiSelectFilter
+          labelId={labelId}
+          allLabel={filter.allLabel}
+          options={filter.options}
+          selected={parseFilterValues(selected)}
+          onChange={(values) =>
+            column.setFilterValue(values.length ? values.join(",") : undefined)
+          }
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2">
       <span
@@ -663,7 +692,7 @@ function ColumnFilter<TData extends RowData>({
       </span>
       <Select
         items={items}
-        value={selected}
+        value={selected || ALL_FILTER_VALUE}
         onValueChange={(value) =>
           column.setFilterValue(
             value === null || value === ALL_FILTER_VALUE ? undefined : value,

@@ -421,6 +421,12 @@ their Lawmatics CRM.
   means bookmarked by the signed-in user, never by anyone else. The filter is hosted
   by a hidden, non-hideable table column so it uses the same URL/saved-view plumbing
   as every other filter, and it works unchanged in Table, Kanban, and CSV export.
+  **Case type**, **Stage**, and **Assigned to** are multi-select: their URL value is a
+  comma-separated list (`filter.stage=NEW,CONTACTED`), parsed through
+  `parseFilterValues` / `readFilterList`, so one filter can match several values.
+  A `DataTableFilter` opts into this with `multiple: true`; the shared
+  `MultiSelectFilter` renders a checkbox popover and keeps a local draft while the
+  URL round-trip is in flight.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("Any time"). It offers `24h`, `3d`, `7d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional

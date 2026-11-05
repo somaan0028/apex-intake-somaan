@@ -47,6 +47,7 @@ import {
 import { toast } from "sonner";
 import {
   DataTable,
+  MultiSelectFilter,
   useTableQuerySync,
   type DataTableFilter,
 } from "@/components/data-table";
@@ -145,6 +146,7 @@ import {
   BOOLEAN_FILTER_OPTIONS,
   filtersFromKey,
   filtersKey,
+  parseFilterValues,
   tableQueryToParams,
   type TableQuery,
 } from "@/lib/table-query";
@@ -464,6 +466,7 @@ function buildFilters(
       columnId: "caseType",
       label: "Case type",
       allLabel: "Any",
+      multiple: true,
       options: CASE_TYPES.map((value) => ({
         label: CASE_TYPE_LABELS[value],
         value,
@@ -473,6 +476,7 @@ function buildFilters(
       columnId: "stage",
       label: "Stage",
       allLabel: "Any",
+      multiple: true,
       options: LEAD_STAGES.map((value) => ({
         label: LEAD_STAGE_LABELS[value],
         value,
@@ -482,6 +486,7 @@ function buildFilters(
       columnId: "assignedTo",
       label: "Assigned to",
       allLabel: "Anyone",
+      multiple: true,
       options: [
         { label: "Unassigned", value: UNASSIGNED },
         ...assignees.map((assignee) => ({
@@ -1382,33 +1387,46 @@ export function LeadsTable({
                     >
                       {filter.label}
                     </label>
-                    <Select
-                      items={values}
-                      value={current || ANY_FILTER_VALUE}
-                      onValueChange={(value) =>
-                        setFilterValue(
-                          filter.columnId,
-                          !value || value === ANY_FILTER_VALUE ? "" : value,
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        id={`mobile-filter-${filter.columnId}`}
+                    {filter.multiple ? (
+                      <MultiSelectFilter
+                        triggerId={`mobile-filter-${filter.columnId}`}
+                        allLabel={filter.allLabel}
+                        options={filter.options}
+                        selected={parseFilterValues(current)}
+                        onChange={(next) =>
+                          setFilterValue(filter.columnId, next.join(","))
+                        }
                         className="w-full"
+                      />
+                    ) : (
+                      <Select
+                        items={values}
+                        value={current || ANY_FILTER_VALUE}
+                        onValueChange={(value) =>
+                          setFilterValue(
+                            filter.columnId,
+                            !value || value === ANY_FILTER_VALUE ? "" : value,
+                          )
+                        }
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ANY_FILTER_VALUE}>
-                          {filter.allLabel}
-                        </SelectItem>
-                        {filter.options.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                        <SelectTrigger
+                          id={`mobile-filter-${filter.columnId}`}
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ANY_FILTER_VALUE}>
+                            {filter.allLabel}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          {filter.options.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 );
               })}

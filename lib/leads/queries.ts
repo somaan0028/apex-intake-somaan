@@ -31,6 +31,7 @@ import {
   booleanFilter,
   planListPage,
   readFilter,
+  readFilterList,
   searchCondition,
   type ListPageResult,
 } from "@/lib/db/list-query";
@@ -45,6 +46,7 @@ import {
   type LeadStage,
 } from "@/lib/db/schema";
 import type { TableQuery, TableSort } from "@/lib/table-query";
+import { parseFilterValues } from "@/lib/table-query";
 import { LEAD_SOURCES, UNASSIGNED, type LeadSource } from "./constants";
 import { KANBAN_DEFAULT_LANE_SIZE } from "./kanban";
 
@@ -304,23 +306,32 @@ function leadScope(query: TableQuery, actor: Actor): LeadScope {
       ]),
     ];
 
-    const caseType = readFilter(query, "caseType", isCaseType);
-    if (caseType === "OTHER") {
-      // "Other" is a bucket, not just the literal code: it covers every stored
-      // case type that is not one of the ad campaigns, including a raw campaign
-      // value we did not recognise (e.g. `workers_comp`).
-      conditions.push(
-        and(
+    // Case type accepts more than one choice. "OTHER" is a bucket, not just the
+    // literal code: it covers every stored case type that is not one of the ad
+    // campaigns, including a raw campaign value we did not recognise.
+    const caseTypes = readFilterList(query, "caseType", isCaseType);
+    if (caseTypes.length) {
+      const parts: SQL[] = [];
+      const canonical = caseTypes.filter((value) => value !== "OTHER");
+      if (canonical.length) {
+        parts.push(inArray(leads.caseType, canonical));
+      }
+      if (caseTypes.includes("OTHER")) {
+        const other = and(
           isNotNull(leads.caseType),
           notInArray(leads.caseType, ["MVA", "MASS_TORT"]),
-        ),
-      );
-    } else if (caseType) {
-      conditions.push(eq(leads.caseType, caseType));
+        );
+        if (other) parts.push(other);
+      }
+      if (parts.length) {
+        conditions.push(parts.length === 1 ? parts[0] : or(...parts));
+      }
     }
 
-    const stage = readFilter(query, "stage", isLeadStage);
-    if (stage) conditions.push(eq(leads.stage, stage));
+    // Stage accepts more than one choice (the table view uses this; the board
+    // drops the filter entirely because it already groups by stage).
+    const stages = readFilterList(query, "stage", isLeadStage);
+    if (stages.length) conditions.push(inArray(leads.stage, stages));
 
     // Source is attribution data: filtering by it would leak which leads came
     // from where, so the condition is only applied for viewers allowed to see it.
@@ -329,14 +340,19 @@ function leadScope(query: TableQuery, actor: Actor): LeadScope {
       : null;
     if (source) conditions.push(eq(leads.source, source));
 
-    // The assignee filter carries either a user id or the "unassigned" sentinel.
-    const assignee = query.filters.assignedTo;
-    if (assignee === UNASSIGNED) {
-      conditions.push(isNull(leads.assignedToId));
-    } else if (assignee) {
-      const id = Number(assignee);
-      if (Number.isInteger(id) && id > 0) {
-        conditions.push(eq(leads.assignedToId, id));
+    // The assignee filter accepts several ids plus the "unassigned" sentinel.
+    const assigneeValues = parseFilterValues(query.filters.assignedTo);
+    if (assigneeValues.length) {
+      const parts: SQL[] = [];
+      if (assigneeValues.includes(UNASSIGNED)) {
+        parts.push(isNull(leads.assignedToId));
+      }
+      const ids = assigneeValues
+        .map(Number)
+        .filter((id) => Number.isInteger(id) && id > 0);
+      if (ids.length) parts.push(inArray(leads.assignedToId, ids));
+      if (parts.length) {
+        conditions.push(parts.length === 1 ? parts[0] : or(...parts));
       }
     }
 
