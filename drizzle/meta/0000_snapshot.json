@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "27c72a9c-07dd-4ec6-a8f1-b98bdd896010",
+  "id": "96e34e72-469e-4a68-82ef-d5121161e2b9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activities": {
@@ -95,7 +95,7 @@
       "checkConstraints": {
         "activities_type_check": {
           "name": "activities_type_check",
-          "value": "\"activities\".\"type\" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'lead:deleted', 'user:added', 'user:deleted')"
+          "value": "\"activities\".\"type\" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'lead:marked-not-duplicate', 'lead:deleted', 'user:added', 'user:deleted')"
         }
       }
     },
@@ -432,6 +432,21 @@
           "notNull": true,
           "autoincrement": false
         },
+        "avatar_path": {
+          "name": "avatar_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "preferences": {
+          "name": "preferences",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -456,6 +471,10 @@
         "users_role_check": {
           "name": "users_role_check",
           "value": "\"users\".\"role\" in ('ADMIN', 'USER')"
+        },
+        "users_preferences_json_check": {
+          "name": "users_preferences_json_check",
+          "value": "json_valid(\"users\".\"preferences\")"
         }
       }
     },
@@ -618,6 +637,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "is_at_fault": {
           "name": "is_at_fault",
           "type": "integer",
@@ -681,6 +707,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "dup_match_string": {
+          "name": "dup_match_string",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dup_group_id": {
+          "name": "dup_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "brightwater_lead_id": {
           "name": "brightwater_lead_id",
           "type": "text",
@@ -730,6 +770,13 @@
           "name": "leads_filler_email_idx",
           "columns": [
             "filler_email"
+          ],
+          "isUnique": false
+        },
+        "leads_dup_group_id_idx": {
+          "name": "leads_dup_group_id_idx",
+          "columns": [
+            "dup_group_id"
           ],
           "isUnique": false
         }

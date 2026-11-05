@@ -448,9 +448,11 @@ their Lawmatics CRM.
   `<input type="date">`: the trigger reads like an input, month/year are dropdowns, and
   day cells are sized for touch in `components/ui/calendar.tsx`. Every calendar in the
   app goes through that pair.
-- The schema has moved past the initial migration: use incremental Drizzle migrations
-  (`npm run db:generate`) so an existing `data/apex.db` upgrades in place. Do not delete
-  or regenerate `drizzle/`; the live database tracks the applied migration journal.
+- **While the app is still in development, keep exactly one migration.** Do not stack
+  incremental migrations: delete `drizzle/` and run `npm run db:generate` to regenerate
+  the single `drizzle/0000_*.sql` from the current schema. Existing local databases must
+  then be reset (`npm run db:reset`) or re-stamped, since their migration journal no
+  longer matches.
 - Keep modules small, commented, and consistent with the existing structure.
 - Rendering `Button` as a link or any non-`<button>` needs `nativeButton={false}` (see
   `components/ui/pagination.tsx`); without it Base UI logs an accessibility warning and

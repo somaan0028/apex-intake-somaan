@@ -7,7 +7,7 @@ CREATE TABLE `activities` (
 	`lead_id` integer,
 	`user_id` integer,
 	`created_at` integer NOT NULL,
-	CONSTRAINT "activities_type_check" CHECK("activities"."type" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'lead:deleted', 'user:added', 'user:deleted'))
+	CONSTRAINT "activities_type_check" CHECK("activities"."type" in ('lead:stage_update', 'lead:claimed', 'lead:released', 'lead:assigned', 'lead:unassigned', 'lead:send_to_firm', 'lead:marked-not-duplicate', 'lead:deleted', 'user:added', 'user:deleted'))
 );
 --> statement-breakpoint
 CREATE INDEX `activities_doer_created_idx` ON `activities` (`doer_id`,`created_at`);--> statement-breakpoint
@@ -62,8 +62,11 @@ CREATE TABLE `users` (
 	`email` text NOT NULL,
 	`role` text DEFAULT 'USER' NOT NULL,
 	`password_hash` text NOT NULL,
+	`avatar_path` text,
+	`preferences` text DEFAULT '{}' NOT NULL,
 	`created_at` integer NOT NULL,
-	CONSTRAINT "users_role_check" CHECK("users"."role" in ('ADMIN', 'USER'))
+	CONSTRAINT "users_role_check" CHECK("users"."role" in ('ADMIN', 'USER')),
+	CONSTRAINT "users_preferences_json_check" CHECK(json_valid("users"."preferences"))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint
@@ -90,6 +93,7 @@ CREATE TABLE `leads` (
 	`postcode` text,
 	`injury_details` text,
 	`accident_details` text,
+	`notes` text,
 	`is_at_fault` integer,
 	`has_attorney` integer,
 	`has_received_settlement` integer,
@@ -99,6 +103,8 @@ CREATE TABLE `leads` (
 	`ipaddress` text,
 	`trustedform` text,
 	`journaya` text,
+	`dup_match_string` text,
+	`dup_group_id` text,
 	`brightwater_lead_id` text,
 	`sent_to_firm_at` integer,
 	FOREIGN KEY (`assigned_to_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
@@ -110,6 +116,7 @@ CREATE INDEX `leads_stage_idx` ON `leads` (`stage`);--> statement-breakpoint
 CREATE INDEX `leads_assigned_to_idx` ON `leads` (`assigned_to_id`);--> statement-breakpoint
 CREATE INDEX `leads_case_type_idx` ON `leads` (`case_type`);--> statement-breakpoint
 CREATE INDEX `leads_filler_email_idx` ON `leads` (`filler_email`);--> statement-breakpoint
+CREATE INDEX `leads_dup_group_id_idx` ON `leads` (`dup_group_id`);--> statement-breakpoint
 CREATE TABLE `sessions` (
 	`token_hash` text PRIMARY KEY NOT NULL,
 	`user_id` integer NOT NULL,

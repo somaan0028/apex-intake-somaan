@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1793815043606,
-      "tag": "0000_concerned_gladiator",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1793846986474,
-      "tag": "0001_cute_kingpin",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1793850230577,
-      "tag": "0002_hot_maverick",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1793852615232,
-      "tag": "0003_lying_sway",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1793857179836,
-      "tag": "0004_remarkable_solo",
+      "when": 1793857423621,
+      "tag": "0000_wild_warbound",
       "breakpoints": true
     }
   ]
