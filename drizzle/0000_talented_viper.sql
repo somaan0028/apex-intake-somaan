@@ -62,6 +62,7 @@ CREATE TABLE `users` (
 	`email` text NOT NULL,
 	`role` text DEFAULT 'USER' NOT NULL,
 	`password_hash` text NOT NULL,
+	`avatar_path` text,
 	`created_at` integer NOT NULL,
 	CONSTRAINT "users_role_check" CHECK("users"."role" in ('ADMIN', 'USER'))
 );

@@ -18,5 +18,8 @@ export interface LeadHistoryRow {
   description: string;
   /** The doer's current name, or "Deleted user". */
   doerName: string;
+  doerId: number;
+  /** The doer's stored photo, or `null` for initials. */
+  doerAvatarPath: string | null;
   createdAt: Date;
 }

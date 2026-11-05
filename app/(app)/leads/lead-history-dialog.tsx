@@ -23,6 +23,7 @@ import {
 } from "@/lib/activities/actions";
 import type { LeadHistoryRow, LeadHistoryType } from "@/lib/activities/history";
 import { formatDateTime } from "@/lib/format";
+import { UserAvatar } from "@/components/user-avatar";
 
 export function LeadHistoryDialog({
   leadId,
@@ -111,11 +112,21 @@ export function LeadHistoryDialog({
             <ul className="max-h-[50vh] divide-y overflow-y-auto">
               {rows.map((row) => (
                 <li key={row.id} className="py-2 text-sm leading-relaxed">
-                  <span className="font-medium">{row.doerName}</span>:{" "}
-                  {row.description}{" "}
-                  <span className="whitespace-nowrap text-muted-foreground">
-                    Date: {formatDateTime(row.createdAt)}
-                  </span>
+                  <div className="flex items-start gap-2.5">
+                    <UserAvatar
+                      size="sm"
+                      userId={row.doerId}
+                      name={row.doerName}
+                      avatarPath={row.doerAvatarPath}
+                    />
+                    <p className="min-w-0">
+                      <span className="font-medium">{row.doerName}</span>:{" "}
+                      {row.description}{" "}
+                      <span className="whitespace-nowrap text-muted-foreground">
+                        Date: {formatDateTime(row.createdAt)}
+                      </span>
+                    </p>
+                  </div>
                 </li>
               ))}
             </ul>

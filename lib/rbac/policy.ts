@@ -145,6 +145,20 @@ export function canManageUsers(actor: Actor): boolean {
 }
 
 /**
+ * May `actor` set `targetUserId`'s profile photo?
+ *
+ * A photo is personal, so everyone may change their own. Admins can change
+ * anyone's through the Users dialog, which is the same `users.manage` grant
+ * that already lets them edit another person's details.
+ */
+export function canChangeUserAvatar(
+  actor: Actor,
+  targetUserId: number,
+): boolean {
+  return targetUserId === actor.id || can(actor.role, "users.manage");
+}
+
+/**
  * The user facts the user-management policies read. A `UserRow` satisfies this.
  *
  * `adminCount` is passed in rather than read here so these stay pure: the caller

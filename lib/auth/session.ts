@@ -20,6 +20,8 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  /** Stored filename of the profile photo, or `null` for initials. */
+  avatarPath: string | null;
 }
 
 /** Session lifetime (7 days). */
@@ -38,7 +40,7 @@ function hashToken(token: string): string {
  * can be forced with `AUTH_COOKIE_SECURE` (e.g. `false` when testing a
  * production build over plain HTTP).
  */
-function useSecureCookies(): boolean {
+function secureCookiesEnabled(): boolean {
   return process.env.AUTH_COOKIE_SECURE
     ? process.env.AUTH_COOKIE_SECURE === "true"
     : process.env.NODE_ENV === "production";
@@ -62,6 +64,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       name: users.name,
       email: users.email,
       role: users.role,
+      avatarPath: users.avatarPath,
       expiresAt: sessions.expiresAt,
     })
     .from(sessions)
@@ -77,7 +80,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     return null;
   }
 
-  return { id: row.id, name: row.name, email: row.email, role: row.role };
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    avatarPath: row.avatarPath,
+  };
 }
 
 /**
@@ -113,7 +122,7 @@ export async function createSession(userId: number): Promise<void> {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: useSecureCookies(),
+    secure: secureCookiesEnabled(),
     maxAge: MAX_AGE_SECONDS,
   });
 }

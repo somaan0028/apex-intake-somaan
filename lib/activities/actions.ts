@@ -74,7 +74,9 @@ export async function getLeadActivities(
     .select({
       id: activities.id,
       description: activities.description,
+      doerId: activities.doerId,
       doerName: users.name,
+      doerAvatarPath: users.avatarPath,
       createdAt: activities.createdAt,
     })
     .from(activities)
@@ -85,7 +87,9 @@ export async function getLeadActivities(
     .map((row) => ({
       id: row.id,
       description: row.description,
+      doerId: row.doerId,
       doerName: row.doerName ?? "Deleted user",
+      doerAvatarPath: row.doerAvatarPath,
       createdAt: row.createdAt,
     }));
 }

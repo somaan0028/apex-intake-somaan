@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   experimental: {
     agentFeedback: true,
+    // Profile photos are uploaded through a Server Action. The default request
+    // cap is 1 MB, which is below the 5 MB image limit, so leave headroom for
+    // the multipart envelope.
+    serverActions: {
+      bodySizeLimit: "6mb",
+    },
     // The authenticated shell is session-gated, so it can never produce an
     // instant shell; automatic validation would flag it on every dev page load
     // (the route redirects to /login mid-validation). Validate only segments

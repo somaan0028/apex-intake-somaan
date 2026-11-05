@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UserAvatarUploader } from "@/components/user-avatar-uploader";
 import {
   Select,
   SelectContent,
@@ -167,6 +168,16 @@ function UserForm({
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="grid gap-4">
+        {user ? (
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <UserAvatarUploader
+              userId={user.id}
+              name={user.name}
+              avatarPath={user.avatarPath}
+            />
+          </div>
+        ) : null}
+
         <div className="grid gap-2">
           <Label htmlFor="user-name">Name</Label>
           <Input

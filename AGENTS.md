@@ -130,6 +130,16 @@ their Lawmatics CRM.
   payload, and the CSV seeder throws on any non-empty value it cannot canonicalise.
   An invalid email can therefore not reach `leads` or `users`.
 - Passwords are a single `scrypt$params$salt$hash` string (per-user salt).
+- Profile photos live in a private folder beside the database (`data/avatars/`), never
+  in `public/`: `users.avatar_path` stores only the generated filename, and
+  `GET /api/users/[id]/avatar` streams the WebP after validating the session. The route
+  is therefore available to every signed-in user, but not to the public. Uploads go
+  through a Server Action (`lib/users/avatar-actions.ts`) that accepts PNG, JPEG or WebP
+  up to 5 MB, rotates by EXIF, crops to a 256×256 square and re-encodes as WebP with
+  `sharp` — which also strips metadata. Each upload gets a fresh filename (used as the
+  URL's cache-busting `v`) and deletes the previous file. A person may change their own
+  photo; an admin may change anyone's (`users.manage`). Every surface that used to show
+  initials uses `components/user-avatar.tsx`, falling back to them when no photo exists.
 - `api_tokens` (one row per personal access token for external agents) stores only the
   SHA-256 hash of the token plus a display `prefix`, its owner and `last_used_at`; the raw
   token is shown once and never persisted.
@@ -193,14 +203,14 @@ their Lawmatics CRM.
   a SHA-256 hash; the route resolves the `Authorization: Bearer` value to a **fresh
   `users` row on every request**, so an agent's abilities are always its owner's current
   ones and a role change or revoked token applies on the very next call. Tokens are
-  minted at `/settings` or with `npm run mcp:token -- <email> [label]`, and the raw value
+  minted at `/settings/ai` or with `npm run mcp:token -- <email> [label]`, and the raw value
   is shown once. Nothing OAuth-shaped is advertised, because this server issues its own
   tokens rather than running an authorization server — pointing a client at discovery
   would be a dead end.
 - The copied endpoint comes from `lib/mcp/endpoint.ts`, which follows the request host
   (`x-forwarded-host` first) and `x-forwarded-proto`. When no proxy says otherwise,
   loopback and private/link-local addresses use HTTP and public hostnames use HTTPS.
-- The Settings card's **Copy Instructions for AI** button copies a ready-to-use prompt
+- The AI Settings card's **Copy Instructions for AI** button copies a ready-to-use prompt
   with the endpoint, the bearer header, and the JSON config. A token created in the same
   visit is included once; otherwise the prompt carries a placeholder.
 - A token carries **no permissions of its own**. Every call runs through the same services
@@ -319,9 +329,15 @@ their Lawmatics CRM.
   caller may not set instead of trusting the form — a hidden input is not a permission.
   A password change requires the current password for everyone, admins included, and the
   last-admin invariant still blocks a self-demotion.
-- **Settings sits above the account menu**, beside Activity at the bottom of the sidebar;
+- The sidebar (`components/app-sidebar.tsx`) keeps Overview, Leads, and Campaign Analytics
+  flat, then folds **Staff** (Users, Activity) and **Settings** (AI Settings, Preferences)
+  into collapsible groups. Both groups start open; clicking a group header while the sidebar
+  is in its icon rail reopens the sidebar instead of toggling a hidden panel.
+  **AI Settings** (`app/(app)/settings/ai/`) holds the MCP token card, and the old
+  `/settings` URL redirects there. **Preferences**
+  (`app/(app)/settings/preferences/`) is a placeholder for now.
   **Profile and Log out live in the account menu**, opened by the bordered profile button
-  at the bottom of the sidebar (`components/app-sidebar.tsx`). The trigger *is* the profile
+  at the bottom of the sidebar. The trigger *is* the profile
   row, so clicking your own name opens the menu rather than navigating on its own; the
   menu opens upward (`side="top"`) and carries the full email, which no longer fits under
   the name in the sidebar (that line shows the role instead).

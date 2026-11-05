@@ -22,9 +22,9 @@ import type {
   ActivityPerformerOption,
   ActivityRow,
 } from "@/lib/activities/queries";
-import { formatDate, formatDateTime, initials } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { TableQuery } from "@/lib/table-query";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -73,9 +73,12 @@ const columns = columnHelper.columns([
     enableSorting: false,
     cell: (info) => (
       <div className="flex items-center gap-2.5">
-        <Avatar size="sm">
-          <AvatarFallback>{initials(info.getValue())}</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          size="sm"
+          userId={info.row.original.doerId}
+          name={info.getValue()}
+          avatarPath={info.row.original.doerAvatarPath}
+        />
         <span className="font-medium">{info.getValue()}</span>
       </div>
     ),

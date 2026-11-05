@@ -150,6 +150,7 @@ export function resolveApiToken(raw: string): ResolvedApiToken | null {
       name: users.name,
       email: users.email,
       role: users.role,
+      avatarPath: users.avatarPath,
     })
     .from(apiTokens)
     .innerJoin(users, eq(apiTokens.userId, users.id))
@@ -172,6 +173,12 @@ export function resolveApiToken(raw: string): ResolvedApiToken | null {
 
   return {
     tokenId: row.tokenId,
-    user: { id: row.id, name: row.name, email: row.email, role: row.role },
+    user: {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      avatarPath: row.avatarPath,
+    },
   };
 }

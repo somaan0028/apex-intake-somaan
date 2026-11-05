@@ -76,6 +76,7 @@ function loadUser(userId: number): AuthUser | null {
         name: users.name,
         email: users.email,
         role: users.role,
+        avatarPath: users.avatarPath,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -92,7 +93,9 @@ function loadUser(userId: number): AuthUser | null {
  * the fields each tool already carries.
  */
 function registerTools(server: McpServer, actor: Actor): void {
-  for (const tool of buildAiTools(actor) as unknown as readonly AnyServerTool[]) {
+  for (const tool of buildAiTools(
+    actor,
+  ) as unknown as readonly AnyServerTool[]) {
     const execute = tool.execute;
     if (!execute) continue;
 
@@ -174,7 +177,12 @@ export function readBearerToken(header: string | null): string | null {
 export function unauthorizedResponse(error?: "invalid_token"): Response {
   const challenge = [
     'Bearer realm="apex-intake-desk"',
-    ...(error ? [`error="${error}"`, 'error_description="That access token is not valid."'] : []),
+    ...(error
+      ? [
+          `error="${error}"`,
+          'error_description="That access token is not valid."',
+        ]
+      : []),
   ].join(", ");
 
   return new Response(

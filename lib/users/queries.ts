@@ -25,6 +25,8 @@ export type UserRow = {
   name: string;
   email: string;
   role: UserRole;
+  /** Stored filename of the profile photo, or `null` for initials. */
+  avatarPath: string | null;
   createdAt: Date;
   /** How many leads this user currently owns. */
   assignedLeadCount: number;
@@ -74,6 +76,7 @@ export function listUsers(query: TableQuery): ListPageResult<UserRow> {
       name: users.name,
       email: users.email,
       role: users.role,
+      avatarPath: users.avatarPath,
       createdAt: users.createdAt,
     })
     .from(users)

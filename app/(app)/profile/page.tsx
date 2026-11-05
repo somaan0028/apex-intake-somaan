@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { UserAvatarUploader } from "@/components/user-avatar-uploader";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { formatDate, initials } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { USER_ROLE_LABELS } from "@/lib/labels";
-import { countAdmins, countAssignedLeads } from "@/lib/users/queries";
+import { countAdmins } from "@/lib/users/queries";
 import { ProfileForms } from "./profile-forms";
 
 export const metadata: Metadata = {
@@ -34,8 +34,6 @@ export default async function ProfilePage() {
     .get();
   if (!row) redirect("/login");
 
-  const assigned = countAssignedLeads(row.id);
-
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -46,23 +44,24 @@ export default async function ProfilePage() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-4">
-          <Avatar className="size-14">
-            <AvatarFallback className="text-base">
-              {initials(row.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 space-y-1">
+        <CardContent className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
+          <UserAvatarUploader
+            userId={row.id}
+            name={row.name}
+            avatarPath={row.avatarPath}
+            avatarClassName="size-24"
+            fallbackClassName="text-2xl"
+            variant="avatar"
+          />
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-lg font-medium">{row.name}</p>
+              <h2 className="truncate text-xl font-semibold tracking-tight">
+                {row.name}
+              </h2>
               <Badge variant="secondary">{USER_ROLE_LABELS[row.role]}</Badge>
             </div>
-            <p className="truncate text-sm text-muted-foreground">
-              {row.email}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Joined {formatDate(row.createdAt)} · {assigned} lead
-              {assigned === 1 ? "" : "s"} assigned to you
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Member since {formatDate(row.createdAt)}
             </p>
           </div>
         </CardContent>

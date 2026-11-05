@@ -30,6 +30,12 @@ export const users = sqliteTable(
     /** `'ADMIN'` or `'USER'`; constrained by a CHECK below. */
     role: text("role").$type<UserRole>().notNull().default("USER"),
     passwordHash: text("password_hash").notNull(),
+    /**
+     * Filename of the user's uploaded profile photo inside the private avatar
+     * directory (see `lib/users/avatar-storage.ts`). Never a URL: the file is
+     * served through an authenticated route, not from `public/`.
+     */
+    avatarPath: text("avatar_path"),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [

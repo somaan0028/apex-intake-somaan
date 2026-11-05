@@ -26,6 +26,8 @@ export interface ActivityRow {
   doerId: number;
   /** "Deleted user" when the actor's row no longer exists. */
   doerName: string;
+  /** The doer's stored photo, or `null` for initials / a deleted user. */
+  doerAvatarPath: string | null;
   leadId: number | null;
   /** `null` for user-only events; "Deleted lead" when the lead is gone. */
   affectedLeadName: string | null;
@@ -155,6 +157,7 @@ export function listActivities(
       createdAt: activities.createdAt,
       doerId: activities.doerId,
       doerName: users.name,
+      doerAvatarPath: users.avatarPath,
       leadId: activities.leadId,
       leadExists: leads.id,
       leadFirstName: leads.injuredFirstName,
@@ -179,6 +182,7 @@ export function listActivities(
       createdAt: row.createdAt,
       doerId: row.doerId,
       doerName: row.doerName ?? "Deleted user",
+      doerAvatarPath: row.doerAvatarPath,
       leadId: row.leadId,
       affectedLeadName:
         row.leadId === null
