@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ApexMark } from "@/components/apex-mark";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LoginForm } from "./login-form";
 
@@ -30,6 +31,12 @@ export default async function LoginPage() {
     <main className="flex flex-1 items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
+              <ApexMark className="size-6" />
+            </span>
+            <span className="text-sm font-medium">Apex Intake Desk</span>
+          </div>
           <CardTitle>Log in</CardTitle>
           <CardDescription>
             Sign in with your Apex email and password.

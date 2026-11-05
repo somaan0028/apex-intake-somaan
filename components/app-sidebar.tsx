@@ -19,6 +19,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { ApexMark } from "@/components/apex-mark";
 import { logout } from "@/lib/auth/actions";
 import type { AuthUser } from "@/lib/auth/session";
 import { USER_ROLE_LABELS } from "@/lib/labels";
@@ -165,8 +166,8 @@ export function AppSidebar({ user }: { user: AuthUser }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
-              <div className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                <LayoutDashboard className="size-4" />
+              <div className="flex size-8 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
+                <ApexMark className="size-6" />
               </div>
               <div className="grid flex-1 text-left leading-tight">
                 <span className="truncate font-medium">Apex Intake Desk</span>

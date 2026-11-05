@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Clock, Lock, ShieldCheck } from "lucide-react";
+import { Clock, Lock } from "lucide-react";
+import { ApexMark } from "@/components/apex-mark";
 import { IntakeForm } from "@/components/intake/intake-form";
 
 export const metadata: Metadata = {
@@ -15,8 +16,8 @@ export default function HomePage() {
           behind it) belongs on this page. */}
       <header className="mx-auto flex w-full max-w-2xl items-center px-5 py-4 sm:px-8">
         <span className="flex items-center gap-2 font-semibold">
-          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <ShieldCheck className="size-4" />
+          <span className="flex size-7 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
+            <ApexMark className="size-5" />
           </span>
           Apex Intake
         </span>
