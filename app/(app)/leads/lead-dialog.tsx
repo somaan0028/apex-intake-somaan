@@ -423,7 +423,7 @@ function LeadForm({
     ...(lead.caseType && !isKnownCaseType
       ? [
           {
-            label: `${caseTypeLabel(lead.caseType)} (imported)`,
+            label: `${caseTypeLabel(lead.caseType)} (campaign)`,
             value: lead.caseType,
           },
         ]
