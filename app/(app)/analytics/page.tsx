@@ -147,7 +147,7 @@ function CampaignMix({
         })}
       </div>
 
-      <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+      <ul className="grid grid-cols-1">
         {rows.map((row, index) => {
           const href = linkFor?.(row.key) ?? null;
           const content = (
