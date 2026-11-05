@@ -106,19 +106,19 @@ function leadSummary(lead: LeadRow) {
     email: lead.injuredEmail,
     assignedTo: lead.assignedToName ?? "Unassigned",
     createdOn: isoDate(lead.createdAt),
-    potentialDuplicate: lead.dupGroupId !== null,
-    duplicateGroupSize: lead.dupGroupCount,
+    mayBeSamePersonAsAnotherLead: lead.dupGroupId !== null,
+    otherSimilarLeads: Math.max(lead.dupGroupCount - 1, 0),
     bookmarked: lead.bookmarked,
   };
 }
 
-/** How big this lead's duplicate cluster is, and how much of it is visible. */
+/** How many other similar leads this one has, and how many the viewer can open. */
 function duplicateInfo(actor: Actor, lead: Lead) {
   if (lead.dupGroupId === null) {
     return {
-      potentialDuplicate: false,
-      groupSize: 0,
-      visibleMembers: 0,
+      mayBeSamePersonAsAnotherLead: false,
+      otherSimilarLeads: 0,
+      otherSimilarLeadsYouCanSee: 0,
     };
   }
 
@@ -139,7 +139,11 @@ function duplicateInfo(actor: Actor, lead: Lead) {
       )
       .get()?.value ?? 0;
 
-  return { potentialDuplicate: true, groupSize, visibleMembers };
+  return {
+    mayBeSamePersonAsAnotherLead: true,
+    otherSimilarLeads: Math.max(groupSize - 1, 0),
+    otherSimilarLeadsYouCanSee: Math.max(visibleMembers - 1, 0),
+  };
 }
 
 /** Whether the actor has bookmarked this lead. */
@@ -200,7 +204,7 @@ function leadDetail(actor: Actor, lead: Lead) {
     },
     notes: lead.notes,
     bookmarked: isBookmarked(actor, lead.id),
-    potentialDuplicate: duplicateInfo(actor, lead),
+    mayBeSamePersonAsAnotherLead: duplicateInfo(actor, lead),
     firmSubmission: {
       sentToFirmAt: lead.sentToFirmAt?.toISOString() ?? null,
       brightwaterLeadId: lead.brightwaterLeadId,
@@ -265,7 +269,7 @@ export function buildAiTools(actor: Actor) {
   const searchLeads = toolDefinition({
     name: "search_leads",
     description:
-      "Search the leads the signed-in user can see. Use this to find a lead by the injured person's name, email or phone, or to list leads by stage, case type, assignee, duplicate status, bookmark or arrival window. Each result carries an internal leadId that lets you call other tools — never show it to the user.",
+      "Search the leads the signed-in user can see. Use this to find a lead by the injured person's name, email or phone, or to list leads by stage, case type, owner, possible similarity to another lead, bookmark or arrival window. Each result carries an internal leadId that lets you call other tools — never show it to the user.",
     inputSchema: z.object({
       search: z
         .string()
@@ -300,7 +304,9 @@ export function buildAiTools(actor: Actor) {
       potentialDuplicate: z
         .enum(["yes", "no"])
         .optional()
-        .describe("'yes' only grouped leads, 'no' only leads with no grouping."),
+        .describe(
+          "'yes' only leads that may be the same person as another lead, 'no' only leads with no such warning.",
+        ),
       bookmarked: z
         .enum(["yes", "no"])
         .optional()
@@ -407,7 +413,7 @@ export function buildAiTools(actor: Actor) {
   const getLead = toolDefinition({
     name: "get_lead",
     description:
-      "Fetch one lead's full detail by lead id, including internal notes, duplicate status, bookmark state and whether a human can send it to the firm. The leadId is an internal handle — never show it to the user.",
+      "Fetch one lead's full detail by lead id, including internal notes, whether it may be the same person as another lead, bookmark state and whether a human can send it to the firm. The leadId is an internal handle — never show it to the user.",
     inputSchema: z.object({
       leadId: z.number().int().positive().describe("The lead's internal id."),
     }),
@@ -418,7 +424,7 @@ export function buildAiTools(actor: Actor) {
   const listSimilarLeads = toolDefinition({
     name: "list_similar_leads",
     description:
-      "List the leads in one lead's potential-duplicate group. Only the members the user may open are returned; hiddenMembers counts the rest. Use it before recommending whether a grouping should be dismissed.",
+      "List the other leads that may be the same person as this lead. Only the ones the user may open are returned; the rest are assigned elsewhere and stay hidden. Use it before recommending whether a warning should be cleared.",
     inputSchema: z.object({
       leadId: z.number().int().positive().describe("The lead's internal id."),
     }),
@@ -426,7 +432,13 @@ export function buildAiTools(actor: Actor) {
     guarded(() => {
       const lead = resolveVisibleLead(actor, input.leadId);
       if (lead.dupGroupId === null) {
-        return { grouped: false, groupSize: 0, hiddenMembers: 0, leads: [] };
+        return {
+          mayBeSamePersonAsAnotherLead: false,
+          otherSimilarLeads: 0,
+          otherSimilarLeadsYouCanSee: 0,
+          otherSimilarLeadsYouCannotSee: 0,
+          leads: [],
+        };
       }
 
       const groupId = lead.dupGroupId;
@@ -448,11 +460,15 @@ export function buildAiTools(actor: Actor) {
         actor,
       );
 
+      const otherSimilarLeads = Math.max(groupSize - 1, 0);
+      const otherSimilarLeadsYouCanSee = Math.max(page.total - 1, 0);
+
       return {
-        grouped: true,
-        groupSize,
-        visibleMembers: page.total,
-        hiddenMembers: Math.max(groupSize - page.total, 0),
+        mayBeSamePersonAsAnotherLead: true,
+        otherSimilarLeads,
+        otherSimilarLeadsYouCanSee,
+        otherSimilarLeadsYouCannotSee:
+          otherSimilarLeads - otherSimilarLeadsYouCanSee,
         leads: page.rows.map(leadSummary),
       };
     }),
@@ -461,7 +477,7 @@ export function buildAiTools(actor: Actor) {
   const checkLeadForDuplicates = toolDefinition({
     name: "check_lead_for_duplicates",
     description:
-      "Re-run the duplicate matcher for one lead and return the fresh grouping. This can re-link a lead that was previously dismissed. Any viewer who can see the lead may run it.",
+      "Re-check whether one lead looks like any other lead and refresh that warning. This can bring back a warning that was previously cleared. Any viewer who can see the lead may run it.",
     inputSchema: z.object({
       leadId: z.number().int().positive(),
     }),
@@ -469,11 +485,14 @@ export function buildAiTools(actor: Actor) {
     guarded(() => {
       const result = checkLeadForDuplicatesForActor(actor, input.leadId);
       if (!result.ok)
-        return { error: result.error ?? "The duplicate check failed." };
+        return { error: result.error ?? "The check could not be completed." };
       return {
-        grouped: Boolean(result.dupGroupId),
-        groupSize: result.dupGroupCount ?? 0,
-        visibleMembers: result.dupGroupVisibleCount ?? 0,
+        mayBeSamePersonAsAnotherLead: Boolean(result.dupGroupId),
+        otherSimilarLeads: Math.max((result.dupGroupCount ?? 0) - 1, 0),
+        otherSimilarLeadsYouCanSee: Math.max(
+          (result.dupGroupVisibleCount ?? 0) - 1,
+          0,
+        ),
       };
     }),
   );
@@ -481,7 +500,7 @@ export function buildAiTools(actor: Actor) {
   const markLeadNotDuplicate = toolDefinition({
     name: "mark_lead_not_duplicate",
     description:
-      "Dismiss a lead's potential-duplicate grouping. Allowed for either role, but refused when the group contains a lead the user cannot see — in that case explain that an administrator must review it. Confirm with the user before calling it.",
+      "Clear a lead's 'possibly the same person' warning. Allowed for either role, but refused when a similar lead is assigned to someone else and therefore hidden from the user — in that case an administrator must review it. Confirm with the user before calling it.",
     inputSchema: z.object({
       leadId: z.number().int().positive(),
     }),
@@ -492,9 +511,13 @@ export function buildAiTools(actor: Actor) {
       });
       if (!result.ok)
         return {
-          error: result.error ?? "The duplicate status could not be updated.",
+          error: result.error ?? "The warning could not be cleared.",
         };
-      return { ok: true, leadId: input.leadId, grouped: false };
+      return {
+        ok: true,
+        leadId: input.leadId,
+        mayBeSamePersonAsAnotherLead: false,
+      };
     }),
   );
 
@@ -587,7 +610,7 @@ export function buildAiTools(actor: Actor) {
   const updateLeadDetails = toolDefinition({
     name: "update_lead_details",
     description:
-      "Change a lead's editable details (injured person, filler, case facts, location, case type, notes). Only send the fields that change. The same validation and permissions as the lead dialog apply; the first refusal is returned as the error. Never send a lead to the firm or delete it — those are human actions.",
+      "Change a lead's editable details (the injured person, the person who submitted the form, the case details, location, case type and notes). Only send the fields that change. The same validation and permissions as the lead dialog apply; the first refusal is returned as the error. Never send a lead to the firm or delete it — those are human actions.",
     inputSchema: z
       .object({
         leadId: z.number().int().positive(),
@@ -678,7 +701,7 @@ export function buildAiTools(actor: Actor) {
   const getDeskMetrics = toolDefinition({
     name: "get_desk_metrics",
     description:
-      "The Overview page's headline numbers for the signed-in user: active leads, the stage breakdown, unassigned, assigned to them, new this week, ready to send, potential duplicates and sent-to-firm. Scoped to the leads they can see.",
+      "The Overview page's headline numbers for the signed-in user: active leads, the stage breakdown, unassigned, assigned to them, new this week, ready to send, leads that may be the same person as another lead, and sent-to-firm. Scoped to the leads they can see.",
     inputSchema: z.object({}),
   }).server(async () => {
     const metrics = leadMetrics(actor);
@@ -694,7 +717,7 @@ export function buildAiTools(actor: Actor) {
       assignedToMe: metrics.assignedToMe,
       newThisWeek: metrics.newThisWeek,
       readyForBrightwater: metrics.readyToSend,
-      potentialDuplicates: metrics.potentialDuplicates,
+      possiblySamePersonAsAnotherLead: metrics.potentialDuplicates,
       sentToFirm: metrics.sentToFirm,
     };
   });

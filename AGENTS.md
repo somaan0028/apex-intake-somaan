@@ -248,6 +248,15 @@ their Lawmatics CRM.
   It takes only an `Actor`, and `lib/mcp/server.ts` exposes that same set to
   external agents unchanged — never add a second tool implementation. Every
   mutating tool passes `{ isAi: true }` so the activity log can mark it.
+- **The prompt talks to a non-technical intake colleague, not a developer**
+  (`lib/ai/prompt.ts`). It states the viewer's role and limits in plain words,
+  forbids implementation vocabulary (records, fields, ids, groups, matchers,
+  visibility, permissions, tool names), and requires a refusal to be restated as
+  something the person can do next. Possible duplicates are always described as
+  "may be the same person as another lead"; the tool outputs use the same
+  vocabulary (`mayBeSamePersonAsAnotherLead`, `otherSimilarLeads`) so the model
+  has no jargon to echo. A User can never look up the team, so the prompt forbids
+  offering to find or name an administrator.
 - **The server owns the transcript.** `lib/ai/store.ts` persists turns to `chats` /
   `chat_messages` (schema `lib/db/schema/chats.ts`), and the chat route rebuilds the
   model input from storage instead of trusting the browser's message list, so a

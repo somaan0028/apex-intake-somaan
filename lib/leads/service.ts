@@ -993,7 +993,7 @@ export function sendEligibilityForActor(
     return {
       canSend: false,
       reason:
-        "This lead is a potential duplicate. Either mark it as 'Not Duplicate', or remove the duplicate records, before sending it to the firm.",
+        "This lead may be the same person as another lead. Review that lead, or clear the warning, before sending it to the firm.",
     };
   }
 
