@@ -88,13 +88,14 @@ function AlertBar({
 }
 
 /** Stage-by-stage breakdown as one stacked bar, with a legend below it. */
-function Pipeline({
-  byStage,
-  total,
-}: {
-  byStage: Record<string, number>;
-  total: number;
-}) {
+function Pipeline({ byStage }: { byStage: Record<string, number> }) {
+  // Includes Disqualified: the pipeline shows where every lead ended up, which
+  // is why it does not reuse the Overview's active-lead total.
+  const total = LEAD_STAGES.reduce(
+    (sum, stage) => sum + (byStage[stage] ?? 0),
+    0,
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -381,15 +382,15 @@ export default async function OverviewPage() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Total leads"
+          label="Active leads"
           value={metrics.total}
-          hint="You have access to these"
+          hint="Excludes disqualified"
           href="/leads"
         />
         <StatCard
           label="Unassigned"
           value={metrics.unassigned}
-          hint="Waiting to be claimed"
+          hint="Active and waiting to be claimed"
           href="/leads?filter.assignedTo=unassigned"
         />
         <StatCard
@@ -412,7 +413,7 @@ export default async function OverviewPage() {
           <RecentActivity activities={activity} />
         </div>
         <div className="space-y-4 lg:order-1">
-          <Pipeline byStage={metrics.byStage} total={metrics.total} />
+          <Pipeline byStage={metrics.byStage} />
           <LatestIntake leads={latest} />
         </div>
       </div>

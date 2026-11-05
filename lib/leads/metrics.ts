@@ -19,6 +19,7 @@ import {
   gte,
   isNotNull,
   isNull,
+  ne,
   type SQL,
 } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -30,11 +31,11 @@ import { leadsVisibilityCondition } from "./queries";
 const RECENT_WINDOW_DAYS = 7;
 
 export interface LeadMetrics {
-  /** Every lead the viewer can see. */
+  /** Every visible lead that is still in play (i.e. not Disqualified). */
   total: number;
   /** Count per stage, in pipeline order (every stage present, zeroes included). */
   byStage: Record<LeadStage, number>;
-  /** No owner yet — the open pool anyone can claim. */
+  /** No owner yet and still in play — the open pool anyone can claim. */
   unassigned: number;
   /** Owned by the viewer. */
   assignedToMe: number;
@@ -87,9 +88,19 @@ export function leadMetrics(actor: Actor): LeadMetrics {
   const since = new Date(Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   return {
-    total: stageRows.reduce((sum, row) => sum + row.value, 0),
+    // Disqualified leads are closed, so they are excluded from the headline
+    // "active" total; the pipeline still shows them as a segment.
+    total: stageRows.reduce(
+      (sum, row) =>
+        row.stage === "DISQUALIFIED" ? sum : sum + row.value,
+      0,
+    ),
     byStage,
-    unassigned: countVisible(actor, isNull(leads.assignedToId)),
+    unassigned: countVisible(
+      actor,
+      isNull(leads.assignedToId),
+      ne(leads.stage, "DISQUALIFIED"),
+    ),
     assignedToMe: countVisible(actor, eq(leads.assignedToId, actor.id)),
     newThisWeek: countVisible(actor, gte(leads.createdAt, since)),
     readyToSend: countVisible(
