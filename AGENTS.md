@@ -77,9 +77,10 @@ their Lawmatics CRM.
   duplicated). Brightwater receives the injured person's details.
 - Brightwater's payload (`lib/brightwater/payload.ts`) sends the state's **full name**
   (`CO` → `Colorado`), the accident date split into `injury_year` (`YYYY`),
-  `injury_month` (`MM`) and `date_of_accident` (the two-digit day only), and no
-  `source` — the stored source is not the identifier Brightwater expects. Emails are
-  re-checked with `isValidEmail` at this boundary.
+  `injury_month` (`MM`) and `date_of_accident` (the two-digit day only), and a fixed
+  `source` of `www.apexleadsource.com` — the stored source is not the identifier
+  Brightwater expects, so it is never sent. Emails are re-checked with `isValidEmail`
+  at this boundary.
 - `case_type` is normally `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in
   `lib/labels.ts`), but an ad campaign we do not recognise is stored **verbatim** in this
   column, so read it through `caseTypeLabel()` rather than indexing `CASE_TYPE_LABELS`
