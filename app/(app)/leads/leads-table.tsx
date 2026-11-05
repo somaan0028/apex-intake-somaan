@@ -1009,7 +1009,7 @@ export function LeadsTable({
 
   const dateFilter = (
     <DateRangeFilter
-      label="Added"
+      label="Date Added"
       options={DATE_RANGE_ANY_OPTIONS}
       preset={addedPreset}
       from={query.filters.addedFrom ?? defaultAddedFrom()}

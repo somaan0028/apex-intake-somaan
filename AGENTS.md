@@ -478,7 +478,7 @@ their Lawmatics CRM.
   visible page in one grouped query. The underlined number links to the leads page filtered
   by `filter.assignedTo=<id>` with `filter.addedWithin=any`, so it matches the all-time
   count. `any` is a real leads date preset ("All Time"), not a hack; a bare `/leads`
-  has no date window (the Added filter starts cleared).
+  has no date window (the Date Added filter starts cleared).
 - The leads page **view is a persisted preference**, not a filter. An explicit
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
@@ -527,10 +527,10 @@ their Lawmatics CRM.
   only while the popover is open; the closed trigger always reads the parent's
   current value, so a URL changed elsewhere (Clear Filters, a stat-card link,
   back/forward) shows immediately instead of after the next click.
-  Every filter trigger (single select, multi-select and the Added range) shares
+  Every filter trigger (single select, multi-select and the Date Added range) shares
   the same transparent, `h-7` look; a control with a value gets a subtle primary
   tint (`border-primary/50 bg-primary/10`) so active filters are obvious.
-- The leads grid and board have **no date window by default**: the Added filter
+- The leads grid and board have **no date window by default**: the Date Added filter
   starts cleared ("All Time"). It offers `24h`, `3d`, `7d`, `30d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional
   `filter.addedTo`; `listLeads` turns those into `created_at` bounds. The custom
@@ -561,14 +561,14 @@ their Lawmatics CRM.
   mount effect has read it; without that, every stage would flash on refresh.
 - On desktop the leads filters live in a **Filters** popover on the toolbar
   (`DataTable`'s `filtersMenu` + `filtersMenuCount`), so there is no separate filter
-  row: it holds the Added range, every filter control and the Clear Filters
+  row: it holds the Date Added range, every filter control and the Clear Filters
   action. The button carries the active-filter count. Below `xl`, the toolbar
   collapses into one **Options** sheet instead: search stays inline, and view, sort,
   saved views, filters, columns, stages, and Clear all move into the sheet.
   `DataTable`'s `mobileControls` prop owns that switch, and the grid card scrolls
   horizontally so a wide table never widens the page. The **Filters**, **Options** and
   **Clear Filters** triggers all carry the same badge with the number of active
-  filters (each filter counts once, the Added range included; "All Time" and the sort
+  filters (each filter counts once, the Date Added range included; "All Time" and the sort
   do not count).
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
