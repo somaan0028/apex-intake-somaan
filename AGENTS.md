@@ -345,6 +345,8 @@ their Lawmatics CRM.
   **MVA**; the date filter falls back to 30 days when the URL carries no preset. The
   trend is a multi-series line chart with dots
   (`app/(app)/analytics/trend-chart.tsx`) showing Leads, Qualified+, Retained+ and Sent.
+  The legend labels toggle their line on and off; the axis rescales to the visible
+  series and the tooltip lists only those.
   The **Campaign mix** card still shows the campaign composition, but reuses the
   Overview pipeline's design: one stacked bar with a two-column dot legend directly
   below it. Campaign totals also appear in the Campaigns table below.

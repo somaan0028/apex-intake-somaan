@@ -11,7 +11,7 @@
  * It is deliberately dependency-free SVG so it inherits the active theme's
  * `--chart-*` and `--border` tokens (see `app/globals.css`).
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { TrendPoint } from "@/lib/leads/analytics";
 
 const SERIES = [
@@ -85,14 +85,34 @@ function axisScale(value: number): { max: number; step: number } {
 
 export function TrendChart({ points }: { points: TrendPoint[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
+  // Series the viewer has switched off. Kept as a set so the legend order stays
+  // stable and the chart can be narrowed to one or two lines at a time.
+  const [hidden, setHidden] = useState<ReadonlySet<SeriesKey>>(() => new Set());
 
-  const peak = useMemo(
-    () => points.reduce((max, point) => Math.max(max, point.total), 0),
-    [points],
+  const visibleSeries = SERIES.filter((series) => !hidden.has(series.key));
+
+  // The axis follows the visible lines only, so hiding "Leads" rescales the
+  // chart to the funnel series instead of leaving them squashed at the bottom.
+  const peak = points.reduce(
+    (max, point) =>
+      Math.max(
+        max,
+        ...visibleSeries.map((series) => point[series.key as SeriesKey]),
+      ),
+    0,
   );
   const { max, step } = axisScale(peak);
 
-  if (points.length === 0 || peak === 0) {
+  function toggleSeries(key: SeriesKey) {
+    setHidden((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  if (points.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         No leads in this window yet.
@@ -122,176 +142,200 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        {SERIES.map((series) => (
-          <span
-            key={series.key}
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-          >
-            <span
-              aria-hidden
-              className="size-2 rounded-full"
-              style={{ backgroundColor: series.color }}
-            />
-            {series.label}
-          </span>
-        ))}
-      </div>
-
-      <div className="overflow-x-auto">
-        <div className="relative min-w-[42rem]">
-          <svg
-            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-            role="img"
-            aria-label="Lead volume and funnel outcomes over time"
-            className="h-auto w-full"
-          >
-            {ticks.map((tick) => (
-              <g key={tick}>
-                <line
-                  x1={PADDING.left}
-                  x2={WIDTH - PADDING.right}
-                  y1={yFor(tick)}
-                  y2={yFor(tick)}
-                  stroke="var(--border)"
-                  strokeDasharray="3 4"
-                  strokeOpacity={0.7}
-                />
-                <text
-                  x={PADDING.left - 8}
-                  y={yFor(tick) + 3}
-                  textAnchor="end"
-                  fontSize={10}
-                  fill="var(--muted-foreground)"
-                >
-                  {tick}
-                </text>
-              </g>
-            ))}
-
-            {points.map((point, index) => {
-              const showLabel =
-                index % labelEvery === 0 || index === points.length - 1;
-              if (!showLabel) return null;
-              return (
-                <text
-                  key={point.key}
-                  x={xFor(index)}
-                  y={HEIGHT - 12}
-                  textAnchor={
-                    index === 0
-                      ? "start"
-                      : index === points.length - 1
-                        ? "end"
-                        : "middle"
-                  }
-                  fontSize={10}
-                  fill="var(--muted-foreground)"
-                >
-                  {point.label}
-                </text>
-              );
-            })}
-
-            {hovered !== null ? (
-              <line
-                x1={hoveredX}
-                x2={hoveredX}
-                y1={PADDING.top}
-                y2={PADDING.top + PLOT_HEIGHT}
-                stroke="var(--border)"
-                strokeWidth={1}
-              />
-            ) : null}
-
-            {SERIES.map((series) => {
-              const path = smoothPath(
-                points.map((point, index) => ({
-                  x: xFor(index),
-                  y: yFor(point[series.key as SeriesKey]),
-                })),
-              );
-
-              return (
-                <g key={series.key}>
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={series.color}
-                    strokeWidth={2}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                  />
-                  {points.map((point, index) => (
-                    <circle
-                      key={point.key}
-                      cx={xFor(index)}
-                      cy={yFor(point[series.key as SeriesKey])}
-                      r={hovered === index ? 4 : 2.5}
-                      fill={series.color}
-                      stroke="var(--background)"
-                      strokeWidth={1.5}
-                    />
-                  ))}
-                </g>
-              );
-            })}
-
-            {/* Wide invisible hit areas make the dots easy to hover. */}
-            {points.map((point, index) => {
-              const left =
-                index === 0
-                  ? PADDING.left
-                  : (xFor(index - 1) + xFor(index)) / 2;
-              const right =
-                index === points.length - 1
-                  ? WIDTH - PADDING.right
-                  : (xFor(index) + xFor(index + 1)) / 2;
-              return (
-                <rect
-                  key={point.key}
-                  x={left}
-                  y={PADDING.top}
-                  width={Math.max(0, right - left)}
-                  height={PLOT_HEIGHT}
-                  fill="transparent"
-                  pointerEvents="all"
-                  onMouseEnter={() => setHovered(index)}
-                  onMouseLeave={() => setHovered(null)}
-                />
-              );
-            })}
-          </svg>
-
-          {hoveredPoint ? (
-            <div
-              className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 rounded-md border bg-popover px-2.5 py-2 text-xs shadow-md"
-              style={{ left: `${tooltipLeft}%` }}
+        {SERIES.map((series) => {
+          const isHidden = hidden.has(series.key);
+          return (
+            <button
+              key={series.key}
+              type="button"
+              aria-pressed={!isHidden}
+              title={`${isHidden ? "Show" : "Hide"} ${series.label}`}
+              onClick={() => toggleSeries(series.key)}
+              className="inline-flex items-center gap-1.5 rounded-md text-xs transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <p className="mb-1 font-medium">{hoveredPoint.fullLabel}</p>
-              <dl className="space-y-0.5">
-                {SERIES.map((series) => (
-                  <div
-                    key={series.key}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <dt className="flex items-center gap-1.5 text-muted-foreground">
-                      <span
-                        aria-hidden
-                        className="size-1.5 rounded-full"
-                        style={{ backgroundColor: series.color }}
-                      />
-                      {series.label}
-                    </dt>
-                    <dd className="font-medium tabular-nums">
-                      {hoveredPoint[series.key as SeriesKey]}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ) : null}
-        </div>
+              <span
+                aria-hidden
+                className="size-2 rounded-full"
+                style={{
+                  backgroundColor: series.color,
+                  opacity: isHidden ? 0.35 : 1,
+                }}
+              />
+              <span
+                className={
+                  isHidden
+                    ? "text-muted-foreground/60 line-through"
+                    : "text-muted-foreground"
+                }
+              >
+                {series.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
+
+      {visibleSeries.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          All lines are hidden. Select a label above to show one.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="relative min-w-[42rem]">
+            <svg
+              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+              role="img"
+              aria-label="Lead volume and funnel outcomes over time"
+              className="h-auto w-full"
+            >
+              {ticks.map((tick) => (
+                <g key={tick}>
+                  <line
+                    x1={PADDING.left}
+                    x2={WIDTH - PADDING.right}
+                    y1={yFor(tick)}
+                    y2={yFor(tick)}
+                    stroke="var(--border)"
+                    strokeDasharray="3 4"
+                    strokeOpacity={0.7}
+                  />
+                  <text
+                    x={PADDING.left - 8}
+                    y={yFor(tick) + 3}
+                    textAnchor="end"
+                    fontSize={10}
+                    fill="var(--muted-foreground)"
+                  >
+                    {tick}
+                  </text>
+                </g>
+              ))}
+
+              {points.map((point, index) => {
+                const showLabel =
+                  index % labelEvery === 0 || index === points.length - 1;
+                if (!showLabel) return null;
+                return (
+                  <text
+                    key={point.key}
+                    x={xFor(index)}
+                    y={HEIGHT - 12}
+                    textAnchor={
+                      index === 0
+                        ? "start"
+                        : index === points.length - 1
+                          ? "end"
+                          : "middle"
+                    }
+                    fontSize={10}
+                    fill="var(--muted-foreground)"
+                  >
+                    {point.label}
+                  </text>
+                );
+              })}
+
+              {hovered !== null ? (
+                <line
+                  x1={hoveredX}
+                  x2={hoveredX}
+                  y1={PADDING.top}
+                  y2={PADDING.top + PLOT_HEIGHT}
+                  stroke="var(--border)"
+                  strokeWidth={1}
+                />
+              ) : null}
+
+              {visibleSeries.map((series) => {
+                const path = smoothPath(
+                  points.map((point, index) => ({
+                    x: xFor(index),
+                    y: yFor(point[series.key as SeriesKey]),
+                  })),
+                );
+
+                return (
+                  <g key={series.key}>
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={series.color}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                    {points.map((point, index) => (
+                      <circle
+                        key={point.key}
+                        cx={xFor(index)}
+                        cy={yFor(point[series.key as SeriesKey])}
+                        r={hovered === index ? 4 : 2.5}
+                        fill={series.color}
+                        stroke="var(--background)"
+                        strokeWidth={1.5}
+                      />
+                    ))}
+                  </g>
+                );
+              })}
+
+              {/* Wide invisible hit areas make the dots easy to hover. */}
+              {points.map((point, index) => {
+                const left =
+                  index === 0
+                    ? PADDING.left
+                    : (xFor(index - 1) + xFor(index)) / 2;
+                const right =
+                  index === points.length - 1
+                    ? WIDTH - PADDING.right
+                    : (xFor(index) + xFor(index + 1)) / 2;
+                return (
+                  <rect
+                    key={point.key}
+                    x={left}
+                    y={PADDING.top}
+                    width={Math.max(0, right - left)}
+                    height={PLOT_HEIGHT}
+                    fill="transparent"
+                    pointerEvents="all"
+                    onMouseEnter={() => setHovered(index)}
+                    onMouseLeave={() => setHovered(null)}
+                  />
+                );
+              })}
+            </svg>
+
+            {hoveredPoint ? (
+              <div
+                className="pointer-events-none absolute top-1 z-10 w-44 -translate-x-1/2 rounded-md border bg-popover px-2.5 py-2 text-xs shadow-md"
+                style={{ left: `${tooltipLeft}%` }}
+              >
+                <p className="mb-1 font-medium">{hoveredPoint.fullLabel}</p>
+                <dl className="space-y-0.5">
+                  {visibleSeries.map((series) => (
+                    <div
+                      key={series.key}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <dt className="flex items-center gap-1.5 text-muted-foreground">
+                        <span
+                          aria-hidden
+                          className="size-1.5 rounded-full"
+                          style={{ backgroundColor: series.color }}
+                        />
+                        {series.label}
+                      </dt>
+                      <dd className="font-medium tabular-nums">
+                        {hoveredPoint[series.key as SeriesKey]}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
