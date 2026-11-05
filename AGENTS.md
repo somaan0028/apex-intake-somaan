@@ -310,7 +310,11 @@ their Lawmatics CRM.
   could not open. The counts each link into the pre-filtered grid
   (`/leads?filter.<columnId>=<value>`), the "ready for Brightwater" callout is shown
   only to a role that can actually send, and a potential-duplicates callout for every
-  role links to the grid with `filter.potentialDuplicate=yes`.
+  role links to the grid with `filter.potentialDuplicate=yes`. Both callouts are slim
+  one-line bars (`AlertBar` in the page) rather than cards: the Brightwater queue is
+  styled as good news (emerald), the duplicate queue as a warning (amber), and they
+  share one tight stack so they never dominate the page. The duplicate bar carries no
+  subtitle by design.
 - The **pipeline** is one stacked bar rather than a bar per stage: the stages are a
   composition of a single total, so a shared bar compares them at a glance, and no label
   has to fit inside a 1%-wide segment. Each segment carries a `title` and an
@@ -320,11 +324,13 @@ their Lawmatics CRM.
   hard-coded, so switching themes changes the pipeline as well. Adding a stage means
   adding a variable there.
 - The Overview's assistant card is a Client Component only because opening the panel is
-  an interaction. `AiAssistantProvider` (in the app shell) publishes `open(prompt)`
-  through `components/ai/assistant-context.tsx`, so any page can open the panel with a
-  question waiting in the composer; `chat-thread.tsx` folds that prompt in during render,
-  keyed by a counter, rather than in an effect. The header button and the suggestions
-  call the same handle — never add a second way to open the panel.
+  an interaction. It is a **compact bar** (mascot, greeting, one button) under the
+  pipeline, not a feature card; the panel's own empty state offers the starter
+  questions. `AiAssistantProvider` (in the app shell) publishes `open(prompt)`
+  through `components/ai/assistant-context.tsx`, so any page can still open the panel
+  with a question waiting in the composer; `chat-thread.tsx` folds that prompt in
+  during render, keyed by a counter, rather than in an effect. The header button and
+  the Overview card call the same handle - never add a second way to open the panel.
 - **Activity** (`app/(app)/activity/`) is the read-only audit trail, open to every role.
   Admins (holding `activities.view.all`) see every row; everyone else sees only rows where
   they are the doer. Search covers the description, and the filters run Date (shared

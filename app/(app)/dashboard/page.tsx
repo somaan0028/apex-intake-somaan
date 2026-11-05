@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
+import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +52,40 @@ function StatCard({
   );
 }
 
+/**
+ * A one-line notice. Deliberately slimmer than a Card: these are banners, not
+ * content, so they use bare padding and keep the action on the right.
+ */
+function AlertBar({
+  tone,
+  action,
+  children,
+}: {
+  tone: "positive" | "warning";
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  const positive = tone === "positive";
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-lg border px-3 py-1.5",
+        positive
+          ? "border-emerald-600/25 bg-emerald-500/10"
+          : "border-amber-600/25 bg-amber-500/10",
+      )}
+    >
+      {positive ? (
+        <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-500" />
+      ) : (
+        <AlertTriangle className="size-4 shrink-0 text-amber-600 dark:text-amber-500" />
+      )}
+      <p className="min-w-0 flex-1 text-sm">{children}</p>
+      {action}
+    </div>
+  );
+}
+
 /** Stage-by-stage breakdown as one stacked bar, with a legend below it. */
 function Pipeline({
   byStage,
@@ -66,7 +102,7 @@ function Pipeline({
           {total} lead{total === 1 ? "" : "s"} across the stages you can see.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         {total === 0 ? (
           <p className="text-sm text-muted-foreground">
             No leads yet, so there is nothing to break down.
@@ -175,7 +211,7 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
                 <li key={lead.id}>
                   <Link
                     href={`/leads?search=${encodeURIComponent(name)}`}
-                    className="flex items-center gap-3 py-3.5"
+                    className="flex items-center gap-3 py-2.5"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{name}</p>
@@ -207,9 +243,12 @@ export default async function OverviewPage() {
   const firstName = user.name.split(" ")[0] ?? user.name;
   // Only an admin can send to the firm, so only an admin is shown a queue for it.
   const showSendQueue = can(user.role, "leads.send_to_firm");
+  const hasAlerts =
+    (showSendQueue && metrics.readyToSend > 0) ||
+    metrics.potentialDuplicates > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
         <p className="text-muted-foreground">
@@ -217,61 +256,60 @@ export default async function OverviewPage() {
         </p>
       </div>
 
-      {/* The one action that is time-sensitive and easy to forget. */}
-      {showSendQueue && metrics.readyToSend > 0 ? (
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-500" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
+      {/* Time-sensitive queues come first, but they are notices, not content. */}
+      {hasAlerts ? (
+        <div className="space-y-2">
+          {showSendQueue && metrics.readyToSend > 0 ? (
+            <AlertBar
+              tone="positive"
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  // Rendering as an anchor: Base UI needs to know it is not a real
+                  // <button> (same convention as `components/ui/pagination.tsx`).
+                  nativeButton={false}
+                  render={
+                    <Link href="/leads?filter.stage=RETAINED&filter.caseType=MVA" />
+                  }
+                >
+                  Review them
+                  <ArrowRight />
+                </Button>
+              }
+            >
+              <span className="font-medium">
                 {metrics.readyToSend} MVA lead
-                {metrics.readyToSend === 1 ? " is" : "s are"} retained and ready
-                for Brightwater
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              // Rendering as an anchor: Base UI needs to know it is not a real
-              // <button> (same convention as `components/ui/pagination.tsx`).
-              nativeButton={false}
-              render={
-                <Link href="/leads?filter.stage=RETAINED&filter.caseType=MVA" />
-              }
-            >
-              Review them
-              <ArrowRight />
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+                {metrics.readyToSend === 1 ? "" : "s"}
+              </span>{" "}
+              {metrics.readyToSend === 1 ? "is" : "are"} retained and ready for
+              Brightwater
+            </AlertBar>
+          ) : null}
 
-      {metrics.potentialDuplicates > 0 ? (
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-500" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                {metrics.potentialDuplicates} potential duplicate lead
-                {metrics.potentialDuplicates === 1 ? " needs" : "s need"} review
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Review them before sending to the firm.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              nativeButton={false}
-              render={
-                <Link href="/leads?filter.potentialDuplicate=yes" />
+          {metrics.potentialDuplicates > 0 ? (
+            <AlertBar
+              tone="warning"
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href="/leads?filter.potentialDuplicate=yes" />}
+                >
+                  Review duplicates
+                  <ArrowRight />
+                </Button>
               }
             >
-              Review duplicates
-              <ArrowRight />
-            </Button>
-          </CardContent>
-        </Card>
+              <span className="font-medium">
+                {metrics.potentialDuplicates} potential duplicate lead
+                {metrics.potentialDuplicates === 1 ? "" : "s"}
+              </span>{" "}
+              {metrics.potentialDuplicates === 1 ? "needs" : "need"} review
+            </AlertBar>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -280,7 +318,7 @@ export default async function OverviewPage() {
           value={metrics.total}
           hint="You have access to these"
           href="/leads"
-        />{" "}
+        />
         <StatCard
           label="Unassigned"
           value={metrics.unassigned}
@@ -301,10 +339,13 @@ export default async function OverviewPage() {
         />
       </div>
 
-      <AssistantInvite greeting={`Hi ${firstName} — need a hand?`} />
-
-      <Pipeline byStage={metrics.byStage} total={metrics.total} />
-      <LatestIntake leads={latest} />
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          <Pipeline byStage={metrics.byStage} total={metrics.total} />
+          <AssistantInvite greeting={`Hi ${firstName} — need a hand?`} />
+        </div>
+        <LatestIntake leads={latest} />
+      </div>
     </div>
   );
 }
