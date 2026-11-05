@@ -180,6 +180,11 @@ export interface DataTableProps<TData extends RowData> {
   filtersMenu?: boolean;
   /** Number shown on the Filters button; 0 hides the badge. */
   filtersMenuCount?: number;
+  /**
+   * Widen the Filters popover for a control that needs more room, e.g. the
+   * custom date range. The default width is sized for the ordinary controls.
+   */
+  filtersMenuWide?: boolean;
   /** Controls rendered beside Filters and Columns, e.g. a view switcher. */
   headerActions?: ReactNode;
   /** Controls rendered after the search box, before the right-hand button group. */
@@ -230,6 +235,7 @@ export function DataTable<TData extends RowData>({
   toolbarFilters,
   filtersMenu = false,
   filtersMenuCount = 0,
+  filtersMenuWide = false,
   headerActions,
   headerLeading,
   filterVisibility: controlledFilterVisibility,
@@ -418,7 +424,10 @@ export function DataTable<TData extends RowData>({
                       </span>
                     ) : null}
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-96 p-3">
+                  <PopoverContent
+                    align="end"
+                    className={cn("p-3", filtersMenuWide ? "w-96" : "w-80")}
+                  >
                     <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
                       {toolbarFilters}
                       {filters?.map((filter) => (

@@ -1165,6 +1165,7 @@ export function LeadsTable({
         toolbarFilters={dateFilter}
         filtersMenu
         filtersMenuCount={activeFilterCount}
+        filtersMenuWide={addedPreset === "custom"}
         toolbarActions={
           <div className="flex items-center gap-2">
             <Button
