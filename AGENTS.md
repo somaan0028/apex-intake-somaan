@@ -360,10 +360,11 @@ their Lawmatics CRM.
   Brightwater" callout is shown
   only to a role that can actually send, and a potential-duplicates callout for every
   role links to the grid with `filter.potentialDuplicate=yes`. Both callouts are slim
-  one-line bars (`AlertBar` in the page) rather than cards: the Brightwater queue is
-  styled as good news (emerald), the duplicate queue as a warning (amber), and they
-  share one tight stack so they never dominate the page. The duplicate bar carries no
-  subtitle by design.
+  one-line bars (`AlertBar` in the page, shared with the leads header) rather than
+  cards: the Brightwater queue is styled as good news (emerald), the duplicate queue as
+  a warning (amber), and they share one flex row — each bar is content-sized and the
+  pair wraps onto separate lines only when they no longer fit — so they never dominate
+  the page. The duplicate bar carries no subtitle by design.
 - The **recent activity** card under the assistant reads `recentActivities(actor, 5)` from
   `lib/activities/queries.ts`, which shares the Activity page's scope: admins see the
   whole log, everyone else only rows they performed. Each row is the doer, the recorded

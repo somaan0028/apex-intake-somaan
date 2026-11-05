@@ -300,9 +300,11 @@ export default async function OverviewPage() {
         </p>
       </div>
 
-      {/* Time-sensitive queues come first, but they are notices, not content. */}
+      {/* Time-sensitive queues come first, but they are notices, not content.
+          They share one line while both fit and wrap onto their own line when
+          the header runs out of room. */}
       {hasAlerts ? (
-        <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
           {showSendQueue && metrics.readyToSend > 0 ? (
             <AlertBar
               tone="positive"
