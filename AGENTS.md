@@ -527,6 +527,9 @@ their Lawmatics CRM.
   inline, and view, sort, saved views, filters, columns, stages, and Clear all
   move into the sheet. `DataTable`'s `mobileControls` prop owns that switch, and
   the grid card scrolls horizontally so a wide table never widens the page.
+  The **Options** and **Clear Filters** triggers both carry the same badge with the
+  number of active filters (each filter counts once, the Added range included;
+  "All Time" and the sort do not count).
 - **Profile** (`app/(app)/profile/`) is self-service and open to every role: a user may
   change their own name and password, and an admin their own email and role as well. The
   rules live in `lib/auth/profile-actions.ts`, which **ignores** submitted fields the

@@ -1003,11 +1003,26 @@ export function LeadsTable({
     onQueryChange({ ...query, page: 1, filters });
   }
 
-  // A quick signal on the compact trigger, ignoring the date filter.
+  // What Clear Filters would actually clear: every filter value plus the search.
+  // The Added range is one filter, whichever shape it takes, and "All Time" is
+  // not active.
+  const dateFilterActive = Boolean(addedWithin) && addedWithin !== "any";
   const activeFilterCount =
     Object.keys(query.filters).filter(
-      (key) => key !== "addedWithin" && query.filters[key],
-    ).length + (query.search ? 1 : 0);
+      (key) =>
+        !["addedWithin", "addedFrom", "addedTo"].includes(key) &&
+        query.filters[key],
+    ).length +
+    (dateFilterActive ? 1 : 0) +
+    (query.search ? 1 : 0);
+
+  /** Shared badge so the Options and Clear Filters triggers agree. */
+  const filterCountBadge =
+    activeFilterCount > 0 ? (
+      <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+        {activeFilterCount}
+      </span>
+    ) : null;
 
   const columnOptions = COLUMN_OPTIONS.filter(
     (option) => canSeeAttribution || option.id !== "source",
@@ -1023,11 +1038,7 @@ export function LeadsTable({
     >
       <SlidersHorizontal aria-hidden />
       Options
-      {activeFilterCount > 0 ? (
-        <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
-          {activeFilterCount}
-        </span>
-      ) : null}
+      {filterCountBadge}
       {viewActive ? (
         <Heart
           aria-label="Saved view active"
@@ -1136,6 +1147,7 @@ export function LeadsTable({
             >
               <FilterX aria-hidden />
               <span className="hidden sm:inline">Clear Filters</span>
+              {filterCountBadge}
             </Button>
             <Button
               variant="outline"
@@ -1367,6 +1379,7 @@ export function LeadsTable({
                   >
                     <FilterX aria-hidden />
                     Clear
+                    {filterCountBadge}
                   </Button>
                   <Button
                     variant="ghost"
