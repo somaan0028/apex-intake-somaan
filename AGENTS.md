@@ -317,7 +317,8 @@ their Lawmatics CRM.
 
 ## Pages
 - **Overview** (`app/(app)/dashboard/`) is the at-a-glance page: headline numbers, the
-  pipeline, the newest intake, and the assistant's invitation. Every number comes from
+  pipeline, the newest intake, the assistant's invitation and a recent-activity feed.
+  Every number comes from
   `lib/leads/metrics.ts`, which scopes its counts with the same
   `leadsVisibilityCondition` the grid uses, so an agent's totals never include leads they
   could not open. The counts each link into the pre-filtered grid
@@ -328,6 +329,13 @@ their Lawmatics CRM.
   styled as good news (emerald), the duplicate queue as a warning (amber), and they
   share one tight stack so they never dominate the page. The duplicate bar carries no
   subtitle by design.
+- The **recent activity** card under the assistant reads `recentActivities(actor, 5)` from
+  `lib/activities/queries.ts`, which shares the Activity page's scope: admins see the
+  whole log, everyone else only rows they performed. Each row is the doer, the recorded
+  description, `Lead: <name>` when a lead is attached, and a relative time
+  (`formatRelativeTime`). The Overview shows the newest intake with a full timestamp
+  (`formatDateTime`) and seven rows, so the Latest intake panel and the Recent activity
+  panel end within a few pixels of each other.
 - The **pipeline** is one stacked bar rather than a bar per stage: the stages are a
   composition of a single total, so a shared bar compares them at a glance, and no label
   has to fit inside a 1%-wide segment. Each segment carries a `title` and an

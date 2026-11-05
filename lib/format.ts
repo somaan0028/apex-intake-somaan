@@ -40,8 +40,8 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
 
 /**
  * A date and time as "Mar 4, 2026, 2:05 PM"; an em dash for missing/invalid
- * input. Used only in client-rendered UI (the lead dialog), so the viewer's
- * local time zone is the right one to show.
+ * input. Used in client-rendered UI (the lead dialog) and in the Overview's
+ * latest-intake list, which is a server snapshot of the request.
  */
 export function formatDateTime(
   value: Date | string | number | null | undefined,
@@ -49,4 +49,38 @@ export function formatDateTime(
   if (value === null || value === undefined || value === "") return "—";
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : DATE_TIME_FORMAT.format(date);
+}
+
+const RELATIVE_TIME_FORMAT = new Intl.RelativeTimeFormat("en-US", {
+  numeric: "auto",
+});
+
+/**
+ * How long ago something happened: "just now", "10 minutes ago", "2 hours
+ * ago", "yesterday". Anything older than a week falls back to a calendar date.
+ *
+ * Rendered on the server as a snapshot of the request, so it does not tick; the
+ * Activity page shows exact timestamps for anything that matters.
+ */
+export function formatRelativeTime(
+  value: Date | string | number | null | undefined,
+): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const seconds = Math.round((date.getTime() - Date.now()) / 1000);
+  const distance = Math.abs(seconds);
+
+  if (distance < 45) return "just now";
+  if (distance < 60 * 60) {
+    return RELATIVE_TIME_FORMAT.format(Math.round(seconds / 60), "minute");
+  }
+  if (distance < 24 * 60 * 60) {
+    return RELATIVE_TIME_FORMAT.format(Math.round(seconds / 3600), "hour");
+  }
+  if (distance < 7 * 24 * 60 * 60) {
+    return RELATIVE_TIME_FORMAT.format(Math.round(seconds / 86400), "day");
+  }
+  return formatDate(date);
 }

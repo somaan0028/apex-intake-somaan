@@ -14,8 +14,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/session";
+import { recentActivities } from "@/lib/activities/queries";
 import { LEAD_STAGES } from "@/lib/db/schema";
-import { formatDate } from "@/lib/format";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { LEAD_STAGE_LABELS, caseTypeLabel } from "@/lib/labels";
 import { leadMetrics, recentLeads } from "@/lib/leads/metrics";
 import { can } from "@/lib/rbac";
@@ -218,7 +219,7 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
                       <p className="truncate text-xs text-muted-foreground">
                         {lead.caseType ? caseTypeLabel(lead.caseType) : "—"}
                         {" · "}
-                        {formatDate(lead.createdAt)}
+                        {formatDateTime(lead.createdAt)}
                       </p>
                     </div>
                     <Badge variant="secondary" className="shrink-0">
@@ -235,10 +236,76 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
   );
 }
 
+/**
+ * The newest actions the viewer may see. Admins get the whole desk; everyone
+ * else only their own rows, exactly like the Activity page. Times are relative
+ * because this is a glance-at-it feed, not the audit log.
+ */
+function RecentActivity({
+  activities,
+}: {
+  activities: ReturnType<typeof recentActivities>;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Recent activity</CardTitle>
+        <CardDescription>The newest actions you can see.</CardDescription>
+        <CardAction>
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link href="/activity" />}
+          >
+            View all
+            <ArrowRight />
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {activities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No activity yet. Changes to leads will appear here.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {activities.map((activity) => (
+              <li
+                key={activity.id}
+                className="flex items-start gap-3 py-2.5"
+              >
+                <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
+                  <span className="font-medium">{activity.doerName}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {activity.description}
+                  </span>
+                  {activity.affectedLeadName ? (
+                    <span className="text-muted-foreground">
+                      {" · "}Lead: {activity.affectedLeadName}
+                    </span>
+                  ) : null}
+                </p>
+                <time
+                  dateTime={activity.createdAt.toISOString()}
+                  className="shrink-0 whitespace-nowrap pt-0.5 text-xs text-muted-foreground"
+                >
+                  {formatRelativeTime(activity.createdAt)}
+                </time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default async function OverviewPage() {
   const user = await requireUser();
   const metrics = leadMetrics(user);
-  const latest = recentLeads(user, 5);
+  const latest = recentLeads(user, 7);
+  const activity = recentActivities(user, 5);
 
   const firstName = user.name.split(" ")[0] ?? user.name;
   // Only an admin can send to the firm, so only an admin is shown a queue for it.
@@ -340,7 +407,10 @@ export default async function OverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <AssistantInvite firstName={firstName} className="lg:order-2" />
+        <div className="space-y-4 lg:order-2">
+          <AssistantInvite firstName={firstName} />
+          <RecentActivity activities={activity} />
+        </div>
         <div className="space-y-4 lg:order-1">
           <Pipeline byStage={metrics.byStage} total={metrics.total} />
           <LatestIntake leads={latest} />

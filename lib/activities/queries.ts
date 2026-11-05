@@ -7,7 +7,7 @@
  * resolved with a left join so a deleted user or lead still leaves the event in
  * place, labelled "Deleted user" / "Deleted lead".
  */
-import { asc, eq, gte, lte, type SQL } from "drizzle-orm";
+import { asc, desc, eq, gte, lte, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import { allOf, planListPage, searchCondition } from "@/lib/db/list-query";
@@ -94,6 +94,67 @@ function activitiesScope(actor: Actor): SQL | undefined {
   return eq(activities.doerId, actor.id);
 }
 
+/**
+ * The joined columns both the Activity grid and the Overview feed render.
+ * Shared so the two readers can never disagree about how a row is shaped.
+ */
+const ACTIVITY_COLUMNS = {
+  id: activities.id,
+  type: activities.type,
+  description: activities.description,
+  isAi: activities.isAi,
+  createdAt: activities.createdAt,
+  doerId: activities.doerId,
+  doerName: users.name,
+  doerAvatarPath: users.avatarPath,
+  leadId: activities.leadId,
+  leadExists: leads.id,
+  leadFirstName: leads.injuredFirstName,
+  leadLastName: leads.injuredLastName,
+  leadMatterId: leads.matterId,
+};
+
+interface ActivityJoinRow {
+  id: number;
+  type: ActivityType;
+  description: string;
+  isAi: boolean;
+  createdAt: Date;
+  doerId: number;
+  doerName: string | null;
+  doerAvatarPath: string | null;
+  leadId: number | null;
+  leadExists: number | null;
+  leadFirstName: string | null;
+  leadLastName: string | null;
+  leadMatterId: string | null;
+}
+
+/** Normalise a joined row, naming deleted actors and leads explicitly. */
+function toActivityRow(row: ActivityJoinRow): ActivityRow {
+  return {
+    id: row.id,
+    type: row.type,
+    description: row.description,
+    isAi: row.isAi,
+    createdAt: row.createdAt,
+    doerId: row.doerId,
+    doerName: row.doerName ?? "Deleted user",
+    doerAvatarPath: row.doerAvatarPath,
+    leadId: row.leadId,
+    affectedLeadName:
+      row.leadId === null
+        ? null
+        : row.leadExists === null
+          ? "Deleted lead"
+          : leadLabel({
+              injuredFirstName: row.leadFirstName,
+              injuredLastName: row.leadLastName,
+              matterId: row.leadMatterId ?? "",
+            }),
+  };
+}
+
 /** Positive integer from a filter value, or `null`. */
 function positiveId(value: string | undefined): number | null {
   if (!value) return null;
@@ -151,21 +212,7 @@ export function listActivities(
   });
 
   const rows = db
-    .select({
-      id: activities.id,
-      type: activities.type,
-      description: activities.description,
-      isAi: activities.isAi,
-      createdAt: activities.createdAt,
-      doerId: activities.doerId,
-      doerName: users.name,
-      doerAvatarPath: users.avatarPath,
-      leadId: activities.leadId,
-      leadExists: leads.id,
-      leadFirstName: leads.injuredFirstName,
-      leadLastName: leads.injuredLastName,
-      leadMatterId: leads.matterId,
-    })
+    .select(ACTIVITY_COLUMNS)
     .from(activities)
     .leftJoin(users, eq(activities.doerId, users.id))
     .leftJoin(leads, eq(activities.leadId, leads.id))
@@ -176,31 +223,28 @@ export function listActivities(
     .all();
 
   return {
-    rows: rows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      description: row.description,
-      isAi: row.isAi,
-      createdAt: row.createdAt,
-      doerId: row.doerId,
-      doerName: row.doerName ?? "Deleted user",
-      doerAvatarPath: row.doerAvatarPath,
-      leadId: row.leadId,
-      affectedLeadName:
-        row.leadId === null
-          ? null
-          : row.leadExists === null
-            ? "Deleted lead"
-            : leadLabel({
-                injuredFirstName: row.leadFirstName,
-                injuredLastName: row.leadLastName,
-                matterId: row.leadMatterId ?? "",
-              }),
-    })),
+    rows: rows.map(toActivityRow),
     total: plan.total,
     page: plan.page,
     sort: plan.sort,
   };
+}
+
+/**
+ * The newest rows for the Overview feed, in the same scope as the Activity page:
+ * an admin sees the whole log, everyone else only their own actions.
+ */
+export function recentActivities(actor: Actor, limit = 5): ActivityRow[] {
+  return getDb()
+    .select(ACTIVITY_COLUMNS)
+    .from(activities)
+    .leftJoin(users, eq(activities.doerId, users.id))
+    .leftJoin(leads, eq(activities.leadId, leads.id))
+    .where(activitiesScope(actor))
+    .orderBy(desc(activities.createdAt), desc(activities.id))
+    .limit(limit)
+    .all()
+    .map(toActivityRow);
 }
 
 /** Distinct doers in the actor's visible activity, for the filter select. */
