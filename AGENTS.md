@@ -190,8 +190,12 @@ their Lawmatics CRM.
   copy TweakCN's `@theme inline`, base layer, font overrides, or `--spacing`.
 - Appearance is **scoped to the authenticated shell**. `app/(app)/layout.tsx` reads the
   signed-in user's preferences from the database, then renders an inline boot script
-  (`buildThemeBootScript`) and `components/theme-scope.tsx`. Those set `data-theme`,
-  `data-theme-mode`, the `dark` class and `color-scheme` on `<html>`. Public pages (the
+  (`buildThemeBootScript` via `components/inline-script.tsx`) and
+  `components/theme-scope.tsx`. Those set `data-theme`, `data-theme-mode`, the `dark`
+  class and `color-scheme` on `<html>`. `InlineScript` renders a real
+  `text/javascript` script in the server HTML and an inert `text/plain` one after
+  hydration, so a soft navigation never makes React warn about a script tag it cannot
+  execute; `ThemeScope` reapplies the theme in that case. Public pages (the
   intake form and login) render neither, so they always keep the default light palette.
   The scope also reapplies the theme on a soft navigation into the shell (login →
   dashboard) and removes the attributes when the shell unmounts (logout), because the

@@ -7,6 +7,10 @@
  * and mode are known on the server from the signed-in user's preferences, so
  * they are embedded directly instead of being read from a cookie.
  *
+ * The script itself goes through `components/inline-script.tsx`, which renders
+ * it as inert `text/plain` after hydration: it only needs to run on a hard
+ * navigation, and `ThemeScope` covers soft ones.
+ *
  * A `system` mode also installs a media-query listener so the app follows the
  * OS while it is open.
  */

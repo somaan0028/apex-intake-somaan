@@ -5,6 +5,7 @@ import {
   AiAssistantProvider,
 } from "@/components/ai/ai-assistant";
 import { AppSidebar } from "@/components/app-sidebar";
+import { InlineScript } from "@/components/inline-script";
 import { ThemeScope } from "@/components/theme-scope";
 import {
   SidebarInset,
@@ -34,11 +35,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <script
+      <InlineScript
         id="apex-theme-boot"
-        dangerouslySetInnerHTML={{
-          __html: buildThemeBootScript(appearance.theme, appearance.mode),
-        }}
+        html={buildThemeBootScript(appearance.theme, appearance.mode)}
       />
       <ThemeScope theme={appearance.theme} mode={appearance.mode} />
       <SidebarProvider defaultOpen={defaultOpen}>
