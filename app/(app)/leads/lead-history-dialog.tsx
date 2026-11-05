@@ -99,6 +99,7 @@ export function LeadHistoryDialog({
         <DialogContent className="sm:max-w-lg" forceBackdrop>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
+            <p className="text-sm text-muted-foreground">Newest to Oldest</p>
           </DialogHeader>
 
           {loading ? (
@@ -127,7 +128,7 @@ export function LeadHistoryDialog({
                       <span className="font-medium">{row.doerName}</span>:{" "}
                       {row.description}{" "}
                       <span className="whitespace-nowrap text-muted-foreground">
-                        Date: {formatDateTime(row.createdAt)}
+                        {formatDateTime(row.createdAt)}
                       </span>
                     </p>
                   </div>
