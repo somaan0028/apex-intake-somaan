@@ -1971,7 +1971,7 @@ function LeadsKanban({
       subject.brightwaterLeadId === null
     ) {
       toast.error("Can't move this lead", {
-        description: "Send it to the firm before marking it Sent to Firm.",
+        description: "Send it to the firm before marking it 'Sent to Firm'.",
       });
       return;
     }
