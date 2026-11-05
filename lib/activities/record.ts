@@ -81,32 +81,32 @@ export type ActivityInput =
 function describeActivity(input: ActivityInput): string {
   switch (input.type) {
     case "lead:stage_update":
-      return `Changed the stage from ${LEAD_STAGE_LABELS[input.from]} to ${LEAD_STAGE_LABELS[input.to]}.`;
+      return `Changed the stage from ${LEAD_STAGE_LABELS[input.from]} to ${LEAD_STAGE_LABELS[input.to]}`;
     case "lead:claimed":
-      return "Claimed unassigned lead.";
+      return "Claimed unassigned lead";
     case "lead:released":
-      return "Released lead.";
+      return "Released lead";
     case "lead:assigned":
-      return "Assigned lead.";
+      return "Assigned lead";
     case "lead:unassigned":
-      return "Unassigned lead.";
+      return "Unassigned lead";
     case "lead:send_to_firm": {
-      if (input.succeeded) return "Successfully sent lead to firm.";
+      if (input.succeeded) return "Successfully sent lead to firm";
       // Keep the description one line even if the provider's reason contains
       // line breaks. The reason is the useful part for anyone reading later.
       const response = input.providerResponse?.replace(/\s+/g, " ").trim();
       return response
         ? `Failed to send lead to firm. Response: ${response}`
-        : "Failed to send lead to firm. Unexpected error occurred.";
+        : "Failed to send lead to firm. Unexpected error occurred";
     }
     case "lead:marked-not-duplicate":
-      return "Marked lead as not a duplicate.";
+      return "Marked lead as not a duplicate";
     case "lead:deleted":
-      return `Deleted lead: ${input.leadName}.`;
+      return `Deleted lead: ${input.leadName}`;
     case "user:added":
-      return "Added user.";
+      return "Added user";
     case "user:deleted":
-      return "Deleted user.";
+      return "Deleted user";
   }
 }
 

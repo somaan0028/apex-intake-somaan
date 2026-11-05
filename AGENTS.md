@@ -361,11 +361,11 @@ their Lawmatics CRM.
   subtitle by design.
 - The **recent activity** card under the assistant reads `recentActivities(actor, 5)` from
   `lib/activities/queries.ts`, which shares the Activity page's scope: admins see the
-  whole log, everyone else only rows they performed. Each row is the doer, the recorded
-  description, `Lead: <name>` when a lead is attached, and a relative time
-  (`formatRelativeTime`). The Overview shows the newest intake with a full timestamp
-  (`formatDateTime`) and seven rows, so the Latest intake panel and the Recent activity
-  panel end within a few pixels of each other.
+  whole log, everyone else only rows they performed. Each row is the doer with a colon,
+  the recorded description, `Lead: <name>` when a lead is attached, and a relative time
+  (`formatRelativeTime`). The Overview's newest-intake rows show the name, the same
+  relative time, and the case type; with seven rows, the Latest intake panel and the
+  Recent activity panel end within a few pixels of each other.
 - The **pipeline** is one stacked bar rather than a bar per stage: the stages are a
   composition of a single total, so a shared bar compares them at a glance, and no label
   has to fit inside a 1%-wide segment. Each segment carries a `title` and an
@@ -392,9 +392,11 @@ their Lawmatics CRM.
 - **Activity** (`app/(app)/activity/`) is the read-only audit trail, open to every role.
   Admins (holding `activities.view.all`) see every row; everyone else sees only rows where
   they are the doer. Search covers the description, and the filters run Date (shared
-  presets/custom range), Performed by (a select), then Affected Lead (a debounced name
-  search over the visibility-scoped lead query). It deliberately has no detail modal, no
-  row click, and no column or filter-visibility menus.
+  presets/custom range), Performed by (a select, admin only — a User has no one else to
+  narrow by), then Affected Lead (a debounced name search over the visibility-scoped lead
+  query). A Clear Filters button beside them clears every filter and the search, and
+  carries the active-filter count. It deliberately has no detail modal, no row click, and
+  no column or filter-visibility menus.
 - **Analytics** (`app/(app)/analytics/`) is admin-only: the sidebar hides it and the
   page redirects without `analytics.view`, so a hand-typed URL cannot reach attribution
   data. `lib/leads/analytics.ts` groups the same leads by campaign (`case_type`),
@@ -453,7 +455,7 @@ their Lawmatics CRM.
 - A failed firm submission records why: when Brightwater returns a JSON `code` other than
   `1` with a `response`, the activity reads
   `Failed to send lead to firm. Response: <text>`; network failures, non-200 responses and
-  other unexpected outcomes read `Failed to send lead to firm. Unexpected error occurred.`
+  other unexpected outcomes read `Failed to send lead to firm. Unexpected error occurred`
   The reason is normalized to one line.
 - **Users** (`app/(app)/users/`) shows an **Assigned leads** count per person, loaded for the
   visible page in one grouped query. The underlined number links to the leads page filtered
@@ -541,9 +543,14 @@ their Lawmatics CRM.
   it appears in the details form below.
 - The sidebar (`components/app-sidebar.tsx`) keeps Overview, Leads, and Analytics
   flat, then folds **Staff** (Users, Activity) and **Settings** (Connect Your Agent,
-  Preferences) into collapsible groups. It uses the sidebar's `inset` variant, so the
-  desktop shell shows the sidebar colour behind a main panel that floats with an 8px
-  margin, rounded corners and a shadow. Nav and sub-item icons use
+  Preferences) into collapsible groups. A User, who cannot see Users and only ever sees
+  their own activity, gets **My Activity** as a flat item beside Overview and Leads
+  instead of a one-item Staff submenu; admins keep Activity under Staff. It uses the
+  sidebar's `inset` variant with `collapsible="icon"`, so collapsing leaves an icon rail
+  instead of hiding the sidebar; hovering that rail expands it exactly like the toggle,
+  pushing the main panel to the right. The desktop shell shows the sidebar colour behind a
+  main panel that floats with an 8px margin, rounded corners and a shadow. Nav and
+  sub-item icons use
   `text-sidebar-accent-foreground`, which stays themed and legible in every preset. Both
   groups start open; clicking a group header while the sidebar is in its icon rail reopens
   the sidebar instead of toggling a hidden panel.

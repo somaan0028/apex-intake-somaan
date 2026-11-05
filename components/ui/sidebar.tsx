@@ -39,6 +39,9 @@ type SidebarContextProps = {
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
+  /** The collapsed icon rail is temporarily expanded under the pointer. */
+  peeking: boolean;
+  setPeeking: (peeking: boolean) => void;
   toggleSidebar: () => void;
 };
 
@@ -68,6 +71,7 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+  const [peeking, setPeeking] = React.useState(false);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -81,6 +85,10 @@ function SidebarProvider({
       } else {
         _setOpen(openState);
       }
+
+      // An explicit toggle ends any hover peek; the rail waits for a fresh
+      // pointer entry before expanding again.
+      setPeeking(false);
 
       // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
@@ -112,6 +120,8 @@ function SidebarProvider({
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
+  // Peeking only applies while the desktop rail is collapsed.
+  const peekingNow = state === "collapsed" && peeking;
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
@@ -121,9 +131,21 @@ function SidebarProvider({
       isMobile,
       openMobile,
       setOpenMobile,
+      peeking: peekingNow,
+      setPeeking,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [
+      state,
+      open,
+      setOpen,
+      isMobile,
+      openMobile,
+      setOpenMobile,
+      peekingNow,
+      setPeeking,
+      toggleSidebar,
+    ],
   );
 
   return (
@@ -162,7 +184,8 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, peeking, setPeeking } =
+    useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -205,14 +228,25 @@ function Sidebar({
     );
   }
 
+  const isPeeking = collapsible === "icon" && peeking;
+
   return (
     <div
       className="group peer hidden text-sidebar-foreground md:block"
-      data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
+      data-state={isPeeking ? "expanded" : state}
+      data-collapsible={
+        state === "collapsed" ? (isPeeking ? "" : collapsible) : ""
+      }
+      data-peek={isPeeking ? "true" : undefined}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      onMouseEnter={() => {
+        // Expand exactly like the toggle while the pointer is over the rail,
+        // but keep the pinned state (and its cookie) collapsed.
+        if (collapsible === "icon" && state === "collapsed") setPeeking(true);
+      }}
+      onMouseLeave={() => setPeeking(false)}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
@@ -509,7 +543,7 @@ function SidebarMenuButton({
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const { isMobile, state } = useSidebar();
+  const { isMobile, state, peeking } = useSidebar();
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -543,7 +577,7 @@ function SidebarMenuButton({
       <TooltipContent
         side="right"
         align="center"
-        hidden={state !== "collapsed" || isMobile}
+        hidden={state !== "collapsed" || isMobile || peeking}
         {...tooltip}
       />
     </Tooltip>

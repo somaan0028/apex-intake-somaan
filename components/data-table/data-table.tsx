@@ -168,6 +168,11 @@ export interface DataTableProps<TData extends RowData> {
   columnMenu?: ReactNode;
   /** Extra filter controls rendered with the select filters (e.g. a date range). */
   toolbarFilters?: ReactNode;
+  /**
+   * Render the toolbar filters and actions on the search row, wrapping to the
+   * next line when they do not fit. Used by pages with only a few filters.
+   */
+  inlineToolbar?: boolean;
   /** Controls rendered beside Filters and Columns, e.g. a view switcher. */
   headerActions?: ReactNode;
   /** Controls rendered after the search box, before the right-hand button group. */
@@ -216,6 +221,7 @@ export function DataTable<TData extends RowData>({
   showColumnMenu = true,
   columnMenu,
   toolbarFilters,
+  inlineToolbar = false,
   headerActions,
   headerLeading,
   filterVisibility: controlledFilterVisibility,
@@ -362,7 +368,13 @@ export function DataTable<TData extends RowData>({
     <div className="space-y-3">
       <div className="space-y-3">
         {/* Row 1: the search box, and the two menus that control what is shown. */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2",
+            inlineToolbar &&
+              "flex-col items-stretch lg:flex-row lg:items-center",
+          )}
+        >
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search
               aria-hidden
@@ -377,43 +389,61 @@ export function DataTable<TData extends RowData>({
             />
           </div>
 
+          {inlineToolbar ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 lg:flex-1">
+              {toolbarFilters}
+              {toolbarActions ? (
+                <div className="ml-auto">{toolbarActions}</div>
+              ) : null}
+            </div>
+          ) : null}
+
           {mobileControls ? (
             <div className="ml-auto flex shrink-0 items-center gap-2 xl:hidden">
               {mobileControls}
             </div>
           ) : null}
 
-          <div
-            className={cn(
-              "ml-auto flex shrink-0 items-center gap-2",
-              mobileControls && "hidden xl:flex",
-            )}
-          >
-            {headerLeading}
-            {filters?.length ? (
-              <FilterVisibilityMenu
-                filters={filters}
-                visibility={filterVisibility}
-                onToggle={(columnId, visible) =>
-                  setFilterVisibility({
-                    ...filterVisibility,
-                    [columnId]: visible,
-                  })
-                }
-                onReset={() =>
-                  setFilterVisibility({ ...defaultFilterVisibility })
-                }
-              />
-            ) : null}
-            {columnMenu ??
-              (showColumnMenu ? <ColumnVisibilityMenu table={table} /> : null)}
-            {headerActions}
-          </div>
+          {headerLeading ||
+          filters?.length ||
+          columnMenu ||
+          showColumnMenu ||
+          headerActions ? (
+            <div
+              className={cn(
+                "ml-auto flex shrink-0 items-center gap-2",
+                mobileControls && "hidden xl:flex",
+              )}
+            >
+              {headerLeading}
+              {filters?.length ? (
+                <FilterVisibilityMenu
+                  filters={filters}
+                  visibility={filterVisibility}
+                  onToggle={(columnId, visible) =>
+                    setFilterVisibility({
+                      ...filterVisibility,
+                      [columnId]: visible,
+                    })
+                  }
+                  onReset={() =>
+                    setFilterVisibility({ ...defaultFilterVisibility })
+                  }
+                />
+              ) : null}
+              {columnMenu ??
+                (showColumnMenu ? (
+                  <ColumnVisibilityMenu table={table} />
+                ) : null)}
+              {headerActions}
+            </div>
+          ) : null}
         </div>
 
         {/* Row 2: the filter controls, with any caller-supplied actions pushed
             to the right of the same line. */}
-        {visibleFilters.length || toolbarFilters || toolbarActions ? (
+        {!inlineToolbar &&
+        (visibleFilters.length || toolbarFilters || toolbarActions) ? (
           <div
             className={cn(
               "flex flex-wrap items-center gap-x-4 gap-y-2",

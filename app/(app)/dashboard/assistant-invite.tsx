@@ -52,10 +52,10 @@ export function AssistantInvite({
             Your AI assistant
           </p>
           <p className="text-lg font-semibold tracking-tight">
-            Hi {firstName} — I&apos;m {ASSISTANT_NAME}.
+            Hi {firstName}, I&apos;m {ASSISTANT_NAME}.
           </p>
           <p className="mx-auto max-w-xs text-sm text-muted-foreground">
-            Ask me about your leads, your team, or what to work on next.
+            I'm here to help you manage leads and answer your questions!
           </p>
         </div>
 

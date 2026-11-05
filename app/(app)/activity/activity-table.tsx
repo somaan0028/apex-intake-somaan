@@ -4,12 +4,13 @@
  * The Activity grid.
  *
  * A read-only audit view: no row click, no editor, and no column menu. The
- * three structured filters are Performed by (a small select), Affected Lead (a
- * name search, because the lead list is far too long for a select), and a date
- * range that matches the leads page.
+ * structured filters are Performed by (a small select, shown only when the
+ * viewer can see other people's rows), Affected Lead (a name search, because
+ * the lead list is far too long for a select), and a date range that matches
+ * the leads page.
  */
 import { createColumnHelper } from "@tanstack/react-table";
-import { Search, X } from "lucide-react";
+import { FilterX, Search, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { DataTable, useTableQuerySync } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
@@ -124,12 +125,15 @@ export function ActivityTable({
   total,
   query,
   performers,
+  showPerformerFilter,
   selectedLeadLabel,
 }: {
   activities: ActivityRow[];
   total: number;
   query: TableQuery;
   performers: ActivityPerformerOption[];
+  /** Only an admin can see other people's rows, so only they can filter by doer. */
+  showPerformerFilter: boolean;
   selectedLeadLabel: string | null;
 }) {
   const { isPending, onQueryChange } = useTableQuerySync();
@@ -172,8 +176,36 @@ export function ActivityTable({
     onQueryChange({ ...query, page: 1, filters });
   }
 
-  // The filters share the search row, pushed to the right. Order matters:
-  // date, then doer, then affected lead.
+  // What Clear Filters would actually clear: every visible filter value plus
+  // the search. The date range is one filter, whichever shape it takes, and
+  // "All Time" is not active.
+  const dateFilterActive =
+    preset !== "any" ||
+    Boolean(query.filters.dateFrom) ||
+    Boolean(query.filters.dateTo);
+  const activeFilterCount =
+    Object.keys(query.filters).filter((key) => {
+      if (["dateWithin", "dateFrom", "dateTo"].includes(key)) return false;
+      // A User never sees the doer filter, so a stray value is not counted.
+      if (key === "performedBy" && !showPerformerFilter) return false;
+      return Boolean(query.filters[key]);
+    }).length +
+    (dateFilterActive ? 1 : 0) +
+    (query.search ? 1 : 0);
+
+  const filterCountBadge =
+    activeFilterCount > 0 ? (
+      <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+        {activeFilterCount}
+      </span>
+    ) : null;
+
+  function clearFilters() {
+    onQueryChange({ ...query, page: 1, search: "", filters: {} });
+  }
+
+  // The filters share the toolbar row, with Clear Filters pushed to the right.
+  // Order matters: date, then doer, then affected lead.
   const headerFilters = (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <DateRangeFilter
@@ -186,11 +218,13 @@ export function ActivityTable({
         onChange={changeDateRange}
       />
 
-      <PerformedByFilter
-        selectedId={positiveId(query.filters.performedBy)}
-        performers={performers}
-        onChange={changePerformer}
-      />
+      {showPerformerFilter ? (
+        <PerformedByFilter
+          selectedId={positiveId(query.filters.performedBy)}
+          performers={performers}
+          onChange={changePerformer}
+        />
+      ) : null}
 
       <LeadSearchFilter
         selectedId={positiveId(query.filters.leadId)}
@@ -222,7 +256,20 @@ export function ActivityTable({
       getRowId={getRowId}
       ariaLabel="Activity"
       searchPlaceholder="Search activity…"
-      headerLeading={headerFilters}
+      toolbarFilters={headerFilters}
+      inlineToolbar
+      toolbarActions={
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={clearFilters}
+        >
+          <FilterX aria-hidden />
+          <span className="hidden sm:inline">Clear Filters</span>
+          {filterCountBadge}
+        </Button>
+      }
       showColumnMenu={false}
       emptyMessage="No activity yet."
       emptyFilteredMessage="No activity matches your filters."
