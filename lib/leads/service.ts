@@ -7,7 +7,16 @@
  * is read from the database here, never taken from a client payload, because a
  * caller could otherwise claim ownership they don't have.
  */
-import { and, count, eq, isNull } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import {
   ForbiddenError,
   requireDuplicateResolve,
@@ -860,11 +869,14 @@ export function checkLeadForDuplicatesForActor(
 /**
  * Send a lead to Brightwater, then record the outcome.
  *
- * Guarded three ways before the network call: the actor must hold
- * `leads.send_to_firm`, the lead must be MVA, and neither `sent_to_firm_at` nor
- * `brightwater_lead_id` may already be set. The write that follows is a
- * conditional update on the same two columns, so two requests racing on one lead
- * cannot both record a send — the loser is told it was already sent.
+ * Guarded four ways before the network call: the actor must hold
+ * `leads.send_to_firm`, the lead must be MVA, neither `sent_to_firm_at` nor
+ * `brightwater_lead_id` may already be set, and no other lead with the same
+ * email may already have a recorded submission. Brightwater rejects a second
+ * submission for an email, so catching that ourselves avoids a guaranteed
+ * provider error. The write that follows is a conditional update on the same
+ * two columns, so two requests racing on one lead cannot both record a send —
+ * the loser is told it was already sent.
  */
 export async function sendLeadForActor(
   actor: Actor,
@@ -888,6 +900,37 @@ export async function sendLeadForActor(
     if (error instanceof ForbiddenError)
       return { ok: false, error: error.message };
     throw error;
+  }
+
+  // Brightwater refuses a second lead with the same email. Our own sent records
+  // are the source of truth: if any other lead with this email already has a
+  // submission, stop here rather than sending a request we know will fail.
+  // Emails are compared case-insensitively and trimmed, matching the provider's
+  // practical behaviour (the seed itself has mixed-case variants).
+  const emailKey = (lead.injuredEmail ?? "").trim().toLowerCase();
+  if (emailKey) {
+    const alreadySent = getDb()
+      .select({ id: leads.id })
+      .from(leads)
+      .where(
+        and(
+          ne(leads.id, lead.id),
+          sql`lower(trim(${leads.injuredEmail})) = ${emailKey}`,
+          or(
+            isNotNull(leads.sentToFirmAt),
+            isNotNull(leads.brightwaterLeadId),
+          ),
+        ),
+      )
+      .get();
+
+    if (alreadySent) {
+      return {
+        ok: false,
+        error:
+          "A lead with this email has already been sent to Brightwater. It will not be sent again.",
+      };
+    }
   }
 
   const result = await sendLeadToBrightwater(lead);

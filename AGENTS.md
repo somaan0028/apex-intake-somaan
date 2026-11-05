@@ -60,7 +60,9 @@ their Lawmatics CRM.
   Enum values are stored as canonical codes (`MASS_TORT`, `SENT_TO_FIRM`, …);
   display labels live in `lib/labels.ts`.
 - Only `MVA` leads are sent to partner firm Brightwater (form-urlencoded API),
-  **at most once per lead**.
+  **at most once per lead**. Brightwater also rejects a second submission for the
+  same email, so the send guard additionally refuses when any other lead with
+  the same case-insensitive, trimmed email already has a recorded send.
 - `SENT_TO_FIRM` records an actual submission: the service refuses to set that
   stage unless `sent_to_firm_at` or `brightwater_lead_id` is populated, so the
   stage cannot be chosen manually on an unsent lead. The dialog, inline select
