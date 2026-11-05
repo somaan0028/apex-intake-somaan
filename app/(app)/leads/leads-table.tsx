@@ -259,6 +259,7 @@ function leadName(lead: LeadRow): string {
 
 /** Columns hidden on first render; the Columns menu can reveal them. */
 const DEFAULT_COLUMN_VISIBILITY = {
+  bookmarked: false,
   contactName: false,
   source: false,
   state: false,
@@ -271,6 +272,7 @@ const DEFAULT_COLUMN_VISIBILITY = {
 
 /** Filter controls hidden on first render; the Filters menu can reveal them. */
 const DEFAULT_FILTER_VISIBILITY = {
+  bookmarked: true,
   isAtFault: false,
   hasAttorney: false,
   hasReceivedSettlement: false,
@@ -422,6 +424,15 @@ const columns = columnHelper.columns([
     enableSorting: false,
     cell: (info) => (info.getValue() ? "Yes" : EMPTY),
   }),
+  // The "Bookmarked" filter is hosted by this column. It is never a visible
+  // table column or a Columns-menu choice; the filter control is the whole
+  // feature.
+  columnHelper.accessor("bookmarked", {
+    header: "Bookmarked",
+    enableSorting: false,
+    enableHiding: false,
+    cell: (info) => (info.getValue() ? "Yes" : EMPTY),
+  }),
 ]);
 
 /** Stable row id so sorting/filtering preserves row identity. */
@@ -429,6 +440,7 @@ const getRowId = (lead: LeadRow) => String(lead.id);
 
 /** Labels for the mobile Columns checklist, derived from the column defs. */
 const COLUMN_OPTIONS = columns
+  .filter((column) => column.enableHiding !== false)
   .map((column) => {
     const id =
       column.id ??
@@ -485,6 +497,18 @@ function buildFilters(
       options: [
         { label: "Only Potential Duplicates", value: "yes" },
         { label: "Only Unique", value: "no" },
+      ],
+    },
+    {
+      // Personal to the signed-in user: "Yes" never includes anyone else's
+      // bookmarks. Visible by default because it is a primary way back to a
+      // lead someone is working on.
+      columnId: "bookmarked",
+      label: "Bookmarked",
+      allLabel: "Any",
+      options: [
+        { label: "Yes", value: "yes" },
+        { label: "No", value: "no" },
       ],
     },
     {
@@ -596,7 +620,10 @@ export function LeadsTable({
     const stored = readPersistedState();
     if (stored) {
       setFilterVisibility(stored.filterVisibility);
-      setColumnVisibility(stored.columnVisibility);
+      setColumnVisibility({
+        ...DEFAULT_COLUMN_VISIBILITY,
+        ...stored.columnVisibility,
+      });
       setHiddenStages(stored.hiddenStages as LeadStage[]);
       setActiveViewId(stored.activeViewId);
     }
@@ -747,7 +774,10 @@ export function LeadsTable({
 
   function applySavedView(saved: SavedLeadView) {
     setFilterVisibility(saved.filterVisibility);
-    setColumnVisibility(saved.columnVisibility);
+    setColumnVisibility({
+      ...DEFAULT_COLUMN_VISIBILITY,
+      ...saved.columnVisibility,
+    });
     setHiddenStages(saved.hiddenStages as LeadStage[]);
     setActiveViewId(saved.id);
     setListOpen(false);

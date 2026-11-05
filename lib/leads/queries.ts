@@ -17,6 +17,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  not,
   notInArray,
   or,
   sql,
@@ -36,6 +37,7 @@ import {
 import {
   CASE_TYPES,
   LEAD_STAGES,
+  leadBookmarks,
   leads,
   users,
   type CaseType,
@@ -64,6 +66,8 @@ type AttributionKey = (typeof ATTRIBUTION_KEYS)[number];
 /** A row as it comes out of SQL, before the duplicate group counts are added. */
 type LeadBaseRow = Omit<Lead, "dupMatchString"> & {
   assignedToName: string | null;
+  /** True when the current actor has bookmarked this lead. */
+  bookmarked: boolean;
 };
 
 /**
@@ -78,6 +82,8 @@ type LeadBaseRow = Omit<Lead, "dupMatchString"> & {
  */
 export type LeadRow = Omit<Lead, AttributionKey | "dupMatchString"> & {
   assignedToName: string | null;
+  /** True when the signed-in viewer has bookmarked this lead. */
+  bookmarked: boolean;
   /** Every lead in this lead's duplicate group, including itself. */
   dupGroupCount: number;
   /** Group members this viewer is allowed to see, including itself. */
@@ -245,6 +251,21 @@ export function leadsVisibilityCondition(actor: Actor): SQL | undefined {
 }
 
 /**
+ * SQL predicate: the signed-in actor has bookmarked this lead.
+ *
+ * The same expression is used to select each row's `bookmarked` flag and to
+ * apply the grid's Bookmarked filter, so the filter and the dialog icon can
+ * never disagree. It is always scoped to the actor — bookmarks are personal.
+ */
+function bookmarkedBy(actor: Actor): SQL<boolean> {
+  return sql<boolean>`exists (
+    select 1 from ${leadBookmarks}
+    where ${leadBookmarks.leadId} = ${leads.id}
+      and ${leadBookmarks.userId} = ${actor.id}
+  )`.mapWith(Boolean);
+}
+
+/**
  * Visibility plus every active filter, shared by the table and the board.
  *
  * Keeping this in one place is what makes the board's column counts and its
@@ -328,6 +349,15 @@ function leadScope(query: TableQuery, actor: Actor): LeadScope {
       conditions.push(isNull(leads.dupGroupId));
     }
 
+    // Personal bookmark filter. "Yes" means bookmarked by this actor, never by
+    // anyone else; "No" is the complement.
+    const bookmarked = query.filters.bookmarked;
+    if (bookmarked === "yes") {
+      conditions.push(bookmarkedBy(actor));
+    } else if (bookmarked === "no") {
+      conditions.push(not(bookmarkedBy(actor)));
+    }
+
     // Tri-state qualifying answers (yes / no / unknown).
     conditions.push(booleanFilter(query, "isAtFault", leads.isAtFault));
     conditions.push(booleanFilter(query, "hasAttorney", leads.hasAttorney));
@@ -395,7 +425,11 @@ export function listLeads(
   });
 
   const selected = db
-    .select({ ...getTableColumns(leads), assignedToName: users.name })
+    .select({
+      ...getTableColumns(leads),
+      assignedToName: users.name,
+      bookmarked: bookmarkedBy(actor),
+    })
     .from(leads)
     .leftJoin(users, eq(leads.assignedToId, users.id))
     .where(plan.where)
@@ -519,7 +553,11 @@ export function listKanbanBoard(
     if (limit === 0) continue;
 
     const stageRows = db
-      .select({ ...getTableColumns(leads), assignedToName: users.name })
+      .select({
+        ...getTableColumns(leads),
+        assignedToName: users.name,
+        bookmarked: bookmarkedBy(actor),
+      })
       .from(leads)
       .leftJoin(users, eq(leads.assignedToId, users.id))
       .where(allOf([where, eq(leads.stage, stage)]))

@@ -125,4 +125,14 @@ CREATE TABLE `sessions` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `sessions_user_id_idx` ON `sessions` (`user_id`);
+CREATE INDEX `sessions_user_id_idx` ON `sessions` (`user_id`);--> statement-breakpoint
+CREATE TABLE `lead_bookmarks` (
+	`user_id` integer NOT NULL,
+	`lead_id` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	PRIMARY KEY(`user_id`, `lead_id`),
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`lead_id`) REFERENCES `leads`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `lead_bookmarks_lead_id_idx` ON `lead_bookmarks` (`lead_id`);

@@ -19,6 +19,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import {
+  Bookmark,
   Check,
   Loader2,
   RefreshCw,
@@ -75,6 +76,7 @@ import {
   deleteLead,
   markLeadNotDuplicate,
   sendLeadToFirm,
+  setLeadBookmark,
 } from "@/lib/leads/actions";
 import { UNASSIGNED } from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
@@ -341,6 +343,8 @@ function LeadForm({
   );
   const [dismissingDup, startDismissingDup] = useTransition();
   const [checkingDuplicates, startCheckingDuplicates] = useTransition();
+  const [bookmarked, setBookmarked] = useState(lead.bookmarked);
+  const [bookmarkPending, startBookmark] = useTransition();
   const {
     status,
     error,
@@ -700,6 +704,28 @@ function LeadForm({
     });
   }
 
+  /**
+   * Toggle this user's bookmark for the lead.
+   *
+   * The icon updates immediately and goes back if the server refuses, so the
+   * control never claims a bookmark that was not saved.
+   */
+  function toggleBookmark() {
+    const next = !bookmarked;
+    setBookmarked(next);
+    startBookmark(async () => {
+      const result = await setLeadBookmark(lead.id, next);
+      if (!result.ok) {
+        setBookmarked(!next);
+        toast.error("Could not update bookmark", {
+          description: result.error ?? "Please try again.",
+        });
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   /** Delete after the confirmation, then close the now-stale dialog. */
   function handleDelete() {
     const formData = new FormData();
@@ -722,12 +748,25 @@ function LeadForm({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>
+      <DialogHeader className="flex-row items-start justify-between gap-3 pr-9">
+        <DialogTitle className="min-w-0">
           {[lead.injuredFirstName, lead.injuredLastName]
             .filter(Boolean)
             .join(" ") || "Lead details"}
         </DialogTitle>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-pressed={bookmarked}
+          aria-label={bookmarked ? "Remove bookmark" : "Bookmark this lead"}
+          title={bookmarked ? "Remove bookmark" : "Bookmark this lead"}
+          disabled={bookmarkPending}
+          onClick={toggleBookmark}
+        >
+          <Bookmark className={bookmarked ? "size-4 fill-current" : "size-4"} />
+        </Button>
       </DialogHeader>
 
       <div className="grid gap-4">

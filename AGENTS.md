@@ -158,6 +158,10 @@ their Lawmatics CRM.
 - `api_tokens` (one row per personal access token for external agents) stores only the
   SHA-256 hash of the token plus a display `prefix`, its owner and `last_used_at`; the raw
   token is shown once and never persisted.
+- `lead_bookmarks` is the personal many-to-many bookmark table: `(user_id, lead_id)` is the
+  primary key, both foreign keys cascade on delete, and `created_at` records when the
+  bookmark was made. It is never shared: the grid's `filter.bookmarked=yes|no` always
+  resolves against the signed-in actor, and bookmarking records no activity.
 - `activities` is the append-only audit log. `type` is one of the canonical codes in
   `lib/db/schema/activities.ts` (`lead:stage_update`, `lead:claimed`, `lead:released`,
   `lead:assigned`, `lead:unassigned`, `lead:send_to_firm`,
@@ -356,7 +360,9 @@ their Lawmatics CRM.
   and keeps a stored raw campaign value selectable until the user changes it.
   The CSV seeder now preserves an unrecognised campaign verbatim and refuses a
   missing one. The **Firm submission** section is shown only while the lead's case
-  type is MVA. A potential-duplicate banner offers **View similar** and **Mark as Not
+  type is MVA. The dialog header carries a **bookmark** toggle (filled when the
+  signed-in user has bookmarked the lead); it updates optimistically through
+  `setLeadBookmark` and never records an activity. A potential-duplicate banner offers **View similar** and **Mark as Not
   Duplicate**, and **Check for Duplicates** sits beside Delete for an on-demand re-run;
   only admins can dismiss a grouping. On a
   lead filed for someone else, the filler's name, phone, email and relationship
@@ -410,7 +416,11 @@ their Lawmatics CRM.
   dropped in Kanban because the board already groups by stage. Grouped leads carry an
   amber warning icon in both views. The **Duplicates** filter
   (`filter.potentialDuplicate=yes|no`) drills into them, and **View similar** uses
-  `filter.dupGroup=<id>`, which ignores every other filter.
+  `filter.dupGroup=<id>`, which ignores every other filter. A **Bookmarked** filter
+  (`filter.bookmarked=yes|no`) is visible by default and is always personal: "yes"
+  means bookmarked by the signed-in user, never by anyone else. The filter is hosted
+  by a hidden, non-hideable table column so it uses the same URL/saved-view plumbing
+  as every other filter, and it works unchanged in Table, Kanban, and CSV export.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("Any time"). It offers `24h`, `3d`, `7d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional

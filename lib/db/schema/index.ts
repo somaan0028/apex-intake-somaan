@@ -10,3 +10,4 @@ export * from "./activities";
 export * from "./sessions";
 export * from "./api-tokens";
 export * from "./chats";
+export * from "./lead-bookmarks";

@@ -42,6 +42,7 @@ import {
   CASE_TYPES,
   LEAD_STAGES,
   RELATIONSHIPS,
+  leadBookmarks,
   leads,
   type Lead,
   type LeadStage,
@@ -859,6 +860,47 @@ export function checkLeadForDuplicatesForActor(
         .get()?.value ?? 0;
 
     return { ok: true, dupGroupId, dupGroupCount, dupGroupVisibleCount };
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Add or remove the actor's personal bookmark for a lead.
+ *
+ * Bookmarking is not a business change: it records no activity and never
+ * touches the lead row. The only requirement is that the actor can currently
+ * see the lead, so a bookmark cannot be created for a record outside their
+ * visibility scope. The composite primary key makes a repeated "add" a no-op.
+ */
+export function setLeadBookmarkForActor(
+  actor: Actor,
+  id: number,
+  bookmarked: boolean,
+): LeadMutationResult {
+  try {
+    requireVisibleLead(actor, id);
+    const db = getDb();
+
+    if (bookmarked) {
+      db.insert(leadBookmarks)
+        .values({ userId: actor.id, leadId: id, createdAt: new Date() })
+        .onConflictDoNothing()
+        .run();
+    } else {
+      db.delete(leadBookmarks)
+        .where(
+          and(
+            eq(leadBookmarks.userId, actor.id),
+            eq(leadBookmarks.leadId, id),
+          ),
+        )
+        .run();
+    }
+
+    return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError)
       return { ok: false, error: error.message };
