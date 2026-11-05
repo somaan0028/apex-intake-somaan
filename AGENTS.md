@@ -258,7 +258,9 @@ their Lawmatics CRM.
   attribution, and Brightwater submission facts stay read-only by design. A
   **Notes** section above Attribution holds free-form internal notes; it is
   autosaved like the other text fields, never populated by public intake, and
-  never sent to the firm. On a
+  never sent to the firm. The **Case type** select is the first field in Case
+  facts; it offers the canonical codes and keeps an imported raw campaign value
+  selectable until the user changes it. On a
   lead filed for someone else, the filler's name, phone, email and relationship
   are editable under the same `leads.edit.*` permission as the injured person's
   fields. An agent

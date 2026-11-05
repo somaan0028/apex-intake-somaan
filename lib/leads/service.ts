@@ -30,6 +30,7 @@ import {
   toUsPhone,
 } from "@/lib/db/normalize";
 import {
+  CASE_TYPES,
   LEAD_STAGES,
   RELATIONSHIPS,
   leads,
@@ -96,6 +97,11 @@ export function requireVisibleLead(actor: Actor, id: number): Lead {
 export interface LeadUpdate {
   stage?: LeadStage;
   assignedToId?: number | null;
+  /**
+   * Canonical case type, or the current raw campaign value (so an imported lead
+   * can be saved without changing it). `null` clears the field.
+   */
+  caseType?: string | null;
   injuredFirstName?: string | null;
   injuredLastName?: string | null;
   injuredPhone?: string | null;
@@ -282,6 +288,20 @@ function validateLeadUpdate(lead: Lead, update: LeadUpdate): NormalizedPatch {
     const value = next[key];
     if (value !== null && typeof value !== "boolean") {
       return { ok: false, error: "Choose Yes, No, or Unknown." };
+    }
+  }
+
+  if (next.caseType !== undefined) {
+    const value = (next.caseType ?? "").trim();
+    if (value === "") {
+      next.caseType = null;
+    } else if (
+      !(CASE_TYPES as readonly string[]).includes(value) &&
+      value !== lead.caseType
+    ) {
+      return { ok: false, error: "Choose a valid case type." };
+    } else {
+      next.caseType = value;
     }
   }
 
@@ -645,6 +665,20 @@ function normalizeLeadPatch(
       return { ok: false, error: "Choose Yes, No, or Unknown." };
     }
     update[key] = value;
+  }
+
+  if (provided("caseType")) {
+    const value = (patch.caseType ?? "").trim();
+    if (value === "") {
+      update.caseType = null;
+    } else if (
+      !(CASE_TYPES as readonly string[]).includes(value) &&
+      value !== lead.caseType
+    ) {
+      return { ok: false, error: "Choose a valid case type." };
+    } else {
+      update.caseType = value;
+    }
   }
 
   if (provided("stage")) {

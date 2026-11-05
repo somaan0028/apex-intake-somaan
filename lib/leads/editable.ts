@@ -9,6 +9,8 @@
 import type { LeadStage } from "@/lib/db/schema";
 
 export interface LeadFieldPatch {
+  /** Canonical case type, or an empty string to clear. */
+  caseType?: string;
   injuredFirstName?: string;
   injuredLastName?: string;
   injuredPhone?: string;

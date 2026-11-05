@@ -56,12 +56,19 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { LEAD_STAGES, RELATIONSHIPS, type LeadStage } from "@/lib/db/schema";
+import {
+  CASE_TYPES,
+  LEAD_STAGES,
+  RELATIONSHIPS,
+  type LeadStage,
+} from "@/lib/db/schema";
 import { formatDateTime } from "@/lib/format";
 import {
+  CASE_TYPE_LABELS,
   LEAD_STAGE_LABELS,
   RELATIONSHIP_LABELS,
   assigneeLabel,
+  caseTypeLabel,
 } from "@/lib/labels";
 import {
   checkLeadForDuplicates,
@@ -237,6 +244,7 @@ function SaveState({ status }: { status: SaveStatus }) {
 }
 
 interface Draft {
+  caseType: string;
   injuredFirstName: string;
   injuredLastName: string;
   injuredPhone: string;
@@ -357,6 +365,7 @@ function LeadForm({
   );
 
   const [draft, setDraft] = useState<Draft>(() => ({
+    caseType: lead.caseType ?? "",
     injuredFirstName: lead.injuredFirstName ?? "",
     injuredLastName: lead.injuredLastName ?? "",
     injuredPhone: lead.injuredPhone ?? "",
@@ -382,6 +391,7 @@ function LeadForm({
   // without waiting for the grid refresh.
   const subject = {
     ...lead,
+    caseType: draft.caseType || null,
     stage,
     assignedToId,
     sentToFirmAt: sentAt,
@@ -398,6 +408,28 @@ function LeadForm({
   const canSend = canSendLeadToFirm(viewer, subject);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Case type is normally a canonical code, but an imported lead may carry a
+  // raw campaign value. Keep that value selectable so opening the dialog cannot
+  // silently change it; every other option is a canonical code.
+  const isKnownCaseType =
+    lead.caseType !== null &&
+    (CASE_TYPES as readonly string[]).includes(lead.caseType);
+  const caseTypeOptions = [
+    { label: "Not set", value: NONE },
+    ...CASE_TYPES.map((value) => ({
+      label: CASE_TYPE_LABELS[value],
+      value,
+    })),
+    ...(lead.caseType && !isKnownCaseType
+      ? [
+          {
+            label: `${caseTypeLabel(lead.caseType)} (imported)`,
+            value: lead.caseType,
+          },
+        ]
+      : []),
+  ];
 
   const currentAssignee =
     assignedToId === null ? UNASSIGNED : String(assignedToId);
@@ -474,6 +506,14 @@ function LeadForm({
       return;
     }
     schedule(key, { [key]: value } as LeadFieldPatch);
+  }
+
+  async function changeCaseType(value: string) {
+    const next = value === NONE ? "" : value;
+    const previous = draft.caseType;
+    updateDraft("caseType", next);
+    const ok = await saveNow({ caseType: next });
+    if (!ok) updateDraft("caseType", previous);
   }
 
   async function changeStage(value: LeadStage) {
@@ -1121,6 +1161,27 @@ function LeadForm({
               Case facts
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="Case type" htmlFor="lead-case-type">
+                <Select
+                  items={caseTypeOptions}
+                  value={draft.caseType || NONE}
+                  onValueChange={(value) => {
+                    if (value) void changeCaseType(value);
+                  }}
+                  disabled={!canEdit}
+                >
+                  <SelectTrigger id="lead-case-type" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {caseTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
               <FormField label="At fault" htmlFor="lead-at-fault">
                 <Select
                   items={TRI_STATE_OPTIONS}
@@ -1283,7 +1344,7 @@ function LeadForm({
             </Field>
             {sent ? null : (
               <div className="col-span-2 grid gap-2">
-                {lead.caseType !== "MVA" ? (
+                {(draft.caseType || null) !== "MVA" ? (
                   <p className="text-xs text-muted-foreground">
                     Only MVA leads are sent to the firm.
                   </p>
