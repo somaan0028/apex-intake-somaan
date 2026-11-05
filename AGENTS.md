@@ -255,7 +255,10 @@ their Lawmatics CRM.
   so there is no Save button. Text fields debounce, selects and the date save
   immediately, and `use-lead-autosave.ts` queues writes so an older patch cannot land
   after a newer one; the footer reports "Saving…" / "Saved". The Lawmatics id,
-  attribution, and Brightwater submission facts stay read-only by design. On a
+  attribution, and Brightwater submission facts stay read-only by design. A
+  **Notes** section above Attribution holds free-form internal notes; it is
+  autosaved like the other text fields, never populated by public intake, and
+  never sent to the firm. On a
   lead filed for someone else, the filler's name, phone, email and relationship
   are editable under the same `leads.edit.*` permission as the injured person's
   fields. An agent

@@ -26,6 +26,8 @@ export interface LeadFieldPatch {
   postcode?: string;
   injuryDetails?: string;
   accidentDetails?: string;
+  /** Free-form internal notes for the intake team. */
+  notes?: string;
   isAtFault?: boolean | null;
   hasAttorney?: boolean | null;
   hasReceivedSettlement?: boolean | null;

@@ -112,6 +112,11 @@ export const leads = sqliteTable(
     postcode: text("postcode"),
     injuryDetails: text("injury_details"),
     accidentDetails: text("accident_details"),
+    /**
+     * Free-form internal notes written by the intake team. Never populated by
+     * the public form and never sent to the partner firm.
+     */
+    notes: text("notes"),
 
     // --- Case-qualifying booleans (stored as SQLite 0/1; null = unknown) ---
     isAtFault: integer("is_at_fault", { mode: "boolean" }),

@@ -252,6 +252,7 @@ interface Draft {
   postcode: string;
   injuryDetails: string;
   accidentDetails: string;
+  notes: string;
   isAtFault: boolean | null;
   hasAttorney: boolean | null;
   hasReceivedSettlement: boolean | null;
@@ -268,7 +269,8 @@ type TextField =
   | "fillerEmail"
   | "postcode"
   | "injuryDetails"
-  | "accidentDetails";
+  | "accidentDetails"
+  | "notes";
 
 type TriStateField = "isAtFault" | "hasAttorney" | "hasReceivedSettlement";
 
@@ -370,6 +372,7 @@ function LeadForm({
     postcode: lead.postcode ?? "",
     injuryDetails: lead.injuryDetails ?? "",
     accidentDetails: lead.accidentDetails ?? "",
+    notes: lead.notes ?? "",
     isAtFault: lead.isAtFault,
     hasAttorney: lead.hasAttorney,
     hasReceivedSettlement: lead.hasReceivedSettlement,
@@ -1227,6 +1230,26 @@ function LeadForm({
                 />
               </FormField>
             </div>
+          </section>
+
+          <section className="grid gap-3">
+            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Notes
+            </h3>
+            <Textarea
+              id="lead-notes"
+              aria-label="Notes"
+              value={draft.notes}
+              disabled={!canEdit}
+              maxLength={MAX_TEXT_LENGTH}
+              className="min-h-24"
+              placeholder="Add a note about this lead…"
+              onChange={(event) => changeText("notes", event.target.value)}
+              onBlur={() => flush("notes")}
+            />
+            <p className="text-xs text-muted-foreground">
+              Internal notes for your team. These are never sent to the firm.
+            </p>
           </section>
 
           {canSeeAttribution ? (

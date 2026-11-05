@@ -111,6 +111,7 @@ export interface LeadUpdate {
   postcode?: string | null;
   injuryDetails?: string | null;
   accidentDetails?: string | null;
+  notes?: string | null;
   isAtFault?: boolean | null;
   hasAttorney?: boolean | null;
   hasReceivedSettlement?: boolean | null;
@@ -263,11 +264,11 @@ function validateLeadUpdate(lead: Lead, update: LeadUpdate): NormalizedPatch {
     next.postcode = postcode;
   }
 
-  for (const key of ["injuryDetails", "accidentDetails"] as const) {
+  for (const key of ["injuryDetails", "accidentDetails", "notes"] as const) {
     if (next[key] === undefined) continue;
     const value = toNullableText(next[key]);
     if (value && value.length > MAX_TEXT_LENGTH) {
-      return { ok: false, error: "That description is too long." };
+      return { ok: false, error: "That text is too long." };
     }
     next[key] = value;
   }
@@ -624,11 +625,11 @@ function normalizeLeadPatch(
     }
   }
 
-  for (const key of ["injuryDetails", "accidentDetails"] as const) {
+  for (const key of ["injuryDetails", "accidentDetails", "notes"] as const) {
     if (!provided(key)) continue;
     const value = toNullableText(patch[key]);
     if (value && value.length > MAX_TEXT_LENGTH) {
-      return { ok: false, error: "That description is too long." };
+      return { ok: false, error: "That text is too long." };
     }
     update[key] = value;
   }
