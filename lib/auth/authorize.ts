@@ -16,6 +16,7 @@ import {
   can,
   canAssignLead,
   canChangeLeadStage,
+  canChangeUserAvatar,
   canChangeUserRole,
   canDeleteLead,
   canDeleteUser,
@@ -117,6 +118,16 @@ export function requireLeadReadyToSend(lead: { stage: LeadStage }): void {
     throw new ForbiddenError(
       "This lead must be at Retained before it can be sent to the firm.",
     );
+  }
+}
+
+/** Throw unless `actor` may change `targetUserId`'s profile photo. */
+export function requireUserAvatarChange(
+  actor: Actor,
+  targetUserId: number,
+): void {
+  if (!canChangeUserAvatar(actor, targetUserId)) {
+    throw new ForbiddenError("You can't change this user's photo.");
   }
 }
 

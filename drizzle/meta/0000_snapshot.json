@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "27c72a9c-07dd-4ec6-a8f1-b98bdd896010",
+  "id": "350382ab-194c-405f-bca0-ef805af00257",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activities": {
@@ -432,6 +432,21 @@
           "notNull": true,
           "autoincrement": false
         },
+        "avatar_path": {
+          "name": "avatar_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "preferences": {
+          "name": "preferences",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -456,6 +471,10 @@
         "users_role_check": {
           "name": "users_role_check",
           "value": "\"users\".\"role\" in ('ADMIN', 'USER')"
+        },
+        "users_preferences_json_check": {
+          "name": "users_preferences_json_check",
+          "value": "json_valid(\"users\".\"preferences\")"
         }
       }
     },

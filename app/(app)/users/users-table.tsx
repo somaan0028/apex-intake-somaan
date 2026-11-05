@@ -17,11 +17,11 @@ import {
   type DataTableFilter,
 } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { USER_ROLE_LABELS } from "@/lib/labels";
-import { formatDate, initials } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { can } from "@/lib/rbac";
 import { USER_ROLES, type UserRole } from "@/lib/db/schema";
 import type { AuthUser } from "@/lib/auth/session";
@@ -36,9 +36,12 @@ const columns = columnHelper.columns([
     header: "Name",
     cell: (info) => (
       <div className="flex items-center gap-2.5">
-        <Avatar size="sm">
-          <AvatarFallback>{initials(info.getValue())}</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          size="sm"
+          userId={info.row.original.id}
+          name={info.getValue()}
+          avatarPath={info.row.original.avatarPath}
+        />
         <span className="font-medium">{info.getValue()}</span>
       </div>
     ),

@@ -2,29 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   Activity,
+  Bot,
+  Briefcase,
   ChartColumn,
+  ChevronDown,
   ChevronsUpDown,
   ClipboardList,
   LayoutDashboard,
   LogOut,
   Settings,
+  SlidersHorizontal,
   UserRound,
   Users,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import type { AuthUser } from "@/lib/auth/session";
-import { initials } from "@/lib/format";
 import { USER_ROLE_LABELS } from "@/lib/labels";
 import { can, type Permission } from "@/lib/rbac";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -39,7 +43,26 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
+
+/** One navigation destination. */
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  permission: Permission | null;
+};
+
+/** A collapsible parent in the sidebar. */
+type NavGroup = {
+  title: string;
+  icon: typeof LayoutDashboard;
+  items: ReadonlyArray<NavItem>;
+};
 
 /**
  * Primary navigation. `/dashboard` is the Overview tab.
@@ -48,12 +71,7 @@ import {
  * are hidden. This is presentation only — the page behind each link re-checks
  * the same policy on the server (see `app/(app)/users/page.tsx`).
  */
-const NAV_ITEMS: ReadonlyArray<{
-  title: string;
-  url: string;
-  icon: typeof LayoutDashboard;
-  permission: Permission | null;
-}> = [
+const NAV_ITEMS: ReadonlyArray<NavItem> = [
   {
     title: "Overview",
     url: "/dashboard",
@@ -67,7 +85,44 @@ const NAV_ITEMS: ReadonlyArray<{
     icon: ChartColumn,
     permission: "analytics.view",
   },
-  { title: "Users", url: "/users", icon: Users, permission: "users.manage" },
+];
+
+/**
+ * The remaining destinations are grouped by what they are about: the people and
+ * audit trail behind the desk, then the account's own settings.
+ */
+const NAV_GROUPS: ReadonlyArray<NavGroup> = [
+  {
+    title: "Staff",
+    icon: Briefcase,
+    items: [
+      {
+        title: "Users",
+        url: "/users",
+        icon: Users,
+        permission: "users.manage",
+      },
+      { title: "Activity", url: "/activity", icon: Activity, permission: null },
+    ],
+  },
+  {
+    title: "Settings",
+    icon: Settings,
+    items: [
+      {
+        title: "Connect Your Agent",
+        url: "/settings/ai",
+        icon: Bot,
+        permission: null,
+      },
+      {
+        title: "Preferences",
+        url: "/settings/preferences",
+        icon: SlidersHorizontal,
+        permission: null,
+      },
+    ],
+  },
 ];
 
 /**
@@ -76,15 +131,16 @@ const NAV_ITEMS: ReadonlyArray<{
  * They are about *you* rather than about the desk's work, which is why they hang
  * off the account menu instead of sitting in the workspace list beside Leads.
  */
-const ACCOUNT_ITEMS: ReadonlyArray<{
-  title: string;
-  url: string;
-  icon: typeof LayoutDashboard;
-  permission: Permission | null;
-}> = [{ title: "Profile", url: "/profile", icon: UserRound, permission: null }];
+const ACCOUNT_ITEMS: ReadonlyArray<NavItem> = [
+  { title: "Profile", url: "/profile", icon: UserRound, permission: null },
+];
 
 export function AppSidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
+  const { state, setOpen } = useSidebar();
+  // Groups start open. A missing key means "open", so the map only records the
+  // groups the person has explicitly folded.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const isCurrent = (url: string) =>
     pathname === url || pathname.startsWith(`${url}/`);
@@ -97,10 +153,14 @@ export function AppSidebar({ user }: { user: AuthUser }) {
     );
 
   const navItems = visible(NAV_ITEMS);
+  const navGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: visible(group.items),
+  })).filter((group) => group.items.length > 0);
   const accountItems = visible(ACCOUNT_ITEMS);
 
   return (
-    <Sidebar>
+    <Sidebar variant="inset">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -131,39 +191,67 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                     tooltip={item.title}
                     render={<Link href={item.url} />}
                   >
-                    <item.icon />
+                    <item.icon className="text-sidebar-accent-foreground" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
-        {/* Activity and Settings sit at the bottom, just above the account menu. */}
-        <SidebarGroup className="mt-auto pb-1">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={isCurrent("/activity")}
-                  tooltip="Activity"
-                  render={<Link href="/activity" />}
+              {navGroups.map((group) => (
+                <Collapsible.Root
+                  key={group.title}
+                  render={<SidebarMenuItem />}
+                  open={openGroups[group.title] ?? true}
+                  onOpenChange={(open) => {
+                    // In the icon rail the submenu is hidden, so a click is a
+                    // request to reopen the sidebar; keep the group expanded
+                    // for when it appears.
+                    if (state === "collapsed") {
+                      setOpen(true);
+                      setOpenGroups((previous) => ({
+                        ...previous,
+                        [group.title]: true,
+                      }));
+                      return;
+                    }
+                    setOpenGroups((previous) => ({
+                      ...previous,
+                      [group.title]: open,
+                    }));
+                  }}
                 >
-                  <Activity />
-                  <span>Activity</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={isCurrent("/settings")}
-                  tooltip="Settings"
-                  render={<Link href="/settings" />}
-                >
-                  <Settings />
-                  <span>Settings</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+                  <Collapsible.Trigger
+                    render={
+                      <SidebarMenuButton
+                        tooltip={group.title}
+                        isActive={group.items.some((item) =>
+                          isCurrent(item.url),
+                        )}
+                      />
+                    }
+                  >
+                    <group.icon className="text-sidebar-accent-foreground" />
+                    <span>{group.title}</span>
+                    <ChevronDown className="ml-auto size-4 shrink-0 transition-transform group-data-[panel-open]/menu-button:rotate-180" />
+                  </Collapsible.Trigger>
+
+                  <Collapsible.Panel>
+                    <SidebarMenuSub>
+                      {group.items.map((item) => (
+                        <SidebarMenuSubItem key={item.url}>
+                          <SidebarMenuSubButton
+                            isActive={isCurrent(item.url)}
+                            render={<Link href={item.url} />}
+                          >
+                            <item.icon className="text-sidebar-accent-foreground" />
+                            <span>{item.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </Collapsible.Panel>
+                </Collapsible.Root>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -184,11 +272,13 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   />
                 }
               >
-                <Avatar className="size-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">
-                    {initials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  userId={user.id}
+                  name={user.name}
+                  avatarPath={user.avatarPath}
+                  className="size-8 rounded-lg"
+                  fallbackClassName="rounded-lg"
+                />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
                   {/* The role, not the email: the email is long enough to be
@@ -211,26 +301,6 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                 sideOffset={6}
                 className="w-(--anchor-width) min-w-56"
               >
-                {/* Base UI requires a group around every label and its items
-                    (`MenuGroupContext is missing` otherwise). */}
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="flex items-center gap-2">
-                    <Avatar className="size-6 rounded-md">
-                      <AvatarFallback className="rounded-md text-xs">
-                        {initials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="grid min-w-0 leading-tight">
-                      <span className="truncate font-medium">{user.name}</span>
-                      {/* The full email belongs here, where there is room. */}
-                      <span className="truncate text-xs font-normal text-muted-foreground">
-                        {user.email}
-                      </span>
-                    </span>
-                  </DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-
                 <DropdownMenuGroup>
                   {accountItems.map((item) => (
                     <DropdownMenuItem

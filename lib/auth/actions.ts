@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { preferencesFromUserRow } from "@/lib/preferences/queries";
+import { clearThemeCookie, setThemeCookie } from "@/lib/themes/cookie";
 import { verifyPassword } from "./password";
 import { createSession, destroySession } from "./session";
 
@@ -37,11 +39,21 @@ export async function login(
   }
 
   await createSession(user.id);
+
+  // The boot script needs the theme before the first paint on the next request;
+  // the database remains the source of truth.
+  const preferences = preferencesFromUserRow(user);
+  await setThemeCookie(
+    preferences.appearance.theme,
+    preferences.appearance.mode,
+  );
+
   redirect("/dashboard");
 }
 
 /** End the current session and return to the login page. */
 export async function logout(): Promise<void> {
   await destroySession();
+  await clearThemeCookie();
   redirect("/login");
 }

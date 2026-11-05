@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           here so it survives navigation between pages. */}
       <AiAssistantProvider>
         <AppSidebar user={user} />
-        <SidebarInset>
+        <SidebarInset className="md:peer-data-[variant=inset]:shadow-md">
           <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
             <SidebarTrigger className="-ml-1" />
             <span aria-hidden className="h-4 w-px bg-border" />

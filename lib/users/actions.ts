@@ -22,6 +22,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { USER_ROLES, users, type UserRole } from "@/lib/db/schema";
 import { isValidEmail } from "@/lib/validation";
+import { deleteAvatarFile } from "./avatar-storage";
 import { countAdmins, countAssignedLeads } from "./queries";
 
 /** Result the dialog renders; `ok` means the change was applied. */
@@ -186,8 +187,11 @@ export async function deleteUser(
   formData: FormData,
 ): Promise<UserActionResult> {
   const actor = await requireUser();
+  // Kept outside the guarded callback so the file can be removed after the row
+  // is gone: the database never holds a photo whose owner no longer exists.
+  let avatarToDelete: string | null = null;
 
-  return guarded(() => {
+  const result = guarded(() => {
     requirePermission(actor, "users.manage");
 
     const id = Number(readText(formData, "id"));
@@ -214,6 +218,8 @@ export async function deleteUser(
       };
     }
 
+    avatarToDelete = target.avatarPath;
+
     db.transaction(() => {
       db.delete(users).where(eq(users.id, id)).run();
       recordActivity({
@@ -226,4 +232,7 @@ export async function deleteUser(
     revalidatePath("/users");
     return { ok: true };
   });
+
+  if (result.ok) await deleteAvatarFile(avatarToDelete);
+  return result;
 }
