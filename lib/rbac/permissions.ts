@@ -41,7 +41,10 @@ export const PERMISSIONS = [
   "leads.send_to_firm",
   /** Permanently delete a lead. */
   "leads.delete",
-  /** Dismiss a potential-duplicate grouping (admin only). */
+  /**
+   * Dismiss a potential-duplicate grouping. Both roles hold this; the service
+   * additionally requires every member of the group to be visible to the actor.
+   */
   "leads.resolve_duplicates",
   /** See a lead's attribution/tracking fields (IP, TrustedForm, Journaya, source). */
   "leads.view.attribution",
@@ -73,6 +76,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "leads.edit.own",
     "leads.claim",
     "leads.release",
+    // A potential duplicate may be dismissed by whoever can see the whole
+    // cluster; the service refuses when part of it is outside their visibility.
+    "leads.resolve_duplicates",
   ],
 };
 

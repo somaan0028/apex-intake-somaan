@@ -44,9 +44,17 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   search_leads: { readOnlyHint: true },
   get_lead: { readOnlyHint: true },
   list_users: { readOnlyHint: true },
+  list_similar_leads: { readOnlyHint: true },
+  get_desk_metrics: { readOnlyHint: true },
+  get_campaign_analytics: { readOnlyHint: true },
+  get_lead_history: { readOnlyHint: true },
+  list_activity: { readOnlyHint: true },
+  check_lead_for_duplicates: { destructiveHint: false, idempotentHint: true },
+  mark_lead_not_duplicate: { idempotentHint: true },
+  set_lead_bookmark: { idempotentHint: true },
   update_lead_stage: { destructiveHint: true, idempotentHint: true },
   assign_lead: { destructiveHint: true, idempotentHint: true },
-  send_lead_to_firm: { destructiveHint: true, idempotentHint: false },
+  update_lead_details: { destructiveHint: true, idempotentHint: true },
 };
 
 /**
@@ -60,7 +68,9 @@ function instructions(user: AuthUser): string {
   return [
     "Apex Intake Desk — the lead-intake system for Apex Lead Source, which passes qualified MVA and mass-tort leads to partner law firms.",
     `You are connected as ${user.name} (${user.email}), role ${USER_ROLE_LABELS[user.role]}. Every tool runs with that person's own permissions, so you can do exactly what they could do in the app and nothing more. A refused action comes back as an error naming the rule that blocked it: report that to the user instead of looking for another route to the same change.`,
-    `Leads move through ${stages}, and only MVA leads are sent to the partner firm (Brightwater), only once they have reached Retained, and at most once each.`,
+    `Leads move through ${stages}. Only MVA leads are sent to the partner firm (Brightwater), only once they have reached Retained, and at most once each.`,
+    "Two actions are deliberately human-only and have no tool: sending a lead to the firm, and deleting a lead. Never claim to have done either — tell the user to use the app.",
+    "A potential duplicate can be dismissed only when every lead in the group is visible to the user; otherwise an administrator must review it. Bookmarks are personal and private, and internal notes are never sent to the firm.",
     "Refer to a lead by the injured person's name. The numeric ids in tool results are handles for your own calls — never show one to the user, and never the matter id.",
   ].join("\n\n");
 }

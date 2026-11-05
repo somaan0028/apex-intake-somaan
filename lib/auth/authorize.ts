@@ -101,13 +101,14 @@ export function requireLeadDelete(actor: Actor): void {
 /**
  * Throw unless `actor` may dismiss a potential-duplicate grouping.
  *
- * Admin-only: a User may see only some members of a cluster, so they cannot
- * judge whether the records are actually the same person.
+ * Both roles hold the capability; the service adds the visibility rule (every
+ * member of the cluster must be readable by the actor) because dismissing a
+ * match is a judgement about records they may not be able to open.
  */
 export function requireDuplicateResolve(actor: Actor): void {
   if (!can(actor.role, "leads.resolve_duplicates")) {
     throw new ForbiddenError(
-      "Only an administrator can mark a lead as not a duplicate.",
+      "You can't mark this lead as not a duplicate.",
     );
   }
 }

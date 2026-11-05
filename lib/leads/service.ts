@@ -23,8 +23,6 @@ import {
   requireLeadAssignment,
   requireLeadDelete,
   requireLeadEdit,
-  requireLeadReadyToSend,
-  requireLeadSend,
   requireLeadStageChange,
   requireLeadView,
 } from "@/lib/auth/authorize";
@@ -49,7 +47,12 @@ import {
   type Relationship,
 } from "@/lib/db/schema";
 import { isValidEmail, normalizePostcode } from "@/lib/validation";
-import type { Actor } from "@/lib/rbac";
+import {
+  canSendLeadToFirm,
+  isLeadReadyToSend,
+  type Actor,
+} from "@/lib/rbac";
+import { DUPLICATE_GROUP_HIDDEN_MESSAGE } from "./constants";
 import { buildDupMatchString } from "./dup-matcher";
 import { reconcileDupGroup, recheckLead } from "./dup-groups";
 import { scheduleDupCheck } from "./dup-queue";
@@ -76,6 +79,18 @@ export interface SendLeadResult extends LeadMutationResult {
   sentToFirmAt?: Date;
   brightwaterLeadId?: string | null;
 }
+
+/**
+ * Actions that only a human may perform.
+ *
+ * The tool layer never exposes these, and the service refuses them again when
+ * an AI caller sets `isAi`. Two independent locks, so a future tool cannot
+ * quietly re-enable an action the desk wants kept in human hands.
+ */
+const AI_SEND_FORBIDDEN =
+  "Sending a lead to the firm is a human action. Ask the user to do it in the app.";
+const AI_DELETE_FORBIDDEN =
+  "Deleting a lead is a human action. Ask the user to do it in the app.";
 
 /** Result of an explicit duplicate re-check; counts are the fresh group sizes. */
 export interface DuplicateCheckResult extends LeadMutationResult {
@@ -743,6 +758,8 @@ export function deleteLeadForActor(
   id: number,
   options: LeadMutationOptions = {},
 ): LeadMutationResult {
+  if (options.isAi) return { ok: false, error: AI_DELETE_FORBIDDEN };
+
   try {
     const lead = requireVisibleLead(actor, id);
     requireLeadDelete(actor);
@@ -774,22 +791,53 @@ export function deleteLeadForActor(
 }
 
 /**
+ * Refuse a dismissal when part of the cluster is outside the actor's
+ * visibility. They cannot judge records they cannot open, and dismissing the
+ * match would silently change a grouping they only half see.
+ */
+function requireVisibleDuplicateGroup(actor: Actor, groupId: string): void {
+  const total =
+    getDb()
+      .select({ value: count() })
+      .from(leads)
+      .where(eq(leads.dupGroupId, groupId))
+      .get()?.value ?? 0;
+
+  const visible =
+    getDb()
+      .select({ value: count() })
+      .from(leads)
+      .where(
+        and(
+          eq(leads.dupGroupId, groupId),
+          leadsVisibilityCondition(actor),
+        ),
+      )
+      .get()?.value ?? 0;
+
+  if (visible < total) throw new ForbiddenError(DUPLICATE_GROUP_HIDDEN_MESSAGE);
+}
+
+/**
  * Clear a lead's potential-duplicate grouping without deleting the lead.
  *
- * Admin-only: dismissing a match is a judgement about records the actor may
- * not be able to see. Other members keep the group id; if only one remains,
- * reconciliation returns it to a unique lead. The matcher is deliberately not
- * run here — a future new or edited lead can still re-link it, because nobody
- * knows whether that new signal is the same person.
+ * Allowed for either role, provided every member of the group is visible: the
+ * judgement is about records the actor must be able to inspect. Other members
+ * keep the group id; if only one remains, reconciliation returns it to a unique
+ * lead. The matcher is deliberately not run here — a future new or edited lead
+ * can still re-link it, because nobody knows whether that new signal is the
+ * same person.
  */
 export function markLeadNotDuplicateForActor(
   actor: Actor,
   id: number,
+  options: LeadMutationOptions = {},
 ): LeadMutationResult {
   try {
     const lead = requireVisibleLead(actor, id);
     requireDuplicateResolve(actor);
     if (lead.dupGroupId === null) return { ok: true };
+    requireVisibleDuplicateGroup(actor, lead.dupGroupId);
 
     const groupId = lead.dupGroupId;
     getDb().transaction(() => {
@@ -803,6 +851,7 @@ export function markLeadNotDuplicateForActor(
         type: "lead:marked-not-duplicate",
         leadId: id,
         doerId: actor.id,
+        isAi: options.isAi,
       });
     });
 
@@ -909,40 +958,31 @@ export function setLeadBookmarkForActor(
 }
 
 /**
- * Send a lead to Brightwater, then record the outcome.
+ * Why a lead can or cannot be sent right now.
  *
- * Guarded five ways before the network call: the actor must hold
- * `leads.send_to_firm`, the lead must be MVA, neither `sent_to_firm_at` nor
- * `brightwater_lead_id` may already be set, the lead must not currently belong
- * to a potential-duplicate group, and no other lead with the same email may
- * already have a recorded submission. Brightwater rejects a second submission
- * for an email, so catching that ourselves avoids a guaranteed provider error.
- * The write that follows is a conditional update on the same two columns, so
- * two requests racing on one lead cannot both record a send — the loser is told
- * it was already sent.
+ * Shared by the send action and by `get_lead`'s `firmSubmission` block, so the
+ * assistant can tell a human exactly what is missing without duplicating the
+ * guard rules.
  */
-export async function sendLeadForActor(
+export interface SendEligibility {
+  canSend: boolean;
+  /** The first reason, in the order the send action reports them. */
+  reason: string | null;
+}
+
+export function sendEligibilityForActor(
   actor: Actor,
-  id: number,
-  options: LeadMutationOptions = {},
-): Promise<SendLeadResult> {
-  let lead: Lead;
-  try {
-    lead = requireVisibleLead(actor, id);
-  } catch (error) {
-    if (error instanceof ForbiddenError)
-      return { ok: false, error: error.message };
-    throw error;
+  lead: Lead,
+): SendEligibility {
+  if (!canSendLeadToFirm(actor, lead)) {
+    return { canSend: false, reason: "You can't send this lead to the firm." };
   }
 
-  // A refusal before the network call is not a submission; it is not logged.
-  try {
-    requireLeadSend(actor, lead);
-    requireLeadReadyToSend(lead);
-  } catch (error) {
-    if (error instanceof ForbiddenError)
-      return { ok: false, error: error.message };
-    throw error;
+  if (!isLeadReadyToSend(lead)) {
+    return {
+      canSend: false,
+      reason: "This lead must be at Retained before it can be sent to the firm.",
+    };
   }
 
   // The desk has already warned that this lead may be the same person as
@@ -951,8 +991,8 @@ export async function sendLeadForActor(
   // Duplicate, or an edit that breaks the match).
   if (lead.dupGroupId !== null) {
     return {
-      ok: false,
-      error:
+      canSend: false,
+      reason:
         "This lead is a potential duplicate. Either mark it as 'Not Duplicate', or remove the duplicate records, before sending it to the firm.",
     };
   }
@@ -981,11 +1021,46 @@ export async function sendLeadForActor(
 
     if (alreadySent) {
       return {
-        ok: false,
-        error:
+        canSend: false,
+        reason:
           "A lead with this email has already been sent to Brightwater. It will not be sent again.",
       };
     }
+  }
+
+  return { canSend: true, reason: null };
+}
+
+/**
+ * Send a lead to Brightwater, then record the outcome.
+ *
+ * Human-only: the tool layer does not expose this, and an AI caller (`isAi`) is
+ * refused here as well. Otherwise guarded as before — permission, MVA, unsent,
+ * no duplicate grouping, and no earlier submission for the same email. The
+ * write that follows is a conditional update on the same two columns, so two
+ * requests racing on one lead cannot both record a send — the loser is told it
+ * was already sent.
+ */
+export async function sendLeadForActor(
+  actor: Actor,
+  id: number,
+  options: LeadMutationOptions = {},
+): Promise<SendLeadResult> {
+  if (options.isAi) return { ok: false, error: AI_SEND_FORBIDDEN };
+
+  let lead: Lead;
+  try {
+    lead = requireVisibleLead(actor, id);
+  } catch (error) {
+    if (error instanceof ForbiddenError)
+      return { ok: false, error: error.message };
+    throw error;
+  }
+
+  // A refusal before the network call is not a submission; it is not logged.
+  const eligibility = sendEligibilityForActor(actor, lead);
+  if (!eligibility.canSend) {
+    return { ok: false, error: eligibility.reason ?? "The lead cannot be sent." };
   }
 
   const result = await sendLeadToBrightwater(lead);

@@ -78,7 +78,7 @@ import {
   sendLeadToFirm,
   setLeadBookmark,
 } from "@/lib/leads/actions";
-import { UNASSIGNED } from "@/lib/leads/constants";
+import { UNASSIGNED, DUPLICATE_GROUP_HIDDEN_MESSAGE } from "@/lib/leads/constants";
 import type { LeadFieldPatch } from "@/lib/leads/editable";
 import type { LeadRow } from "@/lib/leads/queries";
 import {
@@ -642,9 +642,7 @@ function LeadForm({
     // The grid is visibility-scoped, so an agent may be looking at only part of
     // the cluster. Say so rather than silently showing a shorter list.
     if (dupCount > dupVisibleCount) {
-      toast.warning(
-        "You don't have access to some of the potentially similar leads. Please contact an Admin.",
-      );
+      toast.warning(DUPLICATE_GROUP_HIDDEN_MESSAGE);
     }
 
     const params = new URLSearchParams({
@@ -655,14 +653,18 @@ function LeadForm({
     router.push(`/leads?${params.toString()}`);
   }
 
-  /** Clear this lead's grouping. The server refuses anyone but an admin. */
+  /** Clear this lead's grouping. Refused when part of the group is hidden. */
   function markNotDuplicate() {
     startDismissingDup(async () => {
       const result = await markLeadNotDuplicate(lead.id);
       if (!result.ok) {
-        toast.error("Could not update duplicate status", {
-          description: result.error ?? "Please try again.",
-        });
+        if (result.error === DUPLICATE_GROUP_HIDDEN_MESSAGE) {
+          toast.warning(DUPLICATE_GROUP_HIDDEN_MESSAGE);
+        } else {
+          toast.error("Could not update duplicate status", {
+            description: result.error ?? "Please try again.",
+          });
+        }
         return;
       }
 

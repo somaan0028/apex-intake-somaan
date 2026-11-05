@@ -21,6 +21,14 @@ export type LeadSource = (typeof LEAD_SOURCES)[number];
 export const UNASSIGNED = "unassigned";
 
 /**
+ * Why a duplicate grouping cannot be dismissed by someone who cannot see every
+ * member. Shared by the service (the refusal) and the dialog (the toast), so the
+ * two cannot drift apart.
+ */
+export const DUPLICATE_GROUP_HIDDEN_MESSAGE =
+  "You don't have access to some of the potentially similar leads. Please contact an Admin.";
+
+/**
  * Campaign selector on the Analytics page. `OTHER` is the same bucket the lead
  * grid uses: every stored case type that is not MVA or Mass Tort, including raw
  * ad-campaign values. `all` means no campaign filter.

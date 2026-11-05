@@ -91,6 +91,7 @@ const expectedGrants: Record<UserRole, readonly Permission[]> = {
     "leads.edit.own",
     "leads.claim",
     "leads.release",
+    "leads.resolve_duplicates",
   ],
 };
 for (const role of Object.keys(expectedGrants) as UserRole[]) {
