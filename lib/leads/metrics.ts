@@ -37,7 +37,7 @@ export interface LeadMetrics {
   byStage: Record<LeadStage, number>;
   /** No owner yet and still in play — the open pool anyone can claim. */
   unassigned: number;
-  /** Owned by the viewer. */
+  /** Owned by the viewer and still in play. */
   assignedToMe: number;
   /** Arrived in the last `RECENT_WINDOW_DAYS` days. */
   newThisWeek: number;
@@ -101,7 +101,11 @@ export function leadMetrics(actor: Actor): LeadMetrics {
       isNull(leads.assignedToId),
       ne(leads.stage, "DISQUALIFIED"),
     ),
-    assignedToMe: countVisible(actor, eq(leads.assignedToId, actor.id)),
+    assignedToMe: countVisible(
+      actor,
+      eq(leads.assignedToId, actor.id),
+      ne(leads.stage, "DISQUALIFIED"),
+    ),
     newThisWeek: countVisible(actor, gte(leads.createdAt, since)),
     readyToSend: countVisible(
       actor,

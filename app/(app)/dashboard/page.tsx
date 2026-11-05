@@ -390,7 +390,7 @@ export default async function OverviewPage() {
         <StatCard
           label="Active leads"
           value={metrics.total}
-          hint="All non-disqualified leads"
+          hint="Leade upto stage 'Retained'"
           href="/leads"
         />
         <StatCard
@@ -408,7 +408,7 @@ export default async function OverviewPage() {
         <StatCard
           label="Assigned to you"
           value={metrics.assignedToMe}
-          hint="Your own book"
+          hint="Active leads you own"
           href={`/leads?filter.assignedTo=${user.id}`}
         />
       </div>

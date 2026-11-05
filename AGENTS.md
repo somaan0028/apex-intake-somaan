@@ -348,8 +348,8 @@ their Lawmatics CRM.
   Every number comes from
   `lib/leads/metrics.ts`, which scopes its counts with the same
   `leadsVisibilityCondition` the grid uses, so an agent's totals never include leads they
-  could not open. The headline **Active leads** card and the **Unassigned** card both
-  exclude `DISQUALIFIED` (closed leads), and so does the pipeline: `PIPELINE_STAGES`
+  could not open. The headline **Active leads**, **Unassigned** and **Assigned to you**
+  cards all exclude `DISQUALIFIED` (closed leads), and so does the pipeline: `PIPELINE_STAGES`
   filters that stage out of both the bar and its legend, and the card's total is the sum
   of the stages it draws. The counts each link into the pre-filtered grid
   (`/leads?filter.<columnId>=<value>`), the "ready for Brightwater" callout is shown
