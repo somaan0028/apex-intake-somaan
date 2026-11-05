@@ -81,6 +81,13 @@ their Lawmatics CRM.
   `source` of `www.apexleadsource.com` — the stored source is not the identifier
   Brightwater expects, so it is never sent. Emails are re-checked with `isValidEmail`
   at this boundary.
+- Every outbound Brightwater attempt writes one JSON file to
+  `data/brightwater-logs/` (beside the database, gitignored) from
+  `lib/brightwater/log.ts`: timestamp, local lead id, URL, the exact
+  form-urlencoded **body** plus the parsed fields, response status/body, duration
+  and outcome. The `x-candidate` token is never written. Logging is best-effort and
+  cannot change the send result; pre-flight refusals (invalid payload or a missing
+  token) make no request and are not logged.
 - `case_type` is normally `MVA`, `MASS_TORT` or `OTHER` (canonical codes; labels in
   `lib/labels.ts`), but an ad campaign we do not recognise is stored **verbatim** in this
   column, so read it through `caseTypeLabel()` rather than indexing `CASE_TYPE_LABELS`

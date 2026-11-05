@@ -14,6 +14,7 @@ import {
   BRIGHTWATER_TIMEOUT_MS,
   asBrightwaterResponse,
 } from "./contract";
+import { writeBrightwaterAttempt, type BrightwaterAttempt } from "./log";
 import { buildBrightwaterPayload, type BrightwaterLead } from "./payload";
 
 /** Outcome of a submission attempt. Never throws for an expected failure. */
@@ -32,9 +33,14 @@ export type BrightwaterSendResult =
  *
  * A `code` other than `1` is a rejection; its `response` text is surfaced as the
  * error so the operator sees Brightwater's own reason (e.g. "HLR rejection").
+ *
+ * Every outbound attempt is written to `data/brightwater-logs/` first (see
+ * `log.ts`). Pre-flight refusals — a payload that cannot be built, or a missing
+ * token — make no request and are not logged.
  */
 export async function sendLeadToBrightwater(
   lead: BrightwaterLead,
+  options: { leadId?: number | null } = {},
 ): Promise<BrightwaterSendResult> {
   const payload = buildBrightwaterPayload(lead);
   if (!payload.ok) return payload;
@@ -47,6 +53,21 @@ export async function sendLeadToBrightwater(
     };
   }
 
+  const attemptedAt = new Date().toISOString();
+  const startedAt = Date.now();
+  const requestBody = new URLSearchParams(payload.fields).toString();
+  const base: Pick<BrightwaterAttempt, "attemptedAt" | "leadId" | "request"> = {
+    attemptedAt,
+    leadId: options.leadId ?? null,
+    request: {
+      method: "POST",
+      url: BRIGHTWATER_SUBMIT_URL,
+      contentType: "application/x-www-form-urlencoded",
+      body: requestBody,
+      fields: payload.fields,
+    },
+  };
+
   let response: Response;
   try {
     response = await fetch(BRIGHTWATER_SUBMIT_URL, {
@@ -56,50 +77,82 @@ export async function sendLeadToBrightwater(
         Accept: "application/json",
         "x-candidate": token,
       },
-      body: new URLSearchParams(payload.fields).toString(),
+      body: requestBody,
       signal: AbortSignal.timeout(BRIGHTWATER_TIMEOUT_MS),
       cache: "no-store",
     });
   } catch (error) {
-    return { ok: false, error: describeNetworkError(error) };
+    const message = describeNetworkError(error);
+    await writeBrightwaterAttempt({
+      ...base,
+      response: null,
+      outcome: "network_error",
+      error: message,
+    });
+    return { ok: false, error: message };
   }
 
   const raw = await response.text();
+  const responseRecord = {
+    status: response.status,
+    body: raw,
+    durationMs: Date.now() - startedAt,
+  };
   const body = parseJson(raw);
 
   if (!response.ok) {
-    return {
-      ok: false,
-      error: `Brightwater returned HTTP ${response.status}.`,
-    };
+    const error = `Brightwater returned HTTP ${response.status}.`;
+    await writeBrightwaterAttempt({
+      ...base,
+      response: responseRecord,
+      outcome: "http_error",
+      error,
+    });
+    return { ok: false, error };
   }
 
   const parsed = asBrightwaterResponse(body);
   if (!parsed) {
-    return {
-      ok: false,
-      error: "Brightwater returned an unexpected response.",
-    };
+    const error = "Brightwater returned an unexpected response.";
+    await writeBrightwaterAttempt({
+      ...base,
+      response: responseRecord,
+      outcome: "unexpected_response",
+      error,
+    });
+    return { ok: false, error };
   }
 
   if (parsed.code !== 1) {
+    const error =
+      parsed.response || `Brightwater rejected the lead (code ${parsed.code}).`;
+    await writeBrightwaterAttempt({
+      ...base,
+      response: responseRecord,
+      outcome: "rejected",
+      error,
+    });
     return {
       ok: false,
       code: parsed.code,
       // Only a provider rejection carries a "why". Network and HTTP failures
       // leave this unset so the activity log can call them unexpected errors.
       response: parsed.response.trim() || undefined,
-      error:
-        parsed.response ||
-        `Brightwater rejected the lead (code ${parsed.code}).`,
+      error,
     };
   }
 
-  return {
-    ok: true,
-    leadId: parsed.leadId === null ? null : String(parsed.leadId),
-    processTime: parsed.processTime ?? null,
-  };
+  const leadId = parsed.leadId === null ? null : String(parsed.leadId);
+  const processTime = parsed.processTime ?? null;
+  await writeBrightwaterAttempt({
+    ...base,
+    response: responseRecord,
+    outcome: "accepted",
+    brightwaterLeadId: leadId,
+    processTime,
+  });
+
+  return { ok: true, leadId, processTime };
 }
 
 function parseJson(raw: string): unknown {

@@ -1063,7 +1063,7 @@ export async function sendLeadForActor(
     return { ok: false, error: eligibility.reason ?? "The lead cannot be sent." };
   }
 
-  const result = await sendLeadToBrightwater(lead);
+  const result = await sendLeadToBrightwater(lead, { leadId: lead.id });
   if (!result.ok) {
     recordActivity({
       type: "lead:send_to_firm",
