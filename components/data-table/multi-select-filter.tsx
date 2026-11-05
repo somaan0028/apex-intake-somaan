@@ -75,6 +75,20 @@ export function MultiSelectFilter({
     onChange(next);
   }
 
+  function selectAll() {
+    const next = options.map((option) => option.value);
+    setDraft(next);
+    onChange(next);
+  }
+
+  function clearAll() {
+    setDraft([]);
+    onChange([]);
+  }
+
+  const allSelected =
+    options.length > 0 && chosen.length === options.length;
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
@@ -110,20 +124,28 @@ export function MultiSelectFilter({
               <span>{option.label}</span>
             </label>
           ))}
-          {chosen.length ? (
+          <div className="mt-1 flex items-center justify-between gap-2 border-t pt-1">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="mt-1 justify-start"
-              onClick={() => {
-                setDraft([]);
-                onChange([]);
-              }}
+              className="px-2"
+              disabled={allSelected}
+              onClick={selectAll}
+            >
+              Select all
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              disabled={chosen.length === 0}
+              onClick={clearAll}
             >
               Clear
             </Button>
-          ) : null}
+          </div>
         </div>
       </PopoverContent>
     </Popover>

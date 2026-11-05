@@ -425,8 +425,8 @@ their Lawmatics CRM.
   comma-separated list (`filter.stage=NEW,CONTACTED`), parsed through
   `parseFilterValues` / `readFilterList`, so one filter can match several values.
   A `DataTableFilter` opts into this with `multiple: true`; the shared
-  `MultiSelectFilter` renders a checkbox popover and keeps a local draft while the
-  URL round-trip is in flight.
+  `MultiSelectFilter` renders a checkbox popover with **Select all** / **Clear**
+  and keeps a local draft while the URL round-trip is in flight.
 - The leads grid and board have **no date window by default**: the Added filter
   starts cleared ("Any time"). It offers `24h`, `3d`, `7d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional
