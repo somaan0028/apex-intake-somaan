@@ -1324,31 +1324,27 @@ function LeadForm({
             </Section>
           ) : null}
 
-          <Section
-            title="Firm submission"
-            action={
-              <LeadHistoryDialog
-                leadId={lead.id}
-                type="lead:send_to_firm"
-                triggerLabel="View attempts"
-                title="Submission attempts"
-                emptyMessage="No submission attempts have been recorded yet."
-              />
-            }
-          >
-            <Field label="Sent to firm">
-              {sentAt ? formatDateTime(sentAt) : "Not sent"}
-            </Field>
-            <Field label="Brightwater lead id">
-              {orDash(brightwaterLeadId)}
-            </Field>
-            {sent ? null : (
-              <div className="col-span-2 grid gap-2">
-                {(draft.caseType || null) !== "MVA" ? (
-                  <p className="text-xs text-muted-foreground">
-                    Only MVA leads are sent to the firm.
-                  </p>
-                ) : canSend ? (
+          {(draft.caseType || null) === "MVA" ? (
+            <Section
+              title="Firm submission"
+              action={
+                <LeadHistoryDialog
+                  leadId={lead.id}
+                  type="lead:send_to_firm"
+                  triggerLabel="View attempts"
+                  title="Submission attempts"
+                  emptyMessage="No submission attempts have been recorded yet."
+                />
+              }
+            >
+              <Field label="Sent to firm">
+                {sentAt ? formatDateTime(sentAt) : "Not sent"}
+              </Field>
+              <Field label="Brightwater lead id">
+                {orDash(brightwaterLeadId)}
+              </Field>
+              {sent || !canSend ? null : (
+                <div className="col-span-2 grid gap-2">
                   <Button
                     type="button"
                     className="w-full"
@@ -1357,10 +1353,10 @@ function LeadForm({
                   >
                     {sending ? "Sending…" : "Send to Firm"}
                   </Button>
-                ) : null}
-              </div>
-            )}
-          </Section>
+                </div>
+              )}
+            </Section>
+          ) : null}
         </div>
 
         {error ? (
