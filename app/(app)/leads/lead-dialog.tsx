@@ -769,7 +769,7 @@ function LeadForm({
           </div>
         ) : null}
 
-        <div className="grid max-h-[60vh] gap-5 overflow-y-auto pr-1">
+        <div className="grid max-h-[60vh] gap-5 overflow-y-auto px-1.5">
           {/* Stage + assignment. */}
           <section className="grid gap-3">
             <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
