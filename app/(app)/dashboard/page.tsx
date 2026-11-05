@@ -87,11 +87,17 @@ function AlertBar({
   );
 }
 
+/**
+ * Stages the pipeline shows. Disqualified closes a lead, so those rows are not
+ * part of the active pipeline the card is describing.
+ */
+const PIPELINE_STAGES = LEAD_STAGES.filter(
+  (stage) => stage !== "DISQUALIFIED",
+);
+
 /** Stage-by-stage breakdown as one stacked bar, with a legend below it. */
 function Pipeline({ byStage }: { byStage: Record<string, number> }) {
-  // Includes Disqualified: the pipeline shows where every lead ended up, which
-  // is why it does not reuse the Overview's active-lead total.
-  const total = LEAD_STAGES.reduce(
+  const total = PIPELINE_STAGES.reduce(
     (sum, stage) => sum + (byStage[stage] ?? 0),
     0,
   );
@@ -112,7 +118,7 @@ function Pipeline({ byStage }: { byStage: Record<string, number> }) {
         ) : (
           <>
             <div className="flex h-4 w-full gap-px overflow-hidden rounded-full bg-muted">
-              {LEAD_STAGES.map((stage) => {
+              {PIPELINE_STAGES.map((stage) => {
                 const value = byStage[stage] ?? 0;
                 if (value === 0) return null;
                 const label = LEAD_STAGE_LABELS[stage];
@@ -149,7 +155,7 @@ function Pipeline({ byStage }: { byStage: Record<string, number> }) {
 function Legend({ byStage }: { byStage: Record<string, number> }) {
   return (
     <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-      {LEAD_STAGES.map((stage) => {
+      {PIPELINE_STAGES.map((stage) => {
         const value = byStage[stage] ?? 0;
         return (
           <li key={stage}>
@@ -384,7 +390,7 @@ export default async function OverviewPage() {
         <StatCard
           label="Active leads"
           value={metrics.total}
-          hint="Excludes disqualified"
+          hint="All non-disqualified leads"
           href="/leads"
         />
         <StatCard
