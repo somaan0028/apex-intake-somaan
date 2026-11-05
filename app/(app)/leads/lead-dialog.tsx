@@ -609,9 +609,10 @@ function LeadForm({
     startSending(async () => {
       const result = await sendLeadToFirm(formData);
       if (!result.ok) {
-        toast.error("Could not send to firm", {
-          description: result.error ?? "Please try again.",
-        });
+        // The server's refusal is already a complete sentence (e.g. the
+        // potential-duplicate and already-submitted messages), so show it as
+        // the toast rather than burying it under a generic title.
+        toast.error(result.error ?? "Could not send the lead to the firm.");
         return;
       }
 

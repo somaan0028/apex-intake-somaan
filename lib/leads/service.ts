@@ -911,7 +911,7 @@ export async function sendLeadForActor(
     return {
       ok: false,
       error:
-        "This lead is a potential duplicate. Review it with View similar, or mark it as not a duplicate, before sending it to the firm.",
+        "This lead is a potential duplicate. Either mark it as 'Not Duplicate', or remove the duplicate records, before sending it to the firm.",
     };
   }
 
