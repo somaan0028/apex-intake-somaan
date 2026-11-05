@@ -1737,7 +1737,7 @@ function KanbanSkeleton() {
  * The Kanban board.
  *
  * The server hands us a bounded window per stage plus the true count of every
- * stage, so a column can say "165" while painting the newest 25. Cards are drag
+ * stage, so a column can say "165" while painting the newest 10. Cards are drag
  * targets: dropping one on another column calls the same `save` used by the
  * table and dialog, which applies the stage change optimistically and quietly
  * reverts it if the server refuses.

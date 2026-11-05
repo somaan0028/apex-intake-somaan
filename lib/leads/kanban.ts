@@ -12,10 +12,10 @@ import { LEAD_STAGES, type LeadStage } from "@/lib/db/schema";
 import type { TableQuerySource } from "@/lib/table-query";
 
 /** Cards loaded into each stage column on a fresh board. */
-export const KANBAN_DEFAULT_LANE_SIZE = 25;
+export const KANBAN_DEFAULT_LANE_SIZE = 10;
 
 /** How many more cards one "Show more" click adds to a column. */
-export const KANBAN_LANE_STEP = 25;
+export const KANBAN_LANE_STEP = 10;
 
 /**
  * Hard ceiling per column. Beyond this a board stops being a board: the column
