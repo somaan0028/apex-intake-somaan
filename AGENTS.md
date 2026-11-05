@@ -503,6 +503,9 @@ their Lawmatics CRM.
   means bookmarked by the signed-in user, never by anyone else. The filter is hosted
   by a hidden, non-hideable table column so it uses the same URL/saved-view plumbing
   as every other filter, and it works unchanged in Table, Kanban, and CSV export.
+  A **Submitted** filter (`filter.submitted=self|other`, visible by default) uses
+  `is_filling_for_someone_else`: Self means the injured person filed the form, Other
+  means someone filed it for them. Unknown (null) matches neither.
   **Case type**, **Stage**, and **Assigned to** are multi-select: their URL value is a
   comma-separated list (`filter.stage=NEW,CONTACTED`), parsed through
   `parseFilterValues` / `readFilterList`, so one filter can match several values.

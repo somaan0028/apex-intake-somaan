@@ -270,11 +270,13 @@ const DEFAULT_COLUMN_VISIBILITY = {
   hasAttorney: false,
   hasReceivedSettlement: false,
   potentialDuplicate: false,
+  submitted: false,
 };
 
 /** Filter controls hidden on first render; the Filters menu can reveal them. */
 const DEFAULT_FILTER_VISIBILITY = {
   bookmarked: true,
+  submitted: true,
   isAtFault: false,
   hasAttorney: false,
   hasReceivedSettlement: false,
@@ -435,6 +437,17 @@ const columns = columnHelper.columns([
     enableHiding: false,
     cell: (info) => (info.getValue() ? "Yes" : EMPTY),
   }),
+  // The "Submitted" filter is hosted by this hidden column, same pattern.
+  columnHelper.accessor((row) => row.isFillingForSomeoneElse, {
+    id: "submitted",
+    header: "Submitted",
+    enableSorting: false,
+    enableHiding: false,
+    cell: (info) => {
+      const value = info.getValue();
+      return value === null ? EMPTY : <span>{value ? "Other" : "Self"}</span>;
+    },
+  }),
 ]);
 
 /** Stable row id so sorting/filtering preserves row identity. */
@@ -514,6 +527,17 @@ function buildFilters(
       options: [
         { label: "Yes", value: "yes" },
         { label: "No", value: "no" },
+      ],
+    },
+    {
+      // Whether the injured person filed the form themselves or someone else
+      // did. The lead's `isFillingForSomeoneElse` boolean backs it.
+      columnId: "submitted",
+      label: "Submitted",
+      allLabel: "Any",
+      options: [
+        { label: "Self", value: "self" },
+        { label: "Other", value: "other" },
       ],
     },
     {

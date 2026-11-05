@@ -374,6 +374,15 @@ function leadScope(query: TableQuery, actor: Actor): LeadScope {
       conditions.push(not(bookmarkedBy(actor)));
     }
 
+    // "Submitted" filter: Self means the injured person filed the form, Other
+    // means someone filed it on their behalf. Unknown (null) matches neither.
+    const submitted = query.filters.submitted;
+    if (submitted === "self") {
+      conditions.push(eq(leads.isFillingForSomeoneElse, false));
+    } else if (submitted === "other") {
+      conditions.push(eq(leads.isFillingForSomeoneElse, true));
+    }
+
     // Tri-state qualifying answers (yes / no / unknown).
     conditions.push(booleanFilter(query, "isAtFault", leads.isAtFault));
     conditions.push(booleanFilter(query, "hasAttorney", leads.hasAttorney));
