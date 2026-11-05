@@ -469,7 +469,9 @@ their Lawmatics CRM.
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
   card therefore keeps the last chosen view, while filters and search still come from
-  the URL. The board is windowed **per stage**, not paged as a whole: the server
+  the URL. A **Sort** control (newest/oldest by date added) sits in the toolbar in both
+  views — in Table it mirrors the Date column's sort — and moves into the Options sheet
+  below `xl`. The board is windowed **per stage**, not paged as a whole: the server
   returns the newest 10 cards of each column (expandable with "Show more", which
   writes `board.<STAGE>=<limit>`, 10 cards at a time up to a 200-card ceiling)
   plus a true grouped count per stage, so a column badge always describes the

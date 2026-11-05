@@ -176,7 +176,7 @@ const STAGE_OPTIONS = LEAD_STAGES.map((value) => ({
   value,
 }));
 
-const KANBAN_SORT_OPTIONS = [
+const LEADS_SORT_OPTIONS = [
   { label: "Newest to Oldest", value: "newest" },
   { label: "Oldest to Newest", value: "oldest" },
 ];
@@ -546,7 +546,6 @@ export function LeadsTable({
   assignees,
   viewer,
   view,
-  sortExplicit,
   preserveFilters,
 }: {
   leads: LeadRow[];
@@ -561,8 +560,6 @@ export function LeadsTable({
   viewer: AuthUser;
   /** Table or Kanban; the server loads six lane windows for the board. */
   view: LeadsView;
-  /** True when the URL explicitly asked for a date-added sort. */
-  sortExplicit: boolean;
   /**
    * Restore the filters saved in this browser. Only the sidebar's Leads link
    * asks for it; any other landing on `/leads` starts with cleared filters.
@@ -872,10 +869,10 @@ export function LeadsTable({
     return true;
   }
 
-  // Blank until the URL explicitly asks for a date-added sort, so the board
-  // keeps its natural order on a fresh visit.
+  // Reflect the date sort actually in force (the default is newest first), so
+  // the control never reads "Default" while the grid is already date-sorted.
   const sortValue =
-    sortExplicit && query.sort?.id === "createdAt"
+    query.sort?.id === "createdAt"
       ? query.sort.desc
         ? "newest"
         : "oldest"
@@ -1164,35 +1161,33 @@ export function LeadsTable({
           </div>
         }
         headerLeading={
-          view === "kanban" ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
-                Sort
-              </span>
-              <Select
-                items={KANBAN_SORT_OPTIONS}
-                value={sortValue || null}
-                onValueChange={(value) => {
-                  if (value) changeSort(value);
-                }}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
+              Sort
+            </span>
+            <Select
+              items={LEADS_SORT_OPTIONS}
+              value={sortValue || null}
+              onValueChange={(value) => {
+                if (value) changeSort(value);
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-44"
+                aria-label="Sort leads by date added"
               >
-                <SelectTrigger
-                  size="sm"
-                  className="w-44"
-                  aria-label="Sort leads by date added"
-                >
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  {KANBAN_SORT_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : undefined
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent>
+                {LEADS_SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         }
         headerActions={
           <div className="flex flex-wrap items-center gap-2">
@@ -1296,38 +1291,36 @@ export function LeadsTable({
               </div>
             </section>
 
-            {view === "kanban" ? (
-              <section className="space-y-2">
-                <label
-                  htmlFor="mobile-board-sort"
-                  className="text-sm font-medium"
+            <section className="space-y-2">
+              <label
+                htmlFor="mobile-board-sort"
+                className="text-sm font-medium"
+              >
+                Sort
+              </label>
+              <Select
+                items={LEADS_SORT_OPTIONS}
+                value={sortValue || null}
+                onValueChange={(value) => {
+                  if (value) changeSort(value);
+                }}
+              >
+                <SelectTrigger
+                  id="mobile-board-sort"
+                  className="w-full"
+                  aria-label="Sort leads by date added"
                 >
-                  Sort
-                </label>
-                <Select
-                  items={KANBAN_SORT_OPTIONS}
-                  value={sortValue || null}
-                  onValueChange={(value) => {
-                    if (value) changeSort(value);
-                  }}
-                >
-                  <SelectTrigger
-                    id="mobile-board-sort"
-                    className="w-full"
-                    aria-label="Sort leads by date added"
-                  >
-                    <SelectValue placeholder="Default" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {KANBAN_SORT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </section>
-            ) : null}
+                  <SelectValue placeholder="Default" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEADS_SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </section>
 
             <section className="space-y-2">
               <p className="text-sm font-medium">Saved views</p>
