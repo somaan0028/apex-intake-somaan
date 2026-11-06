@@ -251,9 +251,9 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                     render={
                       <SidebarMenuButton
                         tooltip={group.title}
-                        isActive={group.items.some((item) =>
-                          isCurrent(item.url),
-                        )}
+                        // The group header is a disclosure, not a destination:
+                        // the active highlight belongs to the sub-page only.
+                        isActive={false}
                       />
                     }
                   >
