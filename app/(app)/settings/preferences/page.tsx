@@ -29,8 +29,7 @@ export default async function PreferencesPage() {
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Choose a theme and colour mode for your account. Changes apply
-            immediately and are saved to your account.
+            Choose a theme. Set your dashboard the way you like!
           </p>
         </CardHeader>
         <CardContent>
