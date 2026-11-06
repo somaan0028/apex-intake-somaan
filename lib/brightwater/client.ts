@@ -10,7 +10,7 @@
  * the query string and the candidate token in the `x-candidate` header.
  */
 import {
-  BRIGHTWATER_SUBMIT_URL,
+  buildBrightwaterSubmitUrl,
   BRIGHTWATER_TIMEOUT_MS,
   asBrightwaterResponse,
 } from "./contract";
@@ -55,13 +55,14 @@ export async function sendLeadToBrightwater(
 
   const attemptedAt = new Date().toISOString();
   const startedAt = Date.now();
+  const submitUrl = buildBrightwaterSubmitUrl();
   const requestBody = new URLSearchParams(payload.fields).toString();
   const base: Pick<BrightwaterAttempt, "attemptedAt" | "leadId" | "request"> = {
     attemptedAt,
     leadId: options.leadId ?? null,
     request: {
       method: "POST",
-      url: BRIGHTWATER_SUBMIT_URL,
+      url: submitUrl,
       contentType: "application/x-www-form-urlencoded",
       body: requestBody,
       fields: payload.fields,
@@ -70,7 +71,7 @@ export async function sendLeadToBrightwater(
 
   let response: Response;
   try {
-    response = await fetch(BRIGHTWATER_SUBMIT_URL, {
+    response = await fetch(submitUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",

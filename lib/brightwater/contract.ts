@@ -9,10 +9,32 @@
  * Only `MVA` leads are ever sent (see `canSendLeadToFirm`).
  */
 
-/** The full (query-string included) submit URL. Hard-coded per the spec. */
-export const BRIGHTWATER_SUBMIT_URL =
-  "https://n8n.datosoperations.com/webhook/leadbyte-mock-submit" +
-  "?campid=PERSONAL-INJURY-MVA&sid=50&returnjson=yes";
+/**
+ * The submit endpoint and the campaign/source identifiers that always ride on
+ * its query string.
+ *
+ * The URL is built with `URLSearchParams` (see `buildBrightwaterSubmitUrl`) so
+ * every value is percent-encoded by construction. That matters for `campid`,
+ * which currently happens to be URL-safe but must stay safe if it changes.
+ */
+export const BRIGHTWATER_SUBMIT_BASE_URL =
+  "https://n8n.datosoperations.com/webhook/leadbyte-mock-submit";
+
+/** Always-on query-string identifiers, encoded when the submit URL is built. */
+export const BRIGHTWATER_SUBMIT_QUERY = {
+  campid: "PERSONAL-INJURY-MVA",
+  sid: "50",
+  returnjson: "yes",
+} as const;
+
+/** The full submit URL with its encoded query string. */
+export function buildBrightwaterSubmitUrl(): string {
+  const url = new URL(BRIGHTWATER_SUBMIT_BASE_URL);
+  for (const [key, value] of Object.entries(BRIGHTWATER_SUBMIT_QUERY)) {
+    url.searchParams.set(key, value);
+  }
+  return url.toString();
+}
 
 /**
  * Always-on tracking fields. `c1` identifies the campaign; `subid` is the

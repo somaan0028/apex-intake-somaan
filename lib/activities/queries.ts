@@ -29,6 +29,10 @@ export interface ActivityRow {
   /** The doer's stored photo, or `null` for initials / a deleted user. */
   doerAvatarPath: string | null;
   leadId: number | null;
+  /** False once the referenced lead row is gone. */
+  leadExists: boolean;
+  /** True only while the viewer may still open the lead. */
+  leadVisible: boolean;
   /** `null` for user-only events; "Deleted lead" when the lead is gone. */
   affectedLeadName: string | null;
 }
@@ -109,6 +113,7 @@ const ACTIVITY_COLUMNS = {
   doerAvatarPath: users.avatarPath,
   leadId: activities.leadId,
   leadExists: leads.id,
+  leadAssignedToId: leads.assignedToId,
   leadFirstName: leads.injuredFirstName,
   leadLastName: leads.injuredLastName,
   leadMatterId: leads.matterId,
@@ -125,13 +130,15 @@ interface ActivityJoinRow {
   doerAvatarPath: string | null;
   leadId: number | null;
   leadExists: number | null;
+  leadAssignedToId: number | null;
   leadFirstName: string | null;
   leadLastName: string | null;
   leadMatterId: string | null;
 }
 
 /** Normalise a joined row, naming deleted actors and leads explicitly. */
-function toActivityRow(row: ActivityJoinRow): ActivityRow {
+function toActivityRow(row: ActivityJoinRow, actor: Actor): ActivityRow {
+  const exists = row.leadExists !== null;
   return {
     id: row.id,
     type: row.type,
@@ -142,10 +149,19 @@ function toActivityRow(row: ActivityJoinRow): ActivityRow {
     doerName: row.doerName ?? "Deleted user",
     doerAvatarPath: row.doerAvatarPath,
     leadId: row.leadId,
+    leadExists: exists,
+    leadVisible:
+      exists &&
+      canViewLead(actor, {
+        assignedToId: row.leadAssignedToId,
+        caseType: null,
+        sentToFirmAt: null,
+        brightwaterLeadId: null,
+      }),
     affectedLeadName:
       row.leadId === null
         ? null
-        : row.leadExists === null
+        : !exists
           ? "Deleted lead"
           : leadLabel({
               injuredFirstName: row.leadFirstName,
@@ -227,7 +243,7 @@ export function listActivities(
     .all();
 
   return {
-    rows: rows.map(toActivityRow),
+    rows: rows.map((row) => toActivityRow(row, actor)),
     total: plan.total,
     page: plan.page,
     sort: plan.sort,
@@ -248,7 +264,7 @@ export function recentActivities(actor: Actor, limit = 5): ActivityRow[] {
     .orderBy(desc(activities.createdAt), desc(activities.id))
     .limit(limit)
     .all()
-    .map(toActivityRow);
+    .map((row) => toActivityRow(row, actor));
 }
 
 /** Distinct doers in the actor's visible activity, for the filter select. */

@@ -10,6 +10,7 @@
  * the leads page.
  */
 import { createColumnHelper } from "@tanstack/react-table";
+import Link from "next/link";
 import { FilterX, Search, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { DataTable, useTableQuerySync } from "@/components/data-table";
@@ -91,7 +92,22 @@ const columns = columnHelper.columns([
   columnHelper.accessor("affectedLeadName", {
     header: "Lead Involved",
     enableSorting: false,
-    cell: (info) => info.getValue() ?? "—",
+    cell: (info) => {
+      const { leadId, leadExists, leadVisible, affectedLeadName } =
+        info.row.original;
+      if (!affectedLeadName) return "—";
+      // Only a lead that still exists and is visible to the viewer gets a link;
+      // the leads grid can then open it directly.
+      if (!leadId || !leadExists || !leadVisible) return affectedLeadName;
+      return (
+        <Link
+          href={`/leads?lead=${leadId}`}
+          className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+        >
+          {affectedLeadName}
+        </Link>
+      );
+    },
   }),
   columnHelper.accessor("isAi", {
     header: "Through AI",

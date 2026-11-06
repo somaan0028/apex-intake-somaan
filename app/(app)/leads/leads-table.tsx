@@ -573,6 +573,7 @@ export function LeadsTable({
   assignees,
   viewer,
   view,
+  initialLead,
   preserveFilters,
 }: {
   leads: LeadRow[];
@@ -588,6 +589,11 @@ export function LeadsTable({
   /** Table or Kanban; the server loads six lane windows for the board. */
   view: LeadsView;
   /**
+   * A lead to open immediately, loaded from a `?lead=<id>` deep link (for
+   * example an Activity row). It may not be in the current page or lane window.
+   */
+  initialLead: LeadRow | null;
+  /**
    * Restore the filters saved in this browser. Only the sidebar's Leads link
    * asks for it; any other landing on `/leads` starts with cleared filters.
    */
@@ -597,7 +603,10 @@ export function LeadsTable({
   const pathname = usePathname();
   const { isPending, onQueryChange } = useTableQuerySync();
   const [viewPending, startViewTransition] = useTransition();
-  const [selected, setSelected] = useState<LeadRow | null>(null);
+  const [selected, setSelected] = useState<LeadRow | null>(initialLead);
+  // The deep-linked lead is handled once per id, so a server revalidation (or
+  // closing the dialog) cannot reopen it from stale props.
+  const handledInitialLeadId = useRef<number | null>(initialLead?.id ?? null);
   const [overrides, setOverrides] = useState<Record<number, RowOverride>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   // A stage move can push a card outside its target lane's loaded window. Keep
@@ -647,6 +656,14 @@ export function LeadsTable({
     query.sort?.id ?? "",
     query.sort?.desc ? "desc" : "asc",
   ].join("|");
+
+  // A client-side navigation to a different `?lead=<id>` (for example another
+  // Activity row) updates the prop without remounting the grid.
+  useEffect(() => {
+    if (!initialLead || handledInitialLeadId.current === initialLead.id) return;
+    handledInitialLeadId.current = initialLead.id;
+    setSelected(initialLead);
+  }, [initialLead]);
 
   // Restore browser-local state from the last visit. The UI preferences (which
   // filters and columns show, hidden stages, saved views) always come back; the
@@ -1568,6 +1585,15 @@ export function LeadsTable({
           // The dialog revalidates the grid as it saves, so its values are the
           // freshest source once it closes.
           setOverrides({});
+          // Drop the deep-link parameter so a close is not undone by the URL.
+          const params = new URLSearchParams(window.location.search);
+          if (params.has("lead")) {
+            params.delete("lead");
+            const search = params.toString();
+            router.replace(search ? `${pathname}?${search}` : pathname, {
+              scroll: false,
+            });
+          }
         }}
         viewer={viewer}
         assignees={assignees}

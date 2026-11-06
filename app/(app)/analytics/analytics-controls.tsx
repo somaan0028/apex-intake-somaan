@@ -28,6 +28,7 @@ import {
   type CampaignFilterValue,
 } from "@/lib/leads/constants";
 import type { AnalyticsDatePreset } from "@/lib/leads/analytics";
+import { cn } from "@/lib/utils";
 
 interface AnalyticsControlsProps {
   dateWithin: AnalyticsDatePreset;
@@ -48,12 +49,13 @@ export function AnalyticsControls({
 
   function navigate(next: AnalyticsControlsProps) {
     const params = new URLSearchParams();
-    if (next.dateWithin !== "any") {
-      params.set("dateWithin", next.dateWithin);
-      if (next.dateWithin === "custom") {
-        if (next.dateFrom) params.set("dateFrom", next.dateFrom);
-        if (next.dateTo) params.set("dateTo", next.dateTo);
-      }
+    // Always write the date preset, including `any`: the page defaults to 30
+    // days when the parameter is absent, so omitting it would snap All Time
+    // back to Last 30 days.
+    params.set("dateWithin", next.dateWithin);
+    if (next.dateWithin === "custom") {
+      if (next.dateFrom) params.set("dateFrom", next.dateFrom);
+      if (next.dateTo) params.set("dateTo", next.dateTo);
     }
     // Always write the campaign, including `all`: the page's default is MVA,
     // so an omitted parameter would silently snap back to MVA.
@@ -129,7 +131,11 @@ export function AnalyticsControls({
         >
           <SelectTrigger
             size="sm"
-            className="w-44"
+            className={cn(
+              "w-44",
+              campaign !== "all" &&
+                "border-primary/50 bg-primary/10 hover:bg-primary/15 dark:bg-primary/20 dark:hover:bg-primary/25",
+            )}
             aria-label="Campaign filter"
           >
             <SelectValue />
