@@ -464,8 +464,8 @@ function IntakeSuccess({ firstName }: { firstName: string }) {
           {firstName ? `Thanks, ${firstName}` : "Thank you"}
         </h2>
         <p className="max-w-sm text-sm text-muted-foreground text-pretty">
-          We&apos;ve received your information. A member of our team will
-          contact you shortly.
+          We&apos;ve received your information. Our team will
+          reach out shortly.
         </p>
       </CardContent>
     </Card>
