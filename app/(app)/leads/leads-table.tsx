@@ -1747,7 +1747,9 @@ function StageCell({ lead }: { lead: LeadRow }) {
         >
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        {/* The popup is portaled, but React still bubbles its clicks through this
+            cell to the row; without this, picking a stage opens the lead dialog. */}
+        <SelectContent onClick={stopRow}>
           {STAGE_OPTIONS.map((option) => (
             <SelectItem
               key={option.value}
@@ -1829,7 +1831,9 @@ function AssigneeCell({
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          {/* Same reason as the stage select: the portaled popup's clicks still
+              bubble through the React tree to the row. */}
+          <SelectContent onClick={stopRow}>
             {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
