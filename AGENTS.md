@@ -245,7 +245,9 @@ their Lawmatics CRM.
   what `components/ai/larry-mascot.tsx` imports. The player (`lottie-web`, loaded lazily
   because it touches `window`) loops the idle segment (frames 0–60) and recolours every
   fill, stroke and gradient stop from the live `--primary`, keeping each colour's
-  brightness so the shading survives. It repaints when `data-theme`, `data-theme-mode`
+  brightness so the shading survives. The eyes and mouth are the exception: the layers
+  listed in `WHITE_PAINT_LAYERS` stay pure white in every theme, so Larry always has a
+  readable face instead of pink-on-pink features. It repaints when `data-theme`, `data-theme-mode`
   or the `dark` class changes; do not replace it with a canvas player, because canvas
   pixels cannot take their colour from CSS tokens. If the `.lottie` file is replaced,
   re-extract `larry.json` (`a/Main Scene.json` inside the archive).

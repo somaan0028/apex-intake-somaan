@@ -8,7 +8,8 @@
  *
  * The source artwork uses white line work and saturated gradients, so every
  * fill, stroke and gradient stop is remapped onto the live `--primary` value
- * (keeping each colour's brightness) before each render. `lottie-web` renders
+ * (keeping each colour's brightness) before each render — except the eyes and
+ * mouth, which stay white in every theme. `lottie-web` renders
  * SVG, which lets us repaint the shape data itself; a canvas player could only
  * be tinted with filters, which no theme would match. The animation is
  * restarted only when the theme actually changes, so switching presets
@@ -61,11 +62,32 @@ function shadeInto(color: Rgb, base: Rgb): Rgb {
   ];
 }
 
+const WHITE: Rgb = [1, 1, 1];
+
+/**
+ * Face details stay white in every theme.
+ *
+ * These are layer names in `larry.json`: two eyes (the blinking ellipses) and
+ * the mouth. Everything else is tinted from `--primary`, but a pink-eyed Larry
+ * reads as part of the artwork's shading instead of as a face.
+ */
+const WHITE_PAINT_LAYERS = new Set([
+  "Shape Layer 6",
+  "Shape Layer 7",
+  "Shape Layer 8",
+]);
+
+/** Recolour a source colour for a layer: white for the face, tinted otherwise. */
+function paintInto(color: Rgb, base: Rgb, white: boolean): Rgb {
+  if (white) return WHITE;
+  return shadeInto(color, base);
+}
+
 /**
  * A lottie gradient stores its stops as a flat `[offset, r, g, b, …]` list, so
  * every group of four values is one stop. Rewrite each colour in place.
  */
-function tintGradientStops(stops: unknown, base: Rgb) {
+function tintGradientStops(stops: unknown, base: Rgb, white: boolean) {
   if (!Array.isArray(stops)) return;
   for (let index = 0; index + 3 < stops.length; index += 4) {
     const color: Rgb = [
@@ -73,7 +95,7 @@ function tintGradientStops(stops: unknown, base: Rgb) {
       Number(stops[index + 2] ?? 0),
       Number(stops[index + 3] ?? 0),
     ];
-    const shaded = shadeInto(color, base);
+    const shaded = paintInto(color, base, white);
     stops[index + 1] = shaded[0];
     stops[index + 2] = shaded[1];
     stops[index + 3] = shaded[2];
@@ -82,14 +104,15 @@ function tintGradientStops(stops: unknown, base: Rgb) {
 
 /**
  * Clone the animation with every fill, stroke and gradient recoloured from
- * `primary`. Animated gradients are rewritten keyframe by keyframe.
+ * `primary`, except the face layers, which stay white. Animated gradients are
+ * rewritten keyframe by keyframe.
  */
 function tintedAnimation(data: typeof animationData, primary: Rgb) {
   const copy = structuredClone(data) as unknown as Record<string, unknown>;
 
-  const visit = (node: unknown) => {
+  const visit = (node: unknown, base: Rgb, white: boolean) => {
     if (Array.isArray(node)) {
-      node.forEach(visit);
+      node.forEach((child) => visit(child, base, white));
       return;
     }
     if (!node || typeof node !== "object") return;
@@ -104,13 +127,14 @@ function tintedAnimation(data: typeof animationData, primary: Rgb) {
       Array.isArray(paint.k) &&
       paint.k.length === 3
     ) {
-      paint.k = shadeInto(
+      paint.k = paintInto(
         [
           Number(paint.k[0] ?? 0),
           Number(paint.k[1] ?? 0),
           Number(paint.k[2] ?? 0),
         ],
-        primary,
+        base,
+        white,
       );
     }
 
@@ -123,21 +147,25 @@ function tintedAnimation(data: typeof animationData, primary: Rgb) {
     ) {
       const stops = gradient.k.k;
       if (gradient.k.a === 0) {
-        tintGradientStops(stops, primary);
+        tintGradientStops(stops, base, white);
       } else if (Array.isArray(stops)) {
         for (const frame of stops) {
           if (!frame || typeof frame !== "object") continue;
           const keyframe = frame as { s?: unknown; e?: unknown };
-          tintGradientStops(keyframe.s, primary);
-          tintGradientStops(keyframe.e, primary);
+          tintGradientStops(keyframe.s, base, white);
+          tintGradientStops(keyframe.e, base, white);
         }
       }
     }
 
-    Object.values(record).forEach(visit);
+    Object.values(record).forEach((value) => visit(value, base, white));
   };
 
-  visit(copy.layers);
+  for (const layer of copy.layers as Array<Record<string, unknown>>) {
+    const name = typeof layer.nm === "string" ? layer.nm : "";
+    const white = WHITE_PAINT_LAYERS.has(name);
+    visit(layer, white ? WHITE : primary, white);
+  }
   return copy as unknown as typeof animationData;
 }
 
