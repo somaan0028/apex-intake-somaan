@@ -4,7 +4,7 @@ import { ApexMark } from "@/components/apex-mark";
 import { IntakeForm } from "@/components/intake/intake-form";
 
 export const metadata: Metadata = {
-  title: "New client intake",
+  title: "Apex Intake",
   description:
     "Tell us about your matter. Everything you share is confidential.",
 };
