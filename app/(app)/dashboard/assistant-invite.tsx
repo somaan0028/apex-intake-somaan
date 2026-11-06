@@ -32,7 +32,7 @@ export function AssistantInvite({
   return (
     <Card
       className={cn(
-        "border-primary/30 bg-primary/5",
+        "border-primary/30",
         className,
       )}
     >
