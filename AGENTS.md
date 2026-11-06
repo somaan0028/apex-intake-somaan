@@ -45,8 +45,13 @@ their Lawmatics CRM.
   agents over Streamable HTTP at `POST|GET|DELETE /api/mcp`
 
 ## Setup
-- A clean clone runs with `./start.sh`: install, `npm run setup`, build, then serve on
-  port 8080. Development stays on 3000.
+- A clean clone runs with `npm run setup`: install the dependencies, write `.env`,
+  seed the database, then build. `npm start` serves on port 8080; development stays
+  on 3000.
+- `scripts/setup.mjs` is the one-command orchestrator, deliberately plain Node so it
+  runs before `node_modules` exists. It skips the install when dependencies are
+  already present (`npm run setup -- --install` forces it), then runs
+  `scripts/setup.ts` and `npm run build`.
 - `scripts/setup.ts` writes `.env` with only the two required keys and seeds the
   database when it is absent. It keeps real values across reruns; optional settings
   (`DATABASE_PATH`, `AUTH_COOKIE_SECURE`, `AI_MODEL`) belong in `.env.local`.

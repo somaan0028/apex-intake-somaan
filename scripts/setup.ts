@@ -7,7 +7,7 @@
  * generated `.env` never grows beyond what the app cannot boot without.
  *
  * Existing real values are kept. Values passed on the command line win, which
- * makes `OPENROUTER_API_KEY=... CANDIDATE_TOKEN=... ./start.sh` work.
+ * makes `OPENROUTER_API_KEY=... CANDIDATE_TOKEN=... npm run setup` work.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";

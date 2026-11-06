@@ -13,7 +13,7 @@ export interface HeaderReader {
   get(name: string): string | null;
 }
 
-/** Production `npm start` and `./start.sh` serve on 8080. */
+/** Production `npm start` serves on 8080. */
 const FALLBACK_HOST = "localhost:8080";
 
 /** The first value of a possibly comma-separated forwarded header. */

@@ -8,7 +8,6 @@ qualified MVA leads to the partner firm Brightwater.
 
 - Node.js 20 or newer
 - npm
-- A POSIX shell for `./start.sh`. On Windows, run it from Git Bash or WSL.
 
 SQLite is embedded through `better-sqlite3`, so there is no database server to
 install.
@@ -16,7 +15,7 @@ install.
 ## One-command setup
 
 ```bash
-./start.sh
+npm run setup
 ```
 
 From a clean clone this:
@@ -25,7 +24,17 @@ From a clean clone this:
 2. creates `.env` with the two required keys
 3. creates and seeds `data/apex.db` when the file is missing
 4. builds the app
-5. serves it at <http://localhost:8080>
+
+Then serve the build with:
+
+```bash
+npm start
+```
+
+The app runs at <http://localhost:8080>. `npm run setup` is safe to rerun: it
+skips the dependency install when `node_modules` is already present (force it
+with `npm run setup -- --install`), preserves real credentials, and only creates
+the database when it does not exist yet.
 
 The generated `.env` contains only the required values:
 
@@ -35,28 +44,18 @@ CANDIDATE_TOKEN=...
 ```
 
 The placeholders are non-empty so the app can boot, but the AI assistant and
-Brightwater sends need real credentials. Edit `.env`, or pass them once:
+Brightwater sends need real credentials. Edit `.env`, or pass them once (Bash):
 
 ```bash
-OPENROUTER_API_KEY=... CANDIDATE_TOKEN=... ./start.sh
+OPENROUTER_API_KEY=... CANDIDATE_TOKEN=... npm run setup
 ```
+
+In PowerShell, set `$env:OPENROUTER_API_KEY` and `$env:CANDIDATE_TOKEN` before
+running the command, or simply edit `.env` afterwards.
 
 Existing real values are kept when setup runs again. Optional settings such as
 `DATABASE_PATH`, `AUTH_COOKIE_SECURE`, and `AI_MODEL` belong in `.env.local`,
 which Next.js loads and Git ignores.
-
-## Manual setup
-
-```bash
-npm install
-npm run setup
-npm run build
-npm start
-```
-
-`npm start` serves the production build at <http://localhost:8080>.
-`npm run setup` is safe to rerun: it preserves real credentials and only creates
-the database when it does not exist yet.
 
 ## Development
 
@@ -121,8 +120,7 @@ Retained.
 
 | Command               | What it does                                      |
 | --------------------- | ------------------------------------------------- |
-| `./start.sh`          | Full clean-clone setup, build, and production run |
-| `npm run setup`       | Write `.env` and prepare the database             |
+| `npm run setup`       | Full clean-clone setup: install, `.env`, database, build |
 | `npm run dev`         | Development server on port 3000                   |
 | `npm run build`       | Production build                                  |
 | `npm start`           | Serve the build on port 8080                      |
