@@ -113,15 +113,3 @@ Retained.
 
 Stop the server before running `npm run db:reset` so the SQLite file is not
 locked. The reset deletes the file and imports the bundled CSV seed data again.
-
-## Data
-
-- `data/apex.db` holds the SQLite database. `data/` and `.env` are ignored by
-  Git.
-- Seed data lives in `lib/db/seed-data/`. It is imported only when the database
-  file is absent.
-- Passwords are stored as per-user `scrypt` hashes.
-- Dates and timestamps are stored as Unix seconds. Phone numbers are stored as
-  `(XXX) XXX-XXXX`.
-- Brightwater receives only MVA leads, and only once. A lead cannot be moved to
-  Sent to Firm until a submission actually succeeded.
