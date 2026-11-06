@@ -7,10 +7,11 @@
  * is animated; it holds no state of its own and calls the shell's `open()`
  * handle, the same one the header button uses.
  *
- * It is a tall, vertically-centred card in the right-hand column, deliberately
- * larger than a utility tile: the assistant should feel like a colleague
- * waiting on the page. It sizes to its content rather than stretching to the
- * height of the two panels beside it, which left too much empty space.
+ * It is a horizontally-arranged card in the right-hand column: the mascot sits
+ * on the left and the greeting, invite and button stack beside it, so the card
+ * reads as a colleague waiting on the page rather than a tall poster. It sizes
+ * to its content rather than stretching to the height of the two panels beside
+ * it, which left too much empty space.
  */
 import { Sparkles } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/assistant-context";
@@ -36,33 +37,35 @@ export function AssistantInvite({
         className,
       )}
     >
-      <CardContent className="flex flex-col items-center justify-center gap-5 px-6 py-8 text-center">
+      <CardContent className="flex flex-col items-center gap-5 px-6 py-8 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
         <button
           type="button"
           onClick={() => open()}
           aria-label={`Chat with ${ASSISTANT_NAME}`}
           title={`Chat with ${ASSISTANT_NAME}`}
-          className="group rounded-3xl outline-offset-4"
+          className="group shrink-0 rounded-3xl outline-offset-4"
         >
-          <LarryMascot className="size-40 transition-transform duration-300 group-hover:scale-105" />
+          <LarryMascot className="size-32 transition-transform duration-300 group-hover:scale-105" />
         </button>
 
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Your AI assistant
-          </p>
-          <p className="text-lg font-semibold tracking-tight">
-            Hi {firstName}, I&apos;m {ASSISTANT_NAME}.
-          </p>
-          <p className="mx-auto max-w-xs text-sm text-muted-foreground">
-            I'm here to help you manage leads and answer your questions!
-          </p>
-        </div>
+        <div className="flex min-w-0 flex-col items-center gap-3 sm:items-start">
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Your AI assistant
+            </p>
+            <p className="text-lg font-semibold tracking-tight">
+              Hi {firstName}, I&apos;m {ASSISTANT_NAME}.
+            </p>
+            <p className="max-w-xs text-sm text-muted-foreground">
+              I&apos;m here to help you manage leads and answer your questions!
+            </p>
+          </div>
 
-        <Button onClick={() => open()}>
-          <Sparkles />
-          Chat with {ASSISTANT_NAME}
-        </Button>
+          <Button onClick={() => open()}>
+            <Sparkles />
+            Chat with {ASSISTANT_NAME}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -402,9 +402,10 @@ their Lawmatics CRM.
 - The Overview's assistant card is a Client Component only because opening the panel is
   an interaction and the mascot is animated. It is **Larry's home on the page**: the
   right-hand column of the content grid, beside the Pipeline and Latest intake
-  panels stacked on the left, with the Lottie mascot (160px), "Hi {first}
-  — I'm Larry.", a one-line invite and a "Chat with Larry" button, all vertically
-  centred. It sizes to its content instead of stretching to the left column's
+  panels stacked on the left. The card is a horizontal row: the Lottie mascot
+  (128px) on the left, and on the right "Hi {first} — I'm Larry.", a one-line
+  invite and a "Chat with Larry" button stacked beneath it; below `sm` the
+  mascot sits above the text again. It sizes to its content instead of stretching to the left column's
   height (that left too much empty space). The mascot and the button both call `open()`. The mascot is decorative
   (`aria-hidden`) and the button carries the label. The panel's own empty state shows
   the same mascot at 128px above the starter prompts, and drops it as soon as the
