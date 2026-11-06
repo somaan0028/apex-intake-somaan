@@ -623,7 +623,10 @@ their Lawmatics CRM.
   pushing the main panel to the right. The rail keeps the same vertical layout as the
   open sidebar — the group-label slot, the 48px brand and profile rows, and the group
   sub-pages as icons — so expanding on hover never moves an icon out from under the
-  pointer. The desktop shell shows the sidebar colour behind a
+  pointer. The profile row is the account-menu trigger and normally carries a border; in
+  the icon rail that border would draw an empty pill around the avatar, so it is tied to
+  `group-data-[collapsible=icon]` and disappears there (and returns while peeking, when
+  the rail exposes its labels). The desktop shell shows the sidebar colour behind a
   main panel that floats with an 8px margin, rounded corners and a shadow. Nav and
   sub-item icons use
   `text-sidebar-accent-foreground`, which stays themed and legible in every preset. Both

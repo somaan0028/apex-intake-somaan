@@ -315,7 +315,13 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   <SidebarMenuButton
                     size="lg"
                     tooltip={user.name}
-                    className="border border-sidebar-border data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+                    // In the collapsed rail the trigger is nothing but the
+                    // avatar, so its 1px border drew an empty pill around the
+                    // circle. The rail sets `data-collapsible="icon"` (and drops
+                    // it while hover-peeking or pinned open), so tying the
+                    // border to that attribute keeps the border exactly where
+                    // the row has text and removes it where it does not.
+                    className="border border-sidebar-border data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground group-data-[collapsible=icon]:border-transparent"
                   />
                 }
               >
