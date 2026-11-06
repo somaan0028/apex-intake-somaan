@@ -146,13 +146,15 @@ export function AppearanceSettings({
         </div>
 
         {/* A row of cards is too tall on a phone, so below `sm` the presets are a
-            snap slider. `p-1` keeps the selected card's ring from being clipped. */}
+            snap slider. The cards snap to the centre (matching where the mount
+            effect parks the current choice) and `p-1`/`scroll-px-1` leave room
+            for the selected card's ring, which the scroll port would clip. */}
         <div
           ref={themeListRef}
           role="radiogroup"
           aria-label="Theme"
           className={cn(
-            "flex snap-x snap-mandatory gap-3 overflow-x-auto p-1",
+            "flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto p-1",
             "sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:p-0 xl:grid-cols-4",
           )}
         >
@@ -168,7 +170,7 @@ export function AppearanceSettings({
                 disabled={pending}
                 onClick={() => save(option.id, mode)}
                 className={cn(
-                  "group relative w-44 shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-background p-3 text-left text-foreground transition-shadow outline-none",
+                  "group relative w-44 shrink-0 snap-center overflow-hidden rounded-xl border border-border bg-background p-3 text-left text-foreground transition-shadow outline-none",
                   "hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait",
                   "sm:w-auto",
                   selected && "ring-2 ring-primary",
