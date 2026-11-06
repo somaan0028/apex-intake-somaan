@@ -570,7 +570,9 @@ their Lawmatics CRM.
 - **Export CSV** (`app/api/leads/export/route.ts`) downloads every lead under the
   current filters, search and sort — not the visible page or the loaded Kanban
   cards. On desktop it lives in the view-actions (three-dot) menu beside **Save
-  View**; on small screens it sits in the Options sheet's Filters section.
+  View**; on small screens it has its own **Export data** section at the bottom of the
+  Options sheet, below Columns/Stages, as a full-width **Download CSV** button rather
+  than an icon tucked beside the Clear filter control.
   `lib/leads/query-params.ts` applies
   the same date normalisation the page uses, and the route reuses
   `listLeadsForExport` (the `listLeads` query with no page window), so visibility,

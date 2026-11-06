@@ -1426,31 +1426,17 @@ export function LeadsTable({
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">Filters</p>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={clearFilters}
-                  >
-                    <FilterX aria-hidden />
-                    Clear
-                    {filterCountBadge}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    nativeButton={false}
-                    render={
-                      <a href={leadsExportHref(query, view)} download />
-                    }
-                    aria-label="Download filtered leads as CSV"
-                    title="Download filtered leads as CSV"
-                  >
-                    <Download aria-hidden />
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={clearFilters}
+                >
+                  <FilterX aria-hidden />
+                  Clear
+                  {filterCountBadge}
+                </Button>
               </div>
 
               {dateFilter}
@@ -1566,6 +1552,31 @@ export function LeadsTable({
                 </div>
               </section>
             )}
+
+            {/* Export gets its own section rather than riding beside the filter
+                controls: it is the last thing on the sheet, so it reads as a
+                destination instead of a small, easily missed icon. */}
+            <section className="space-y-2">
+              <p className="text-sm font-medium">Export data</p>
+              <p className="text-xs text-muted-foreground">
+                Every lead that matches the current filters, not just this page.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                nativeButton={false}
+                render={
+                  <a
+                    href={leadsExportHref(query, view)}
+                    download
+                    aria-label="Download filtered leads as CSV"
+                  />
+                }
+              >
+                <Download aria-hidden />
+                Download CSV
+              </Button>
+            </section>
           </div>
 
           <SheetFooter className="border-t">
