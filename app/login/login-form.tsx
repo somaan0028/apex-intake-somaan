@@ -20,7 +20,6 @@ export function LoginForm() {
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="dana.whitfield@apex-leads.test"
           required
         />
       </div>
@@ -31,7 +30,6 @@ export function LoginForm() {
           name="password"
           type="password"
           autoComplete="current-password"
-          placeholder="apex-demo-2026"
           required
         />
       </div>
