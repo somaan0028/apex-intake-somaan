@@ -388,13 +388,7 @@ export function DataTable<TData extends RowData>({
     <div className="space-y-3">
       <div className="space-y-3">
         {/* Row 1: the search box, and the two menus that control what is shown. */}
-        <div
-          className={cn(
-            "flex flex-wrap items-center gap-2",
-            inlineToolbar &&
-              "flex-col items-stretch lg:flex-row lg:items-center",
-          )}
-        >
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search
               aria-hidden

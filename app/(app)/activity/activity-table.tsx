@@ -11,7 +11,7 @@
  */
 import { createColumnHelper } from "@tanstack/react-table";
 import Link from "next/link";
-import { FilterX, Search, X } from "lucide-react";
+import { FilterX, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { DataTable, useTableQuerySync } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
@@ -41,6 +41,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const columnHelper = createColumnHelper<
   typeof dataTableFeatures,
@@ -154,6 +162,9 @@ export function ActivityTable({
 }) {
   const { isPending, onQueryChange } = useTableQuerySync();
   const preset = rangePreset(query.filters.dateWithin);
+  // On a phone the filters live in a side sheet so the search box and one
+  // Options button are all the toolbar shows.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   function changePreset(next: string) {
     const filters: Record<string, string> = { ...query.filters };
@@ -220,10 +231,11 @@ export function ActivityTable({
     onQueryChange({ ...query, page: 1, search: "", filters: {} });
   }
 
-  // The filters share the toolbar row, with Clear Filters pushed to the right.
+  // The filters share the toolbar row on desktop, with Clear Filters pushed to
+  // the right; on a phone the same controls stack inside the Options sheet.
   // Order matters: date, then doer, then affected lead.
-  const headerFilters = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+  const filterControls = (
+    <>
       <DateRangeFilter
         label="Date"
         options={DATE_RANGE_ANY_OPTIONS}
@@ -258,38 +270,102 @@ export function ActivityTable({
           onQueryChange({ ...query, page: 1, filters });
         }}
       />
+    </>
+  );
+
+  const headerFilters = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {filterControls}
     </div>
   );
 
+  const mobileControls = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="xl:hidden"
+      onClick={() => setFiltersOpen(true)}
+    >
+      <SlidersHorizontal aria-hidden />
+      Options
+      {filterCountBadge}
+    </Button>
+  );
+
   return (
-    <DataTable
-      columns={columns}
-      data={activities}
-      rowCount={total}
-      query={query}
-      onQueryChange={onQueryChange}
-      isPending={isPending}
-      getRowId={getRowId}
-      ariaLabel="Activity"
-      searchPlaceholder="Search by description"
-      toolbarFilters={headerFilters}
-      inlineToolbar
-      toolbarActions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={clearFilters}
-        >
-          <FilterX aria-hidden />
-          <span className="hidden sm:inline">Clear Filters</span>
-          {filterCountBadge}
-        </Button>
-      }
-      showColumnMenu={false}
-      emptyMessage="No activity yet."
-      emptyFilteredMessage="No activity matches your filters."
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={activities}
+        rowCount={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        isPending={isPending}
+        getRowId={getRowId}
+        ariaLabel="Activity"
+        searchPlaceholder="Search by description"
+        toolbarFilters={headerFilters}
+        mobileControls={mobileControls}
+        toolbarActions={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+          >
+            <FilterX aria-hidden />
+            <span className="hidden sm:inline">Clear Filters</span>
+            {filterCountBadge}
+          </Button>
+        }
+        showColumnMenu={false}
+        emptyMessage="No activity yet."
+        emptyFilteredMessage="No activity matches your filters."
+      />
+
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent side="right" className="w-[92vw] gap-0 sm:max-w-md">
+          <SheetHeader className="border-b">
+            <SheetTitle>Filters</SheetTitle>
+            <SheetDescription>
+              Narrow the activity list without leaving the page.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Filters</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={clearFilters}
+              >
+                <FilterX aria-hidden />
+                Clear
+                {filterCountBadge}
+              </Button>
+            </div>
+
+            <div className="flex flex-col items-stretch gap-3">
+              {filterControls}
+            </div>
+          </div>
+
+          <SheetFooter className="border-t">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => setFiltersOpen(false)}
+            >
+              Done
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 

@@ -421,7 +421,10 @@ their Lawmatics CRM.
   presets/custom range), Performed by (a select, admin only — a User has no one else to
   narrow by), then Affected Lead (a debounced name search over the visibility-scoped lead
   query). A Clear Filters button beside them clears every filter and the search, and
-  carries the active-filter count. It deliberately has no detail modal, no row click, and
+  carries the active-filter count. Below `xl` the filter row is replaced by one
+  **Options** button on the search row, which opens the filters in a right-hand sheet
+  (the leads page's pattern) so a phone shows only the search box and that button.
+  It deliberately has no detail modal, no row click, and
   no column or filter-visibility menus.
 - **Analytics** (`app/(app)/analytics/`) is admin-only: the sidebar hides it and the
   page redirects without `analytics.view`, so a hand-typed URL cannot reach attribution
@@ -494,7 +497,8 @@ their Lawmatics CRM.
   hack; a bare `/leads` has no date window (the Date Added filter starts cleared). The
   page itself has no filters or column selector: the toolbar is a single row with the
   name/email search on the left and **Add user** on the right (`inlineToolbar`,
-  `showColumnMenu={false}`), and `listUsers` ignores any `filter.*` left in the URL.
+  `showColumnMenu={false}`), and a phone keeps them on that one row rather than stacking
+  them. `listUsers` ignores any `filter.*` left in the URL.
 - The leads page **view is a persisted preference**, not a filter. An explicit
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
@@ -615,7 +619,10 @@ their Lawmatics CRM.
   sub-item icons use
   `text-sidebar-accent-foreground`, which stays themed and legible in every preset. Both
   groups start open; clicking a group header while the sidebar is in its icon rail reopens
-  the sidebar instead of toggling a hidden panel. The sidebar content is a
+  the sidebar instead of toggling a hidden panel. On a phone the sidebar is a sheet:
+  every destination link in it closes the sheet on click (the app layout survives the
+  navigation, so nothing else would), and the brand, group sub-pages and the account
+  menu's Profile item behave the same way. The sidebar content is a
   `navigation` landmark labelled **Main**.
   Collapsing and the hover peek must both work on the first paint, before React
   has hydrated. The peek is therefore CSS: `app/globals.css` grows a hovered icon

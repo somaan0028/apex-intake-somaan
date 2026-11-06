@@ -148,7 +148,11 @@ const ACCOUNT_ITEMS: ReadonlyArray<NavItem> = [
 
 export function AppSidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
-  const { state, peeking, setOpen } = useSidebar();
+  const { state, peeking, setOpen, setOpenMobile } = useSidebar();
+  // On a phone the sidebar is a sheet that would otherwise stay open over the
+  // page it just navigated to; every destination link closes it first (the
+  // layout survives client-side navigation, so nothing else would).
+  const closeMobile = () => setOpenMobile(false);
   // Groups start open. A missing key means "open", so the map only records the
   // groups the person has explicitly folded.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -191,7 +195,10 @@ export function AppSidebar({ user }: { user: AuthUser }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href="/dashboard" onClick={closeMobile} />}
+            >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
                 <ApexMark className="size-6" />
               </div>
@@ -216,7 +223,12 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   <SidebarMenuButton
                     isActive={isCurrent(item.url)}
                     tooltip={item.title}
-                    render={<Link href={item.href ?? item.url} />}
+                    render={
+                      <Link
+                        href={item.href ?? item.url}
+                        onClick={closeMobile}
+                      />
+                    }
                   >
                     <item.icon className="text-sidebar-accent-foreground" />
                     <span>{item.title}</span>
@@ -276,7 +288,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                                 ? item.title
                                 : undefined
                             }
-                            render={<Link href={item.url} />}
+                            render={<Link href={item.url} onClick={closeMobile} />}
                           >
                             <item.icon className="text-sidebar-accent-foreground" />
                             <span>{item.title}</span>
@@ -341,7 +353,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   {accountItems.map((item) => (
                     <DropdownMenuItem
                       key={item.url}
-                      render={<Link href={item.url} />}
+                      render={<Link href={item.url} onClick={closeMobile} />}
                     >
                       <item.icon />
                       {item.title}
