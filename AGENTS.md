@@ -422,7 +422,7 @@ their Lawmatics CRM.
   narrow by), then Affected Lead (a debounced name search over the visibility-scoped lead
   query). A Clear Filters button beside them clears every filter and the search, and
   carries the active-filter count. Below `xl` the filter row is replaced by one
-  **Options** button on the search row, which opens the filters in a right-hand sheet
+  **Filters** button on the search row, which opens the filters in a right-hand sheet
   (the leads page's pattern) so a phone shows only the search box and that button.
   It deliberately has no detail modal, no row click, and
   no column or filter-visibility menus.

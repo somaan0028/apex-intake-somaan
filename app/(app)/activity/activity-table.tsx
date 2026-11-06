@@ -288,7 +288,7 @@ export function ActivityTable({
       onClick={() => setFiltersOpen(true)}
     >
       <SlidersHorizontal aria-hidden />
-      Options
+      Filters
       {filterCountBadge}
     </Button>
   );
