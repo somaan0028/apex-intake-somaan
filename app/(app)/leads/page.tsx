@@ -11,6 +11,7 @@ import { potentialDuplicateCount } from "@/lib/leads/metrics";
 import { normalizeLeadsQueryParams } from "@/lib/leads/query-params";
 import {
   LEADS_DEFAULT_SORT,
+  getLeadForActor,
   listKanbanBoard,
   listLeads,
   type LeadRow,
@@ -84,6 +85,15 @@ export default async function LeadsPage({
   }
 
   const potentialDuplicates = potentialDuplicateCount(user);
+  // A deep link (for example from the Activity grid) asks for one lead to be
+  // opened on arrival. It is loaded on its own so it works in either view even
+  // when the current filters or lane window would not include it.
+  const requestedLeadId =
+    typeof params.lead === "string" && /^\d+$/.test(params.lead)
+      ? Number(params.lead)
+      : null;
+  const initialLead =
+    requestedLeadId !== null ? getLeadForActor(requestedLeadId, user) : null;
   // The callout is a way in, so it steps aside once the person is already
   // looking at the duplicates it points to.
   const duplicatesViewActive = params["filter.potentialDuplicate"] === "yes";
@@ -138,6 +148,7 @@ export default async function LeadsPage({
         assignees={assignees}
         viewer={user}
         view={view}
+        initialLead={initialLead}
         preserveFilters={params.preserveFilters === "true"}
       />
     </div>

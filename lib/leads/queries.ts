@@ -485,6 +485,35 @@ export function listLeads(
 }
 
 /**
+ * One lead by id, in the same shape as a grid row, or `null` when it does not
+ * exist or the actor may not view it.
+ *
+ * Used by a deep link (`/leads?lead=<id>`, e.g. from the Activity grid) so the
+ * detail dialog can open a lead that is not in the current page or lane window.
+ */
+export function getLeadForActor(id: number, actor: Actor): LeadRow | null {
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  const showAttribution = can(actor.role, "leads.view.attribution");
+  const selected = getDb()
+    .select({
+      ...getTableColumns(leads),
+      assignedToName: users.name,
+      bookmarked: bookmarkedBy(actor),
+    })
+    .from(leads)
+    .leftJoin(users, eq(leads.assignedToId, users.id))
+    .where(and(eq(leads.id, id), leadsVisibilityCondition(actor)))
+    .get();
+  if (!selected) return null;
+
+  const { dupMatchString, ...row } = selected;
+  void dupMatchString;
+  const base = showAttribution ? row : withoutAttribution(row);
+  return attachDupCounts([base], actor)[0] ?? null;
+}
+
+/**
  * Every lead matching `query`, not one page.
  *
  * The CSV export deliberately ignores the grid's page window. Rather than
