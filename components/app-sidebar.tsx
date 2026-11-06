@@ -148,7 +148,7 @@ const ACCOUNT_ITEMS: ReadonlyArray<NavItem> = [
 
 export function AppSidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
-  const { state, setOpen } = useSidebar();
+  const { state, peeking, setOpen } = useSidebar();
   // Groups start open. A missing key means "open", so the map only records the
   // groups the person has explicitly folded.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -268,6 +268,14 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                         <SidebarMenuSubItem key={item.url}>
                           <SidebarMenuSubButton
                             isActive={isCurrent(item.url)}
+                            // The rail shows sub-pages as icons only, so the
+                            // label needs a native tooltip there. It also reads
+                            // the same name to assistive tech.
+                            title={
+                              state === "collapsed" && !peeking
+                                ? item.title
+                                : undefined
+                            }
                             render={<Link href={item.url} />}
                           >
                             <item.icon className="text-sidebar-accent-foreground" />

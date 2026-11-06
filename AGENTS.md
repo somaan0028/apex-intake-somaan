@@ -588,7 +588,10 @@ their Lawmatics CRM.
   instead of a one-item Staff submenu; admins keep Activity under Staff. It uses the
   sidebar's `inset` variant with `collapsible="icon"`, so collapsing leaves an icon rail
   instead of hiding the sidebar; hovering that rail expands it exactly like the toggle,
-  pushing the main panel to the right. The desktop shell shows the sidebar colour behind a
+  pushing the main panel to the right. The rail keeps the same vertical layout as the
+  open sidebar — the group-label slot, the 48px brand and profile rows, and the group
+  sub-pages as icons — so expanding on hover never moves an icon out from under the
+  pointer. The desktop shell shows the sidebar colour behind a
   main panel that floats with an 8px margin, rounded corners and a shadow. Nav and
   sub-item icons use
   `text-sidebar-accent-foreground`, which stays themed and legible in every preset. Both
