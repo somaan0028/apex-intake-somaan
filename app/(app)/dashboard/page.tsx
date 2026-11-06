@@ -61,14 +61,20 @@ const PIPELINE_STAGES = LEAD_STAGES.filter(
 );
 
 /** Stage-by-stage breakdown as one stacked bar, with a legend below it. */
-function Pipeline({ byStage }: { byStage: Record<string, number> }) {
+function Pipeline({
+  byStage,
+  className,
+}: {
+  byStage: Record<string, number>;
+  className?: string;
+}) {
   const total = PIPELINE_STAGES.reduce(
     (sum, stage) => sum + (byStage[stage] ?? 0),
     0,
   );
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="text-base">Pipeline</CardTitle>
         <CardDescription>
@@ -150,9 +156,15 @@ function Legend({ byStage }: { byStage: Record<string, number> }) {
 }
 
 /** The newest visible leads, with a link through to the full grid. */
-function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
+function LatestIntake({
+  leads,
+  className,
+}: {
+  leads: ReturnType<typeof recentLeads>;
+  className?: string;
+}) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="text-base">Latest intake</CardTitle>
         <CardDescription>
@@ -218,11 +230,13 @@ function LatestIntake({ leads }: { leads: ReturnType<typeof recentLeads> }) {
  */
 function RecentActivity({
   activities,
+  className,
 }: {
   activities: ReturnType<typeof recentActivities>;
+  className?: string;
 }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="text-base">Recent activity</CardTitle>
         <CardDescription>Latest actions that have taken place.</CardDescription>
@@ -393,14 +407,19 @@ export default async function OverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4 lg:order-2">
-          <AssistantInvite firstName={firstName} />
-          <RecentActivity activities={activity} />
-        </div>
-        <div className="space-y-4 lg:order-1">
-          <Pipeline byStage={metrics.byStage} />
-          <LatestIntake leads={latest} />
-        </div>
+        <AssistantInvite
+          firstName={firstName}
+          className="lg:col-start-2 lg:row-start-1"
+        />
+        <RecentActivity
+          activities={activity}
+          className="lg:col-start-2 lg:row-start-2"
+        />
+        <Pipeline
+          byStage={metrics.byStage}
+          className="lg:col-start-1 lg:row-start-1"
+        />
+        <LatestIntake leads={latest} className="lg:col-start-1 lg:row-start-2" />
       </div>
     </div>
   );

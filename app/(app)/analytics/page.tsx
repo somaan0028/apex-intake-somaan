@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -707,21 +705,10 @@ export default async function AnalyticsPage({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>
-          Attribution is captured from UTM parameters. Imported CRM leads may
-          not carry medium or content.
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          nativeButton={false}
-          render={<Link href={leadsHref(filters)} />}
-        >
-          Open the lead grid
-          <ArrowRight />
-        </Button>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Attribution is captured from UTM parameters. Imported CRM leads may not
+        carry medium or content.
+      </p>
     </div>
   );
 }
