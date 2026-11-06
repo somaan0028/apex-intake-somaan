@@ -24,6 +24,10 @@ import {
 } from "@tanstack/react-table";
 
 export const dataTableFeatures = tableFeatures({
+  // Type-only slot for `columnDef.meta` (see `DataTableColumnMeta` below).
+  // The value is stripped at runtime; only its type is used.
+  columnMeta: {} as DataTableColumnMeta,
+
   // Filter state + `column.getFilterValue()` / `column.setFilterValue()`.
   columnFilteringFeature,
 
@@ -39,3 +43,15 @@ export const dataTableFeatures = tableFeatures({
 
 /** The concrete feature set, used to type column defs and table props. */
 export type DataTableFeatures = typeof dataTableFeatures;
+
+/**
+ * Per-column metadata every grid can declare on `columnDef.meta`.
+ *
+ * `align` only changes how the header and cell content sit in the column; the
+ * cell's own markup stays responsible for its colours and weights. It exists so
+ * a narrow numeric column (the Users page's assigned-lead count) can centre its
+ * header over its numbers instead of reading as a ragged left stack.
+ */
+export interface DataTableColumnMeta {
+  align?: "left" | "center" | "right";
+}

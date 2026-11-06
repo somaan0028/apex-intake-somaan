@@ -69,6 +69,9 @@ const columns = columnHelper.columns([
   }),
   columnHelper.accessor("assignedLeadCount", {
     header: "Assigned leads",
+    // A short numeric column reads best with its header centred over the stack
+    // of counts rather than left-aligned in a wide cell.
+    meta: { align: "center" },
     cell: (info) => (
       // The row itself opens the edit dialog; the link must navigate only.
       <Link

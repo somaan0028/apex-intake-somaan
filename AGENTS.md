@@ -496,7 +496,10 @@ their Lawmatics CRM.
   The reason is normalized to one line.
 - **Users** (`app/(app)/users/`) shows an **Assigned leads** count per person, loaded for the
   visible page in one grouped query. The count is **active** assigned leads — Disqualified
-  is excluded, exactly like the Overview's "Assigned to you" card. The underlined number
+  is excluded, exactly like the Overview's "Assigned to you" card. The column is a short
+  numeric one, so it centres its header over its numbers through
+  `columnDef.meta.align` (`DataTableColumnMeta`), which every grid can use; left is the
+  default. The underlined number
   links to the leads page filtered by `filter.assignedTo=<id>`, every open stage
   (`filter.stage=…`, no Disqualified) and `filter.addedWithin=any`, so the grid total
   matches the number on the row. `any` is a real leads date preset ("All Time"), not a

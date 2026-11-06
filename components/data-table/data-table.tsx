@@ -89,7 +89,11 @@ import {
   parseFilterValues,
   type TableQuery,
 } from "@/lib/table-query";
-import { dataTableFeatures, type DataTableFeatures } from "./features";
+import {
+  dataTableFeatures,
+  type DataTableColumnMeta,
+  type DataTableFeatures,
+} from "./features";
 import { MultiSelectFilter } from "./multi-select-filter";
 
 /** One choice in a declarative column filter. */
@@ -540,10 +544,12 @@ export function DataTable<TData extends RowData>({
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
                       const sorted = header.column.getIsSorted();
+                      const align = header.column.columnDef.meta?.align;
                       return (
                         <TableHead
                           key={header.id}
                           colSpan={header.colSpan}
+                          className={alignClass(align)}
                           aria-sort={
                             sorted === "asc"
                               ? "ascending"
@@ -556,7 +562,13 @@ export function DataTable<TData extends RowData>({
                             <button
                               type="button"
                               onClick={header.column.getToggleSortingHandler()}
-                              className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:text-foreground"
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:text-foreground",
+                                // The negative offset pulls a left-aligned label
+                                // onto the cell's padding edge; a centred or
+                                // right-aligned label must keep its own padding.
+                                (!align || align === "left") && "-ml-1",
+                              )}
                             >
                               <table.FlexRender header={header} />
                               <SortIcon direction={sorted} />
@@ -596,7 +608,10 @@ export function DataTable<TData extends RowData>({
                       }
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                        <TableCell
+                          key={cell.id}
+                          className={alignClass(cell.column.columnDef.meta?.align)}
+                        >
                           <table.FlexRender cell={cell} />
                         </TableCell>
                       ))}
@@ -889,4 +904,14 @@ function columnLabel<TData extends RowData>(
 ): string {
   const header = column.columnDef.header;
   return typeof header === "string" ? header : column.id;
+}
+
+/**
+ * The text alignment a column asked for through `columnDef.meta.align`.
+ * Left is the table's default, so it needs no class at all.
+ */
+function alignClass(align: DataTableColumnMeta["align"]): string | undefined {
+  if (align === "center") return "text-center";
+  if (align === "right") return "text-right";
+  return undefined;
 }
