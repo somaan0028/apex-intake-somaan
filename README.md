@@ -12,40 +12,18 @@ qualified MVA leads to the partner firm Brightwater.
 ## Setup
 
 1. Clone the repo
-2. Run `npn run setup`
+2. Move into the folder and run `npm run setup` (this installs dependencies, creates a SQLite database, and seeds it with the CSVs)
+3. Replace `OPENROUTER_API_KEY` and `CANDIDATE_TOKEN` in the `.env` file
+4. Run `npm start`
 
-This command does the following:
-
-1. installs the dependencies
-2. creates `.env` with the two required keys
-3. creates and seeds `data/apex.db` which is an sqlite database
-4. builds the app
-
-Then fill the .env file and start the app with:
-
-```bash
-npm start
-```
-
-The app runs at <http://localhost:8080>. 
-
-
-The generated `.env` contains only the required values:
-
-```dotenv
-OPENROUTER_API_KEY=...
-CANDIDATE_TOKEN=...
-```
-
+The app runs at <http://localhost:8080>.
 
 ## Development
 
-```bash
-npm run dev
-```
+To run the development server, run `npm run dev`.
 
 The dev server runs at <http://localhost:3000>. The database is created and
-seeded on the first server boot if `data/apex.db` is absent.
+seeded on the first server boot if no database is present.
 
 ## Demo accounts
 
@@ -81,35 +59,90 @@ Retained.
 - **Analytics** for admins, grouped by campaign, source, medium, and content,
   with the shared date-range filter and a campaign selector.
 
+## Architecture
+
+```text
+.
+├── app/
+│   ├── (app)/                 signed-in shell
+│   │   ├── dashboard/         overview, pipeline, Larry's card
+│   │   ├── leads/             board, table, detail dialog
+│   │   ├── activity/          audit trail
+│   │   ├── analytics/         admin attribution reporting
+│   │   ├── users/             admin user management
+│   │   ├── settings/          MCP tokens, preferences
+│   │   └── profile/           own account
+│   ├── api/                   public intake, AI chat, MCP, avatars, CSV export
+│   ├── login/                 public sign-in
+│   └── layout.tsx             root shell and theme boot
+├── components/
+│   ├── ai/                    Larry panel, transcript, mascot
+│   ├── data-table/            shared grid: filters, columns, paging
+│   ├── intake/                public lead form
+│   └── ui/                    shadcn/ui primitives
+├── hooks/                     small client hooks
+├── lib/
+│   ├── db/                    Drizzle schema (one file per table), bootstrap, seed
+│   ├── leads/                 service, queries, validation, duplicates, analytics
+│   ├── ai/                    prompt, chat store, tool layer
+│   ├── mcp/                   MCP handler over the same tool layer
+│   ├── auth/                  session, scrypt passwords, profile actions
+│   ├── rbac/                  permission checks
+│   ├── brightwater/           payload, client, attempt logging
+│   ├── activities/            audit log queries and descriptions
+│   ├── users/                 avatars, user service
+│   ├── preferences/           appearance JSON schema
+│   └── themes/                preset registry
+├── scripts/                   setup, seeding, token minting, checks
+├── drizzle/                   generated migration
+├── public/                    static assets, Larry's Lottie animation
+└── data/                      SQLite database, Brightwater logs, avatars (gitignored)
+```
+
+- **Next.js 16 App Router** with Server Components for pages, Server Actions for
+  mutations, and a thin route-handler layer under `app/api/`.
+- **SQLite via Drizzle ORM** (`lib/db/`), one schema file per table. `instrumentation.ts`
+  creates and seeds `data/apex.db` from the bundled CSVs only when the file is absent.
+- **One service layer** (`lib/leads/service.ts`, `lib/users/`, `lib/auth/`) holds every
+  read and write. Pages, Server Actions, the AI assistant, and the MCP server all call
+  it, so permissions (`lib/rbac/`) are enforced once rather than per surface.
+- **One tool layer** (`lib/ai/tools.ts`) is shared by the assistant and the MCP server;
+  both act with the signed-in person's permissions. Sending to the firm and deleting a
+  lead are human-only and have no tool.
+- **Brightwater** (`lib/brightwater/`) builds a form-urlencoded payload and writes one
+  JSON log per attempt to `data/brightwater-logs/`, beside the database.
+- **Auth** is a session cookie backed by scrypt password hashes; MCP calls use a
+  bearer personal access token stored as a SHA-256 hash.
+
 ## Routes
 
-| Route                 | Access    | Purpose                                       |
-| --------------------- | --------- | --------------------------------------------- |
-| `/`                   | Public    | Lead intake form                              |
-| `/login`              | Public    | Email and password sign-in                    |
-| `/dashboard`          | Protected | Overview and pipeline summary                 |
-| `/leads`              | Protected | Leads board/table; the last view is remembered, and `?view=table` or `?view=kanban` overrides it for that page |
-| `/analytics`          | Admin     | Attribution and funnel reporting              |
-| `/users`              | Admin     | User management                               |
-| `/settings`           | Protected | MCP access tokens                             |
-| `/profile`            | Protected | Name, password, and account details           |
-| `/api/public/leads`   | Public    | Intake submission endpoint                    |
-| `/api/ai/chat`        | Protected | Streaming assistant replies                   |
-| `/api/mcp`            | Token     | MCP server for external agents                |
+| Route                    | Access    | Purpose                                             |
+| ------------------------ | --------- | --------------------------------------------------- |
+| `/`                      | Public    | Lead intake form                                    |
+| `/login`                 | Public    | Email and password sign-in                          |
+| `/dashboard`             | Protected | Overview and pipeline summary                       |
+| `/leads`                 | Protected | Board/table; `?view=` overrides the remembered view |
+| `/analytics`             | Admin     | Attribution and funnel reporting                    |
+| `/activity`              | Protected | Audit trail (own actions, or all for admins)        |
+| `/users`                 | Admin     | User management                                     |
+| `/settings`              | Protected | Redirects to `/settings/ai`                         |
+| `/settings/ai`           | Protected | MCP access tokens                                   |
+| `/settings/preferences`  | Protected | Theme and colour mode                               |
+| `/profile`               | Protected | Name, password, and account details                 |
+| `/api/public/leads`      | Public    | Intake submission endpoint                          |
+| `/api/leads/export`      | Protected | CSV export of every lead under the current filters  |
+| `/api/ai/chat`           | Protected | Streaming assistant replies                         |
+| `/api/mcp`               | Token     | MCP server for external agents                      |
+| `/api/users/[id]/avatar` | Protected | Profile photo stream                                |
 
 ## Scripts
 
-| Command               | What it does                                      |
-| --------------------- | ------------------------------------------------- |
-| `npm run setup`       | Full clean-clone setup: install, `.env`, database, build |
-| `npm run dev`         | Development server on port 3000                   |
-| `npm run build`       | Production build                                  |
-| `npm start`           | Serve the build on port 8080                      |
-| `npm run db:reset`    | Delete, recreate, and reseed the database         |
-| `npm run db:generate` | Regenerate the Drizzle migration                  |
-| `npm run db:studio`   | Browse the database with Drizzle Studio           |
-| `npm run mcp:token`   | Mint an MCP token for an email address            |
-| `npm run lint`        | Run ESLint                                        |
-
-Stop the server before running `npm run db:reset` so the SQLite file is not
-locked. The reset deletes the file and imports the bundled CSV seed data again.
+| Command                | What it does                                             |
+| ---------------------- | -------------------------------------------------------- |
+| `npm run setup`        | Full clean-clone setup: install, `.env`, database, build |
+| `npm run dev`          | Development server on port 3000                          |
+| `npm run build`        | Production build                                         |
+| `npm start`            | Serve the build on port 8080                             |
+| `npm run db:reset`     | Delete, recreate, and reseed the database                |
+| `npm run db:generate`  | Regenerate the Drizzle migration                         |
+| `npm run db:studio`    | Browse the database with Drizzle Studio                  |
