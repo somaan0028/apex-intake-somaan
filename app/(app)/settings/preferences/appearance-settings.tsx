@@ -8,7 +8,7 @@
  * preference that was not persisted.
  */
 import { Check, Loader2, Monitor, Moon, Sun } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { updateAppearance } from "@/lib/preferences/actions";
 import {
   type AppearancePreferences,
@@ -39,6 +39,22 @@ export function AppearanceSettings({
   const [pending, startTransition] = useTransition();
   // Guards against an older save resolving after a newer one.
   const requestId = useRef(0);
+  // The preset list is a snap slider on a phone, so on first paint bring the
+  // current choice into view instead of leaving it scrolled off to the right.
+  const themeListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const list = themeListRef.current;
+    const selected = list?.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (!list || !selected) return;
+    if (list.scrollWidth <= list.clientWidth) return;
+
+    // Scroll the list only; `scrollIntoView` could also move the page.
+    const listBox = list.getBoundingClientRect();
+    const selectedBox = selected.getBoundingClientRect();
+    list.scrollLeft +=
+      selectedBox.left - listBox.left - (listBox.width - selectedBox.width) / 2;
+  }, []);
 
   function save(nextTheme: ThemeId, nextMode: ThemeMode) {
     if (nextTheme === theme && nextMode === mode) return;
@@ -70,12 +86,14 @@ export function AppearanceSettings({
 
   return (
     <div className="grid gap-6">
-      <div className="grid gap-3">
+      {/* Colour mode comes first: it is the most visible change, and on a phone
+          it is a single row of buttons rather than a long list of cards. */}
+      <div className="grid gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-sm font-medium">Theme</p>
+            <p className="text-sm font-medium">Colour mode</p>
             <p className="text-xs text-muted-foreground">
-              Pick the palette used across the desk.
+              Use a light or dark palette, or follow your system setting.
             </p>
           </div>
           {pending ? (
@@ -85,11 +103,58 @@ export function AppearanceSettings({
             </span>
           ) : null}
         </div>
-
         <div
+          role="group"
+          aria-label="Colour mode"
+          className="mt-1 flex flex-wrap gap-2"
+        >
+          {MODE_OPTIONS.map((option) => {
+            const selected = option.value === mode;
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={selected}
+                disabled={pending}
+                onClick={() => save(theme, option.value)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                  selected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background hover:bg-muted",
+                  "disabled:cursor-wait",
+                )}
+              >
+                <Icon className="size-3.5" />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          System follows your operating system&apos;s light or dark appearance.
+        </p>
+      </div>
+
+      <div className="grid gap-3">
+        <div>
+          <p className="text-sm font-medium">Theme</p>
+          <p className="text-xs text-muted-foreground">
+            Pick the palette used across the desk.
+          </p>
+        </div>
+
+        {/* A row of cards is too tall on a phone, so below `sm` the presets are a
+            snap slider. `p-1` keeps the selected card's ring from being clipped. */}
+        <div
+          ref={themeListRef}
           role="radiogroup"
           aria-label="Theme"
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          className={cn(
+            "flex snap-x snap-mandatory gap-3 overflow-x-auto p-1",
+            "sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:p-0 xl:grid-cols-4",
+          )}
         >
           {THEMES.map((option) => {
             const selected = option.id === theme;
@@ -103,8 +168,9 @@ export function AppearanceSettings({
                 disabled={pending}
                 onClick={() => save(option.id, mode)}
                 className={cn(
-                  "group relative overflow-hidden rounded-xl border border-border bg-background p-3 text-left text-foreground transition-shadow outline-none",
+                  "group relative w-44 shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-background p-3 text-left text-foreground transition-shadow outline-none",
                   "hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait",
+                  "sm:w-auto",
                   selected && "ring-2 ring-primary",
                 )}
               >
@@ -140,45 +206,6 @@ export function AppearanceSettings({
             );
           })}
         </div>
-      </div>
-
-      <div className="grid gap-2">
-        <p className="text-sm font-medium">Colour mode</p>
-        <p className="text-xs text-muted-foreground">
-          Use a light or dark palette, or follow your system setting.
-        </p>
-        <div
-          role="group"
-          aria-label="Colour mode"
-          className="mt-1 flex flex-wrap gap-2"
-        >
-          {MODE_OPTIONS.map((option) => {
-            const selected = option.value === mode;
-            const Icon = option.icon;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={selected}
-                disabled={pending}
-                onClick={() => save(theme, option.value)}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors",
-                  selected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:bg-muted",
-                  "disabled:cursor-wait",
-                )}
-              >
-                <Icon className="size-3.5" />
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          System follows your operating system&apos;s light or dark appearance.
-        </p>
       </div>
 
       {error ? (

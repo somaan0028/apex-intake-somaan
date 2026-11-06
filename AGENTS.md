@@ -226,8 +226,11 @@ their Lawmatics CRM.
   a matching `::-webkit-scrollbar` thumb.
 - The Preferences page's **Appearance** section (`app/(app)/settings/preferences/`) applies
   changes optimistically, then calls `updateAppearance` (`lib/preferences/actions.ts`) to
-  save the JSON. The preview cards scope a theme to their own
-  subtree with `data-theme`, so they never duplicate colour values in JavaScript.
+  save the JSON. **Colour mode comes first**, since it changes the whole desk at a glance,
+  and the preset themes follow. The preview cards scope a theme to their own
+  subtree with `data-theme`, so they never duplicate colour values in JavaScript. Below
+  `sm` the themes are a horizontal snap slider (one wide card at a time) rather than a
+  tall grid, so a phone does not have to scroll past eight cards to reach anything else.
 
 ## AI assistant
 - The assistant is **Larry** — `ASSISTANT_NAME` in `lib/ai/identity.ts`, used by the UI
