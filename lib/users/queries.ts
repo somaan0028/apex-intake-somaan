@@ -5,7 +5,7 @@
  * happen in SQL, and the grid is handed one page at a time. Nothing here ever
  * selects `password_hash`.
  */
-import { asc, count, eq, inArray, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db";
 import {
@@ -27,7 +27,7 @@ export type UserRow = {
   /** Stored filename of the profile photo, or `null` for initials. */
   avatarPath: string | null;
   createdAt: Date;
-  /** How many leads this user currently owns. */
+  /** How many active leads this user currently owns (Disqualified excluded). */
   assignedLeadCount: number;
 };
 
@@ -82,6 +82,8 @@ export function listUsers(query: TableQuery): ListPageResult<UserRow> {
 
   // Count only the users on this page, in one grouped query. A correlated
   // subquery per row would be correct too, but this keeps the page bounded.
+  // Disqualified is a closed stage, so it is left out exactly like the
+  // Overview's "Assigned to you" card: the number is active workload.
   const counts =
     rows.length === 0
       ? []
@@ -89,9 +91,12 @@ export function listUsers(query: TableQuery): ListPageResult<UserRow> {
           .select({ userId: leads.assignedToId, value: count() })
           .from(leads)
           .where(
-            inArray(
-              leads.assignedToId,
-              rows.map((row) => row.id),
+            and(
+              inArray(
+                leads.assignedToId,
+                rows.map((row) => row.id),
+              ),
+              ne(leads.stage, "DISQUALIFIED"),
             ),
           )
           .groupBy(leads.assignedToId)

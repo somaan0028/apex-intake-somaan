@@ -477,13 +477,15 @@ their Lawmatics CRM.
   other unexpected outcomes read `Failed to send lead to firm. Unexpected error occurred`
   The reason is normalized to one line.
 - **Users** (`app/(app)/users/`) shows an **Assigned leads** count per person, loaded for the
-  visible page in one grouped query. The underlined number links to the leads page filtered
-  by `filter.assignedTo=<id>` with `filter.addedWithin=any`, so it matches the all-time
-  count. `any` is a real leads date preset ("All Time"), not a hack; a bare `/leads`
-  has no date window (the Date Added filter starts cleared). The page itself has no
-  filters or column selector: the toolbar is a single row with the name/email search on
-  the left and **Add user** on the right (`inlineToolbar`, `showColumnMenu={false}`),
-  and `listUsers` ignores any `filter.*` left in the URL.
+  visible page in one grouped query. The count is **active** assigned leads — Disqualified
+  is excluded, exactly like the Overview's "Assigned to you" card. The underlined number
+  links to the leads page filtered by `filter.assignedTo=<id>`, every open stage
+  (`filter.stage=…`, no Disqualified) and `filter.addedWithin=any`, so the grid total
+  matches the number on the row. `any` is a real leads date preset ("All Time"), not a
+  hack; a bare `/leads` has no date window (the Date Added filter starts cleared). The
+  page itself has no filters or column selector: the toolbar is a single row with the
+  name/email search on the left and **Add user** on the right (`inlineToolbar`,
+  `showColumnMenu={false}`), and `listUsers` ignores any `filter.*` left in the URL.
 - The leads page **view is a persisted preference**, not a filter. An explicit
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat

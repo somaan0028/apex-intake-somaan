@@ -21,12 +21,22 @@ import { Button } from "@/components/ui/button";
 import { USER_ROLE_LABELS } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import { can } from "@/lib/rbac";
+import { LEAD_STAGES } from "@/lib/db/schema";
 import type { AuthUser } from "@/lib/auth/session";
 import type { TableQuery } from "@/lib/table-query";
 import type { UserRow } from "@/lib/users/queries";
 import { UserDialog, type UserDialogState } from "./user-dialog";
 
 const columnHelper = createColumnHelper<typeof dataTableFeatures, UserRow>();
+
+/**
+ * The stage filter the Assigned leads link carries: every open stage, so the
+ * grid shows exactly the active leads the number counted (Disqualified is a
+ * closed stage and stays out).
+ */
+const ACTIVE_STAGES = LEAD_STAGES.filter(
+  (stage) => stage !== "DISQUALIFIED",
+).join(",");
 
 const columns = columnHelper.columns([
   columnHelper.accessor("name", {
@@ -62,7 +72,7 @@ const columns = columnHelper.columns([
     cell: (info) => (
       // The row itself opens the edit dialog; the link must navigate only.
       <Link
-        href={`/leads?filter.assignedTo=${info.row.original.id}&filter.addedWithin=any`}
+        href={`/leads?filter.assignedTo=${info.row.original.id}&filter.stage=${ACTIVE_STAGES}&filter.addedWithin=any`}
         className="font-medium underline underline-offset-4 hover:text-foreground"
         aria-label={`View leads assigned to ${info.row.original.name}`}
         onClick={(event) => event.stopPropagation()}
