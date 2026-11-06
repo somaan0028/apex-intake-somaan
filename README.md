@@ -32,9 +32,7 @@ Every seeded account uses the password `apex-demo-2026`.
 | Role  | Email                            |
 | ----- | -------------------------------- |
 | Admin | `dana.whitfield@apex-leads.test` |
-| Admin | `marcus.bell@apex-leads.test`    |
-| Agent | `maria.delgado@apex-leads.test`  |
-| Agent | `derek.lawson@apex-leads.test`   |
+| User | `derek.lawson@apex-leads.test`   |
 
 The seed file contains 15 users in total. Admins can see and edit every lead,
 assign work, send leads to Brightwater, manage users, and open Campaign
