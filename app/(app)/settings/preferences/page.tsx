@@ -29,7 +29,7 @@ export default async function PreferencesPage() {
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Choose a theme. Set your dashboard the way you like!
+            Set your dashboard the way you like
           </p>
         </CardHeader>
         <CardContent>

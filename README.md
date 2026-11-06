@@ -9,32 +9,26 @@ qualified MVA leads to the partner firm Brightwater.
 - Node.js 20 or newer
 - npm
 
-SQLite is embedded through `better-sqlite3`, so there is no database server to
-install.
+## Setup
 
-## One-command setup
+1. Clone the repo
+2. Run `npn run setup`
 
-```bash
-npm run setup
-```
-
-From a clean clone this:
+This command does the following:
 
 1. installs the dependencies
 2. creates `.env` with the two required keys
-3. creates and seeds `data/apex.db` when the file is missing
+3. creates and seeds `data/apex.db` which is an sqlite database
 4. builds the app
 
-Then serve the build with:
+Then fill the .env file and start the app with:
 
 ```bash
 npm start
 ```
 
-The app runs at <http://localhost:8080>. `npm run setup` is safe to rerun: it
-skips the dependency install when `node_modules` is already present (force it
-with `npm run setup -- --install`), preserves real credentials, and only creates
-the database when it does not exist yet.
+The app runs at <http://localhost:8080>. 
+
 
 The generated `.env` contains only the required values:
 
@@ -43,19 +37,6 @@ OPENROUTER_API_KEY=...
 CANDIDATE_TOKEN=...
 ```
 
-The placeholders are non-empty so the app can boot, but the AI assistant and
-Brightwater sends need real credentials. Edit `.env`, or pass them once (Bash):
-
-```bash
-OPENROUTER_API_KEY=... CANDIDATE_TOKEN=... npm run setup
-```
-
-In PowerShell, set `$env:OPENROUTER_API_KEY` and `$env:CANDIDATE_TOKEN` before
-running the command, or simply edit `.env` afterwards.
-
-Existing real values are kept when setup runs again. Optional settings such as
-`DATABASE_PATH`, `AUTH_COOKIE_SECURE`, and `AI_MODEL` belong in `.env.local`,
-which Next.js loads and Git ignores.
 
 ## Development
 
