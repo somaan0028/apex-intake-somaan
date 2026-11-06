@@ -55,7 +55,7 @@ export function AiAssistantButton() {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="default"
       size="icon"
       className="ml-auto"
       // Stable hook for automation; the label below is what users hear.
