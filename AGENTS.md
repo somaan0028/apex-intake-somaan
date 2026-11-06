@@ -232,8 +232,8 @@ their Lawmatics CRM.
   `sm` the themes are a horizontal snap slider (one wide card at a time) rather than a
   tall grid, so a phone does not have to scroll past eight cards to reach anything else.
   The cards snap to the centre (`snap-center` plus `scroll-px-1` and `p-1`, which keep
-  the selected card's ring out of the scroll port's clip) and the list opens scrolled to
-  the current choice.
+  the selected card's ring out of the scroll port's clip, plus `pb-4` so the horizontal
+  scrollbar sits clear of the cards) and the list opens scrolled to the current choice.
 
 ## AI assistant
 - The assistant is **Larry** — `ASSISTANT_NAME` in `lib/ai/identity.ts`, used by the UI

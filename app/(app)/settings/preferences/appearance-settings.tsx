@@ -154,8 +154,8 @@ export function AppearanceSettings({
           role="radiogroup"
           aria-label="Theme"
           className={cn(
-            "flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto p-1",
-            "sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:p-0 xl:grid-cols-4",
+            "flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto p-1 pb-4",
+            "sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:p-0 sm:pb-0 xl:grid-cols-4",
           )}
         >
           {THEMES.map((option) => {
