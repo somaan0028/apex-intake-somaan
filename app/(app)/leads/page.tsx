@@ -112,7 +112,7 @@ export default async function LeadsPage({
         {potentialDuplicates > 0 ? (
           <AlertBar
             tone="warning"
-            className="shrink-0"
+            className="w-full min-w-0 sm:w-auto"
             action={
               duplicatesViewActive ? null : (
                 <Button
