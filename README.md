@@ -112,6 +112,33 @@ Retained.
 - **Auth** is a session cookie backed by scrypt password hashes; MCP calls use a
   bearer personal access token stored as a SHA-256 hash.
 
+## Assumptions
+
+- Leads only arrive through the public intake form and the one-time CSV import; there is
+  no other integration.
+- Disqualified is also considered a stage.
+- The injured person is the one the firm contacts.
+- The team stays small enough to load in full for assignee pickers and `@`-mentions;
+  only the Users table itself is paged.
+- Brightwater's `source` is a fixed identifier (`www.apexleadsource.com`), not the lead's
+  stored attribution source.
+- There is exactly one partner firm (Brightwater). The send path assumes one endpoint and
+  one payload shape.
+- Brightwater takes the accident date as separate year, month and day fields, so the
+  stored date is split at that boundary.
+
+## Next Steps (Future Features)
+
+- A way to send retainer document to the lead from within the app.
+- Keep the raw submitted form payload, so a lead can be audited or rebuilt.
+- Soft deletes with restore, instead of the current permanent delete.
+- Create leads directly in the desk, not only through the public form.
+- Notifications (in-app, email or Slack) for new intake, assigned leads and failed sends.
+- More partner firms, each with its own payload and credentials.
+- Server-side saved views shared across the team; today they are browser-local.
+- Bulk actions in the grid: assign, change stage, send.
+- CSV import from the UI, rather than only at boot.
+
 ## Routes
 
 | Route                    | Access    | Purpose                                             |
