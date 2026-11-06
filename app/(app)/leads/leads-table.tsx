@@ -2335,7 +2335,7 @@ function LeadsKanban({
                           </div>
                         </div>
 
-                        <div className="mt-2 grid min-w-0 gap-1 text-xs text-muted-foreground">
+                        <div className="mt-2 grid min-w-0 text-xs text-muted-foreground">
                           <p className="flex min-w-0 items-center gap-1.5">
                             <span
                               className="min-w-0 flex-1 truncate"
@@ -2345,7 +2345,7 @@ function LeadsKanban({
                             </span>
                             <CopyButton value={lead.injuredEmail} label="Email" />
                           </p>
-                          <p className="flex min-w-0 items-center gap-1.5">
+                          <p className="mt-0.5 flex min-w-0 items-center gap-1.5">
                             <span
                               className="min-w-0 flex-1 truncate"
                               title={lead.injuredPhone ?? undefined}
@@ -2354,7 +2354,7 @@ function LeadsKanban({
                             </span>
                             <CopyButton value={lead.injuredPhone} label="Phone" />
                           </p>
-                          <p className="truncate">
+                          <p className="mt-2.5 truncate">
                             Added {formatDate(lead.createdAt)}
                           </p>
                         </div>
