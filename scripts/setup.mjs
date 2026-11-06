@@ -51,33 +51,6 @@ function runNpm(args, label) {
   );
 }
 
-/**
- * Same as `runNpm`, but reports failure instead of stopping the setup. The
- * dependency install uses it so a failed compile can be retried another way.
- */
-function tryRunNpm(args, label) {
-  const command = npmCli
-    ? process.execPath
-    : process.platform === "win32"
-      ? "npm.cmd"
-      : "npm";
-  const commandArgs = npmCli ? [npmCli, ...args] : args;
-
-  console.log(`[setup] ${label}`);
-  const result = spawnSync(command, commandArgs, {
-    cwd: root,
-    stdio: "inherit",
-    env: process.env,
-  });
-  if (result.error) {
-    console.error(
-      `[setup] ${label.replace(/…$/, "")} could not start: ${result.error.message}`,
-    );
-    return false;
-  }
-  return result.status === 0;
-}
-
 const major = Number(process.versions.node.split(".")[0]);
 if (major < 20) {
   fail(
@@ -89,32 +62,18 @@ const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
 const dependenciesReady = existsSync(tsxCli);
 
 if (forceInstall || !dependenciesReady) {
+  // `--ignore-scripts` on purpose: npm runs `node-gyp rebuild` for
+  // `better-sqlite3` (the package has a binding.gyp) even though v13 ships
+  // prebuilt binaries, and that compile needs a C++ toolchain node-gyp cannot
+  // always find (Visual Studio 2026 on Windows, for instance). Every native
+  // dependency here ships a prebuilt binary, so nothing needs building.
   const hasLock = existsSync(path.join(root, "package-lock.json"));
-  const installArgs = [hasLock ? "ci" : "install"];
-  const installLabel = hasLock
-    ? "Installing dependencies (npm ci)…"
-    : "Installing dependencies (npm install)…";
-
-  if (!tryRunNpm(installArgs, installLabel)) {
-    // `better-sqlite3` ships prebuilt binaries, but npm still runs
-    // `node-gyp rebuild` for it because the package has a binding.gyp. That
-    // compile needs a C++ toolchain node-gyp cannot always find (Visual Studio
-    // 2026 on Windows, for instance), and nothing in this project actually
-    // needs building, so retry with the lifecycle scripts turned off instead
-    // of sending the person off to install Build Tools.
-    console.warn(
-      "[setup] The dependency install failed, most likely while compiling better-sqlite3. Retrying without lifecycle scripts…",
-    );
-    const fallbackLabel = hasLock
+  runNpm(
+    [hasLock ? "ci" : "install", "--ignore-scripts"],
+    hasLock
       ? "Installing dependencies (npm ci --ignore-scripts)…"
-      : "Installing dependencies (npm install --ignore-scripts)…";
-    if (!tryRunNpm([...installArgs, "--ignore-scripts"], fallbackLabel)) {
-      fail("Installing dependencies failed twice; see the npm output above.");
-    }
-    console.warn(
-      "[setup] Installed without lifecycle scripts. Every native dependency here ships a prebuilt binary; if one still fails at runtime, install the Visual Studio \"Desktop development with C++\" workload (including a Windows SDK) and run `npm run setup -- --install`.",
-    );
-  }
+      : "Installing dependencies (npm install --ignore-scripts)…",
+  );
 } else {
   console.log(
     "[setup] Dependencies already installed. Run `npm run setup -- --install` to reinstall them.",
