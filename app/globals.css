@@ -383,3 +383,65 @@ button:not(:disabled),
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted-foreground);
 }
+
+/*
+ * Sidebar hover peek.
+ *
+ * The collapsed rail normally expands under the pointer through React state.
+ * The first paint has no handlers yet, so the same expansion is expressed in
+ * CSS: a hovered icon rail grows to its open width and reveals its labels.
+ * These rules are deliberately unlayered and `!important`, because they must
+ * beat the `group-data-[collapsible=icon]` utilities regardless of source
+ * order. Once the shell hydrates, the state-driven peek produces the same
+ * layout, so the two mechanisms agree.
+ */
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-gap"],
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-container"] {
+  width: var(--sidebar-width) !important;
+}
+
+[data-slot="sidebar-wrapper"]:has(
+    > [data-slot="sidebar"][data-collapsible="icon"]:hover
+  )
+  [data-slot="sidebar-inset"] {
+  margin-left: 0 !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-menu-button"] {
+  width: 100% !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover
+  [data-slot="sidebar-menu-button"][data-size="sm"] {
+  height: calc(var(--spacing) * 7) !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover
+  [data-slot="sidebar-menu-button"][data-size="lg"] {
+  padding: calc(var(--spacing) * 2) !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-content"] {
+  overflow: auto !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-group-label"] {
+  opacity: 1 !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-group-action"],
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-menu-action"],
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-menu-badge"] {
+  display: flex !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-menu-sub"] {
+  margin-inline: calc(var(--spacing) * 3.5) !important;
+  translate: 1px 0 !important;
+  border-left-width: 1px !important;
+  padding-inline: calc(var(--spacing) * 2.5) !important;
+}
+
+[data-slot="sidebar"].group[data-collapsible="icon"]:hover [data-slot="sidebar-menu-sub-button"] {
+  translate: -1px 0 !important;
+}

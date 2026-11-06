@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { requireUser } from "@/lib/auth/session";
 import { getUserPreferences } from "@/lib/preferences/queries";
+import { toggleSidebarPinned } from "@/lib/sidebar/actions";
 import { buildThemeBootScript } from "@/lib/themes/boot-script";
 
 // The shell reads the session, so the whole authenticated subtree renders per
@@ -48,7 +49,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <AppSidebar user={user} />
           <SidebarInset className="md:peer-data-[variant=inset]:shadow-md">
             <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
-              <SidebarTrigger className="-ml-1" />
+              <SidebarTrigger
+                className="-ml-1"
+                action={toggleSidebarPinned}
+              />
               <span aria-hidden className="h-4 w-px bg-border" />
               <span className="text-sm font-medium">Apex Intake Desk</span>
               <AiAssistantButton />

@@ -206,7 +206,7 @@ export function AppSidebar({ user }: { user: AuthUser }) {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent aria-label="Main" role="navigation">
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>

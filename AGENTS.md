@@ -614,13 +614,19 @@ their Lawmatics CRM.
   sub-item icons use
   `text-sidebar-accent-foreground`, which stays themed and legible in every preset. Both
   groups start open; clicking a group header while the sidebar is in its icon rail reopens
-  the sidebar instead of toggling a hidden panel.
-  Collapsing and the hover peek are client interactions, so the shell cannot honour
-  them until it has hydrated. The trigger therefore renders as a same-size skeleton
-  until `useSyncExternalStore` reports hydration (the server snapshot is `false`),
-  and the rail then adopts the pointer's current `:hover` state, so a mouse that was
-  already resting over it before hydration still expands it. The assistant's
-  transcript is loaded on demand for the same reason (see **AI assistant**).
+  the sidebar instead of toggling a hidden panel. The sidebar content is a
+  `navigation` landmark labelled **Main**.
+  Collapsing and the hover peek must both work on the first paint, before React
+  has hydrated. The peek is therefore CSS: `app/globals.css` grows a hovered icon
+  rail and tells the inset to follow (unlayered `!important`, so it beats the
+  `group-data-[collapsible=icon]` utilities). The header's collapse trigger is
+  wrapped in a form pointing at `toggleSidebarPinned` (`lib/sidebar/actions.ts`):
+  before hydration a click posts, flips the `sidebar_state` cookie and re-renders
+  the layout, and after hydration the same button becomes `type="button"` and
+  toggles locally. Readiness comes from `useSyncExternalStore` (the server
+  snapshot is `false`), so the rail also adopts the pointer's current `:hover`
+  state and a mouse already resting on it expands. The assistant's transcript is
+  loaded on demand for the same reason (see **AI assistant**).
   **Connect Your Agent** (`app/(app)/settings/ai/`) holds the MCP token card, and the old
   `/settings` URL redirects there. **Preferences**
   (`app/(app)/settings/preferences/`) has the Appearance section: preset themes plus

@@ -326,38 +326,53 @@ function Sidebar({
 function SidebarTrigger({
   className,
   onClick,
+  action,
   ...props
-}: React.ComponentProps<typeof Button>) {
+}: React.ComponentProps<typeof Button> & {
+  /**
+   * Server action used by the no-JavaScript fallback. Until the shell hydrates,
+   * the trigger submits this form instead of relying on its click handler.
+   */
+  action?: (formData: FormData) => void | Promise<void>;
+}) {
   const { toggleSidebar, ready } = useSidebar();
 
-  // The first paint has no event handlers yet: the button would look ready
-  // while silently ignoring clicks and hover. Hold its footprint with a
-  // placeholder until the shell hydrates, then swap in the real control.
-  if (!ready) {
-    return (
-      <Skeleton
-        aria-hidden
-        className={cn("size-7 shrink-0", className)}
-      />
-    );
-  }
-
-  return (
+  const trigger = (
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon-sm"
       className={cn(className)}
+      // Before hydration a click must submit the form; afterwards the local
+      // toggle handles it and the form is never submitted.
+      type={action && !ready ? "submit" : "button"}
+      // Without a fallback the only honest state before hydration is disabled.
+      disabled={!action && !ready}
+      aria-busy={!action && !ready ? true : undefined}
       onClick={(event) => {
+        // If React has attached this handler the local toggle is authoritative;
+        // never let the same click also submit the no-JavaScript fallback.
+        event.preventDefault();
         onClick?.(event);
         toggleSidebar();
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      <PanelLeftIcon
+        className={cn(!action && !ready && "animate-pulse")}
+      />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
+  );
+
+  if (!action) return trigger;
+
+  return (
+    // `contents` keeps the form out of the header's flex layout.
+    <form action={action} className="contents">
+      {trigger}
+    </form>
   );
 }
 
