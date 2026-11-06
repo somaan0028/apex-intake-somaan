@@ -16,6 +16,7 @@
  * list: which chat is open, the "past chats" view, and starting or deleting a
  * conversation.
  */
+import dynamic from "next/dynamic";
 import { History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import {
   useCallback,
@@ -38,7 +39,27 @@ import type { ChatSummary, StoredMessage } from "@/lib/ai/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AiAssistantContext, useAiAssistant } from "./assistant-context";
-import { ChatThread, type ComposerDraft } from "./chat-thread";
+import type { ComposerDraft } from "./chat-thread";
+
+/**
+ * Load the conversation UI on demand.
+ *
+ * The transcript pulls in the Markdown renderer and the TanStack AI client,
+ * which the shell does not need until the panel is actually opened. Keeping
+ * them out of the initial bundle lets the app shell hydrate — and the sidebar
+ * become interactive — sooner on the first landing.
+ */
+const ChatThread = dynamic(
+  () => import("./chat-thread").then((module) => module.ChatThread),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+      </div>
+    ),
+  },
+);
 
 /** Remembers the conversation to reopen, so a page reload resumes it. */
 const LAST_CHAT_KEY = "apex.ai.lastChatId";

@@ -43,6 +43,11 @@ type SidebarContextProps = {
   peeking: boolean;
   setPeeking: (peeking: boolean) => void;
   toggleSidebar: () => void;
+  /**
+   * False until the shell has hydrated. The collapse control cannot respond
+   * before its handlers exist, so it renders as a placeholder until this flips.
+   */
+  ready: boolean;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -72,6 +77,15 @@ function SidebarProvider({
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
   const [peeking, setPeeking] = React.useState(false);
+  // Hydration is invisible from inside the tree. `useSyncExternalStore` is the
+  // one hook that can tell the two apart without an effect: the server snapshot
+  // is false, and React re-reads the client snapshot once hydration commits. An
+  // effect would flag controls live before React has finished attaching them.
+  const ready = React.useSyncExternalStore(
+    React.useCallback(() => () => {}, []),
+    () => true,
+    () => false,
+  );
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -134,6 +148,7 @@ function SidebarProvider({
       peeking: peekingNow,
       setPeeking,
       toggleSidebar,
+      ready,
     }),
     [
       state,
@@ -145,6 +160,7 @@ function SidebarProvider({
       peekingNow,
       setPeeking,
       toggleSidebar,
+      ready,
     ],
   );
 
@@ -184,8 +200,26 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile, peeking, setPeeking } =
-    useSidebar();
+  const {
+    isMobile,
+    state,
+    openMobile,
+    setOpenMobile,
+    peeking,
+    setPeeking,
+    ready,
+  } = useSidebar();
+
+  // The rail reacts to the pointer. React attaches enter/leave listeners only
+  // when the shell hydrates, so a pointer that was already resting over the
+  // rail would never produce an event. Adopting the current `:hover` state on
+  // mount (and whenever the rail becomes collapsed) keeps the peek honest on
+  // the first landing instead of waiting for the pointer to leave and return.
+  const railRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!ready || collapsible !== "icon" || state !== "collapsed") return;
+    if (railRef.current?.matches(":hover")) setPeeking(true);
+  }, [collapsible, ready, setPeeking, state]);
 
   if (collapsible === "none") {
     return (
@@ -232,6 +266,7 @@ function Sidebar({
 
   return (
     <div
+      ref={railRef}
       className="group peer hidden text-sidebar-foreground md:block"
       data-state={isPeeking ? "expanded" : state}
       data-collapsible={
@@ -242,6 +277,9 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
       onMouseEnter={() => {
+        // Until the shell is ready the control is a placeholder; expanding the
+        // rail here would look like an interaction the user did not ask for.
+        if (!ready) return;
         // Expand exactly like the toggle while the pointer is over the rail,
         // but keep the pinned state (and its cookie) collapsed.
         if (collapsible === "icon" && state === "collapsed") setPeeking(true);
@@ -290,7 +328,19 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, ready } = useSidebar();
+
+  // The first paint has no event handlers yet: the button would look ready
+  // while silently ignoring clicks and hover. Hold its footprint with a
+  // placeholder until the shell hydrates, then swap in the real control.
+  if (!ready) {
+    return (
+      <Skeleton
+        aria-hidden
+        className={cn("size-7 shrink-0", className)}
+      />
+    );
+  }
 
   return (
     <Button
