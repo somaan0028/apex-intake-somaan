@@ -564,8 +564,10 @@ their Lawmatics CRM.
   and **Download CSV**; the trigger turns red while the page still matches the
   saved view it came from. **Clear Filters**
   resets the filter values and search but never deletes a saved view. Stage
-  visibility is browser-local too, so the Kanban board shows a skeleton until the
-  mount effect has read it; without that, every stage would flash on refresh.
+  visibility and column visibility are browser-local too, so both views show a
+  skeleton until the mount effect has read them: the Kanban board would otherwise
+  flash every stage, and the table would flash columns the person had turned off.
+  Neither skeleton renders a real table header, so no unselected column is ever painted.
 - On desktop the leads filters live in a **Filters** popover on the toolbar
   (`DataTable`'s `filtersMenu` + `filtersMenuCount`), so there is no separate filter
   row: it holds the Date Added range, every filter control and the Clear Filters

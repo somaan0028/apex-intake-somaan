@@ -1291,7 +1291,12 @@ export function LeadsTable({
               // selection applies.
               <KanbanSkeleton />
             )
-          ) : undefined
+          ) : viewsReady ? undefined : (
+            // Same reason as the board: which columns are shown is a
+            // browser-local preference, so the default set would flash before
+            // the restore effect applies the person's selection.
+            <TableSkeleton />
+          )
         }
         onRowClick={
           view === "table"
@@ -1891,6 +1896,44 @@ function KanbanSkeleton() {
           <Skeleton className="h-24 w-full" />
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The table's first-paint stand-in.
+ *
+ * Column visibility is browser-local too, so the server cannot know which
+ * columns to draw. Painting the table with the defaults would flash every
+ * column before the restore effect applies the saved selection; this holds the
+ * table's footprint with a neutral header and rows instead.
+ */
+function TableSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-xl border">
+      <p role="status" className="sr-only">
+        Loading your leads…
+      </p>
+      <div aria-hidden>
+        <div className="flex items-center gap-4 border-b bg-muted/30 px-3 py-2.5">
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className="h-4 flex-1" />
+          ))}
+        </div>
+        {Array.from({ length: 8 }, (_, row) => (
+          <div
+            key={row}
+            className="flex items-center gap-4 border-b px-3 py-3 last:border-b-0"
+          >
+            {Array.from({ length: 6 }, (_, cell) => (
+              <Skeleton
+                key={cell}
+                className={cn("h-4 flex-1", cell === 5 && "hidden lg:block")}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
