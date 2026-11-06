@@ -331,7 +331,9 @@ export function AppSidebar({ user }: { user: AuthUser }) {
                   avatarPath={user.avatarPath}
                   // The sidebar profile is just a circle: keep the default
                   // rounded-full shape and drop the avatar's inset border ring.
-                  className="after:hidden"
+                  // In the icon rail the row is only 32px wide, so a 32px circle
+                  // was clipped by a hair on the right; shrink it a step there.
+                  className="after:hidden group-data-[collapsible=icon]:size-7"
                 />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
