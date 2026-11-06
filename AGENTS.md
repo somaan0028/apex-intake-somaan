@@ -501,7 +501,10 @@ their Lawmatics CRM.
   filters, search or sort change. Cards drag between stage columns through the
   same `saveLeadFields`
   action, carry an eye button that opens the detail dialog, and reuse the inline
-  assignee control. Touch has no native HTML drag, so every card also carries a
+  assignee control. The email and phone rows are plain text followed by the same
+  `CopyButton` the table uses (no leading icon) and the date row is plain text, so
+  a person can copy contact details in one click straight from the board. Touch has
+  no native HTML drag, so every card also carries a
   grip handle that runs a pointer drag for mouse and touch: it hit-tests
   `[data-stage]`, auto-scrolls the board near its edges, and names the pending
   stage in a floating pill. Keep that path intact when changing the card layout.

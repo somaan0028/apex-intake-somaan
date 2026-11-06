@@ -29,7 +29,6 @@ import {
   type SyntheticEvent,
 } from "react";
 import {
-  CalendarDays,
   Columns3,
   Download,
   EllipsisVertical,
@@ -38,8 +37,6 @@ import {
   GripVertical,
   Heart,
   Loader2,
-  Mail,
-  Phone,
   SlidersHorizontal,
   Table2,
   Trash2,
@@ -2340,28 +2337,25 @@ function LeadsKanban({
 
                         <div className="mt-2 grid min-w-0 gap-1 text-xs text-muted-foreground">
                           <p className="flex min-w-0 items-center gap-1.5">
-                            <Mail className="size-3.5 shrink-0" />
                             <span
                               className="min-w-0 flex-1 truncate"
                               title={lead.injuredEmail ?? undefined}
                             >
                               {lead.injuredEmail ?? "—"}
                             </span>
+                            <CopyButton value={lead.injuredEmail} label="Email" />
                           </p>
                           <p className="flex min-w-0 items-center gap-1.5">
-                            <Phone className="size-3.5 shrink-0" />
                             <span
                               className="min-w-0 flex-1 truncate"
                               title={lead.injuredPhone ?? undefined}
                             >
                               {lead.injuredPhone ?? "—"}
                             </span>
+                            <CopyButton value={lead.injuredPhone} label="Phone" />
                           </p>
-                          <p className="flex min-w-0 items-center gap-1.5">
-                            <CalendarDays className="size-3.5 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate">
-                              Added {formatDate(lead.createdAt)}
-                            </span>
+                          <p className="truncate">
+                            Added {formatDate(lead.createdAt)}
                           </p>
                         </div>
 
