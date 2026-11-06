@@ -17,14 +17,13 @@ import { openRouterText } from "@tanstack/ai-openrouter";
 type OpenRouterModel = Parameters<typeof openRouterText>[0];
 
 /**
- * A free model with working tool calling, kept deliberately cheap: this is a
- * test app, and a stronger model can be dropped in later via `AI_MODEL`.
- *
- * Chosen after probing the free tier: several free models are unavailable,
- * harness-only, or rate-limited, and a paid flash-class model was not needed.
- * `north-mini-code` was the one that consistently called tools and answered.
+ * The cheap tier's most dependable tool-caller. Larry needs several model turns
+ * per reply and has to hold a plain-language voice, so instruction-following and
+ * reliable tool calls matter more than the per-token price at this volume — a
+ * three-turn conversation costs a fraction of a cent either way. Swap it with
+ * `AI_MODEL` when trying something else.
  */
-const DEFAULT_MODEL = "cohere/north-mini-code:free";
+const DEFAULT_MODEL = "anthropic/claude-haiku-5.5";
 
 /** The OpenRouter model id used for every assistant call. */
 export const AI_MODEL: OpenRouterModel = (process.env.AI_MODEL?.trim() ||
