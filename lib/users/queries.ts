@@ -11,11 +11,10 @@ import { getDb } from "@/lib/db";
 import {
   allOf,
   planListPage,
-  readFilter,
   searchCondition,
   type ListPageResult,
 } from "@/lib/db/list-query";
-import { USER_ROLES, leads, users, type UserRole } from "@/lib/db/schema";
+import { leads, users, type UserRole } from "@/lib/db/schema";
 import { can, type Actor } from "@/lib/rbac";
 import type { TableQuery } from "@/lib/table-query";
 
@@ -46,20 +45,15 @@ const SORT_COLUMNS: Record<UserSortKey, AnySQLiteColumn> = {
 /** The grid's natural order. */
 export const USERS_DEFAULT_SORT = { id: "name", desc: false } as const;
 
-function isUserRole(value: string): value is UserRole {
-  return (USER_ROLES as readonly string[]).includes(value);
-}
-
 /** One page of users for `query`, plus the total number of matching rows. */
 export function listUsers(query: TableQuery): ListPageResult<UserRow> {
   const db = getDb();
 
+  // Search is the only narrowing control the Users page offers; any stale
+  // `filter.*` in the URL is deliberately ignored rather than applied blindly.
   const conditions: Array<SQL | undefined> = [
     searchCondition(query.search, [users.name, users.email]),
   ];
-
-  const role = readFilter(query, "role", isUserRole);
-  if (role) conditions.push(eq(users.role, role));
 
   const plan = planListPage({
     db,

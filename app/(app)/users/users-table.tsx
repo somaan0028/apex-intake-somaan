@@ -3,19 +3,17 @@
 /**
  * The Users grid.
  *
- * Columns, the filter descriptors, and the row-id accessor live at module scope:
- * TanStack Table treats a new identity for any of them as a configuration change.
- * The URL sync comes from the shared `useTableQuerySync` hook.
+ * Columns and the row-id accessor live at module scope: TanStack Table treats a
+ * new identity for either as a configuration change. There is no filter or
+ * column selector here — a search box and the Add user button are all the page
+ * needs — so the toolbar stays on one line. The URL sync comes from the shared
+ * `useTableQuerySync` hook.
  */
 import { createColumnHelper } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import {
-  DataTable,
-  useTableQuerySync,
-  type DataTableFilter,
-} from "@/components/data-table";
+import { DataTable, useTableQuerySync } from "@/components/data-table";
 import { dataTableFeatures } from "@/components/data-table/features";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { USER_ROLE_LABELS } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import { can } from "@/lib/rbac";
-import { USER_ROLES, type UserRole } from "@/lib/db/schema";
 import type { AuthUser } from "@/lib/auth/session";
 import type { TableQuery } from "@/lib/table-query";
 import type { UserRow } from "@/lib/users/queries";
@@ -84,19 +81,6 @@ const columns = columnHelper.columns([
   }),
 ]);
 
-const filters: DataTableFilter[] = [
-  {
-    columnId: "role",
-    label: "Role",
-    allLabel: "Any",
-    options: USER_ROLES.map((role: UserRole) => ({
-      label: USER_ROLE_LABELS[role],
-      value: role,
-    })),
-  },
-];
-
-/** Stable row id so sorting/filtering preserves row identity. */
 const getRowId = (user: UserRow) => String(user.id);
 
 export function UsersTable({
@@ -129,7 +113,8 @@ export function UsersTable({
         getRowId={getRowId}
         ariaLabel="Users"
         searchPlaceholder="Search by name or email"
-        filters={filters}
+        inlineToolbar
+        showColumnMenu={false}
         emptyMessage="No users yet."
         emptyFilteredMessage="No users match your search."
         onRowClick={(user) => setDialog({ mode: "edit", user })}

@@ -480,7 +480,10 @@ their Lawmatics CRM.
   visible page in one grouped query. The underlined number links to the leads page filtered
   by `filter.assignedTo=<id>` with `filter.addedWithin=any`, so it matches the all-time
   count. `any` is a real leads date preset ("All Time"), not a hack; a bare `/leads`
-  has no date window (the Date Added filter starts cleared).
+  has no date window (the Date Added filter starts cleared). The page itself has no
+  filters or column selector: the toolbar is a single row with the name/email search on
+  the left and **Add user** on the right (`inlineToolbar`, `showColumnMenu={false}`),
+  and `listUsers` ignores any `filter.*` left in the URL.
 - The leads page **view is a persisted preference**, not a filter. An explicit
   `view=table` or `view=kanban` in the URL wins; otherwise the `apex_leads_view`
   cookie decides, falling back to Kanban. Navigating from the dashboard or a stat
