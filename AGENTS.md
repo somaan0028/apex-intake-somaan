@@ -561,7 +561,10 @@ their Lawmatics CRM.
   back/forward) shows immediately instead of after the next click.
   Every filter trigger (single select, multi-select and the Date Added range) shares
   the same transparent, `h-7` look; a control with a value gets a subtle primary
-  tint (`border-primary/50 bg-primary/10`) so active filters are obvious.
+  tint (`border-primary/50 bg-primary/10`) so active filters are obvious. The
+  Activity page's Date, Performed by and Affected lead controls follow the same
+  rule: neutral means no fill at all, and only a set value (including "Last 7 days"
+  or a picked person) carries the tint.
 - The leads grid and board have **no date window by default**: the Date Added filter
   starts cleared ("All Time"). It offers `24h`, `3d`, `7d`, `30d`, and a Custom option
   that uses `filter.addedFrom` (required, default seven days ago) and optional

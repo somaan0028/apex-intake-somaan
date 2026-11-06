@@ -26,6 +26,7 @@ import type {
 } from "@/lib/activities/queries";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { TableQuery } from "@/lib/table-query";
+import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,6 +126,14 @@ const columns = columnHelper.columns([
 ]);
 
 const getRowId = (activity: ActivityRow) => String(activity.id);
+
+/**
+ * The tint a filter control carries while it is narrowing the list, matching
+ * the Date range control: neutral controls stay transparent, and only an
+ * active value gets the primary wash.
+ */
+const ACTIVE_FILTER_CLASS =
+  "border-primary/50 bg-primary/10 hover:bg-primary/15 dark:bg-primary/20 dark:hover:bg-primary/25";
 
 /** The date-range preset represented by the current filters. */
 function rangePreset(value: string | undefined): string {
@@ -408,7 +417,11 @@ function PerformedByFilter({
           onChange(!value || value === ANY_PERFORMER ? null : Number(value))
         }
       >
-        <SelectTrigger size="sm" className="w-fit" aria-label="Performed by">
+        <SelectTrigger
+          size="sm"
+          className={cn("w-fit", selectedId && ACTIVE_FILTER_CLASS)}
+          aria-label="Performed by"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -484,7 +497,13 @@ function LeadSearchFilter({
               type="button"
               variant="outline"
               size="sm"
-              className="max-w-56 justify-start gap-2 font-normal"
+              className={cn(
+                // Neutral: no fill, exactly like the Date control. The outline
+                // variant's `bg-background` made this one look permanently
+                // active beside it.
+                "max-w-56 justify-start gap-2 bg-transparent font-normal",
+                selectedId && ACTIVE_FILTER_CLASS,
+              )}
             />
           }
         >
