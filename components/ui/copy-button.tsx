@@ -21,7 +21,7 @@ export function CopyButton({
   value: string | null | undefined;
   /** What is being copied, e.g. "Email". */
   label: string;
-  size?: "icon-xs" | "icon-sm";
+  size?: "icon-2xs" | "icon-xs" | "icon-sm";
   className?: string;
 }) {
   if (!value) return null;

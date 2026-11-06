@@ -2343,18 +2343,26 @@ function LeadsKanban({
                             >
                               {lead.injuredEmail ?? "—"}
                             </span>
-                            <CopyButton value={lead.injuredEmail} label="Email" />
+                            <CopyButton
+                              value={lead.injuredEmail}
+                              label="Email"
+                              size="icon-2xs"
+                            />
                           </p>
-                          <p className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                          <p className="flex min-w-0 items-center gap-1.5">
                             <span
                               className="min-w-0 flex-1 truncate"
                               title={lead.injuredPhone ?? undefined}
                             >
                               {lead.injuredPhone ?? "—"}
                             </span>
-                            <CopyButton value={lead.injuredPhone} label="Phone" />
+                            <CopyButton
+                              value={lead.injuredPhone}
+                              label="Phone"
+                              size="icon-2xs"
+                            />
                           </p>
-                          <p className="mt-2.5 truncate">
+                          <p className="mt-3 truncate">
                             Added {formatDate(lead.createdAt)}
                           </p>
                         </div>
