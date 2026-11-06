@@ -37,7 +37,7 @@ export function AssistantInvite({
         className,
       )}
     >
-      <CardContent className="flex flex-col items-center gap-5 px-6 py-8 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
+      <CardContent className="flex flex-col items-center justify-center gap-5 px-6 py-8 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
         <button
           type="button"
           onClick={() => open()}
